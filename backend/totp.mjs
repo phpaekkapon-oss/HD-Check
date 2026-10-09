@@ -69,8 +69,8 @@ export function verifyTOTP(token, secret) {
   const cleanToken = String(token).trim()
   if (cleanToken.length !== 6 || !/^\d{6}$/.test(cleanToken)) return false
 
-  // Check current window, -30s window, and +30s window
-  const offsets = [0, -30, 30]
+  // Check current window, +/- 30s window, and +/- 60s window (clock drift tolerance)
+  const offsets = [0, -30, 30, -60, 60]
   for (const offset of offsets) {
     if (generateTOTP(secret, offset) === cleanToken) {
       return true

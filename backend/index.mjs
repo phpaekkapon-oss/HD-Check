@@ -452,7 +452,7 @@ app.post('/api/auth/verify-2fa', async (req, res) => {
     delete result.token
     res.json(result)
   } catch (err) {
-    res.status(401).json({ success: false, error: 'รหัส 2FA ไม่ถูกต้องหรือเซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' })
+    res.status(200).json({ success: false, error: err.message || 'รหัส 2FA ไม่ถูกต้องหรือเซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' })
   }
 })
 

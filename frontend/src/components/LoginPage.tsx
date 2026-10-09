@@ -307,7 +307,21 @@ export const LoginPage: FC = () => {
               {error && (
                 <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-shake">
                   <AlertCircle className="size-4 shrink-0 text-rose-400" />
-                  <span className="flex-1">{error}</span>
+                  <span className="flex-1">
+                    {error}
+                    {error.includes('หมดอายุ') && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setStep('login')
+                          setError(null)
+                        }}
+                        className="underline font-bold text-white hover:text-amber-300 ml-1 cursor-pointer"
+                      >
+                        (คลิกเพื่อเข้าสู่ระบบใหม่)
+                      </button>
+                    )}
+                  </span>
                 </div>
               )}
 
@@ -365,9 +379,9 @@ export const LoginPage: FC = () => {
                     setStep('login')
                     setError(null)
                   }}
-                  className="text-slate-400 hover:text-rose-400 transition cursor-pointer"
+                  className="text-slate-400 hover:text-amber-400 transition cursor-pointer"
                 >
-                  ยกเลิก
+                  ← กลับไปหน้า Login
                 </button>
               </div>
             </form>
