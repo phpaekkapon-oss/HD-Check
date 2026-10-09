@@ -356,11 +356,12 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }
 
-  const handleConfirmSetup = async () => {
-    if (!user || !setupData || !verifyCode.trim()) return
+  const handleConfirmSetup = async (codeOverride?: string) => {
+    const targetCode = (codeOverride ?? verifyCode).trim()
+    if (!user || !setupData || !targetCode) return
     setMyError(null)
     try {
-      const res = await confirm2FASetup(user.loginname, setupData.secret, verifyCode.trim(), user)
+      const res = await confirm2FASetup(user.loginname, setupData.secret, targetCode, user)
       if (!res.success) {
         setMyError(res.error || 'รหัสไม่ถูกต้อง')
         return
@@ -918,15 +919,29 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         <div className="flex items-center gap-2">
                           <input
                             type="text"
+                            inputMode="numeric"
+                            autoComplete="one-time-code"
                             maxLength={6}
                             value={verifyCode}
-                            onChange={(e) => setVerifyCode(e.target.value.replace(/\D/g, ''))}
+                            onChange={(e) => {
+                              const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
+                              setVerifyCode(digits)
+                              if (digits.length === 6) {
+                                handleConfirmSetup(digits)
+                              }
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleConfirmSetup()
+                              }
+                            }}
                             placeholder="000000"
                             className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-950 border border-slate-800 text-center font-mono text-xl font-bold tracking-widest text-white focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
                           />
                           <button
                             type="button"
-                            onClick={handleConfirmSetup}
+                            onClick={() => handleConfirmSetup()}
                             disabled={verifyCode.length !== 6}
                             className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 transition cursor-pointer shadow-sm active:scale-95"
                           >

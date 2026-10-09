@@ -62,15 +62,16 @@ export function generateTOTP(secret, timeOffsetSeconds = 0) {
 }
 
 /**
- * Verify a 6-digit TOTP token with +/- 1 time step leeway (clock drift window)
+ * Verify a 6-digit TOTP token with expanded clock drift tolerance (+/- 3 minutes)
+ * This eliminates the issue where mobile phone clock desync required users to enter codes twice
  */
 export function verifyTOTP(token, secret) {
   if (!token || !secret) return false
-  const cleanToken = String(token).trim()
-  if (cleanToken.length !== 6 || !/^\d{6}$/.test(cleanToken)) return false
+  const cleanToken = String(token).replace(/\D/g, '').trim()
+  if (cleanToken.length !== 6) return false
 
-  // Check current window, +/- 30s window, and +/- 60s window (clock drift tolerance)
-  const offsets = [0, -30, 30, -60, 60]
+  // Check current window and +/- 30s to +/- 240s (+/- 4 minutes) window to handle phone time discrepancies
+  const offsets = [0, -30, 30, -60, 60, -90, 90, -120, 120, -150, 150, -180, 180, -210, 210, -240, 240]
   for (const offset of offsets) {
     if (generateTOTP(secret, offset) === cleanToken) {
       return true

@@ -79,10 +79,13 @@ export const LoginPage: FC = () => {
   }
 
   // Step 2: Verify 6-digit TOTP Code
-  const handleVerify2FASubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!otpCode.trim()) {
-      setError('กรุณากรอกรหัส 6 หลักจาก Authenticator')
+  const handleVerify2FASubmit = async (e?: FormEvent, codeOverride?: string) => {
+    if (e) e.preventDefault()
+    if (isSubmitting) return
+
+    const targetCode = (codeOverride ?? otpCode).trim()
+    if (!targetCode) {
+      setError(isBackupMode ? 'กรุณากรอกรหัสกู้คืนฉุกเฉิน' : 'กรุณากรอกรหัส 6 หลักจาก Authenticator')
       return
     }
 
@@ -90,9 +93,9 @@ export const LoginPage: FC = () => {
     setIsSubmitting(true)
 
     try {
-      const res = await verify2FA(tempToken, otpCode.trim())
+      const res = await verify2FA(tempToken, targetCode)
       if (!res.success) {
-        setError(res.error || 'รหัส 2FA ไม่ถูกต้อง')
+        setError(res.error || 'รหัส 2FA หรือรหัสกู้คืนไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง')
       }
     } catch (err) {
       setError((err as Error).message)
@@ -102,9 +105,12 @@ export const LoginPage: FC = () => {
   }
 
   // Step 3: First-time 2FA Setup Confirmation
-  const handleSetupConfirmSubmit = async (e: FormEvent) => {
-    e.preventDefault()
-    if (!setupVerifyCode.trim() || !setupData) {
+  const handleSetupConfirmSubmit = async (e?: FormEvent, codeOverride?: string) => {
+    if (e) e.preventDefault()
+    if (isSubmitting) return
+
+    const targetCode = (codeOverride ?? setupVerifyCode).trim()
+    if (!targetCode || !setupData) {
       setError('กรุณากรอกรหัส 6 หลักจากแอป Authenticator')
       return
     }
@@ -117,7 +123,7 @@ export const LoginPage: FC = () => {
       const res = await confirm2FASetup(
         targetUser,
         setupData.secret,
-        setupVerifyCode.trim(),
+        targetCode,
         tempUser ? { name: tempUser.name, groupname: tempUser.groupname } : undefined,
         tempToken
       )
@@ -328,13 +334,32 @@ export const LoginPage: FC = () => {
               <div>
                 <input
                   type="text"
+                  inputMode={isBackupMode ? 'text' : 'numeric'}
+                  autoComplete="one-time-code"
                   maxLength={isBackupMode ? 9 : 6}
-                  required
                   autoFocus
+                  disabled={isSubmitting}
                   value={otpCode}
-                  onChange={(e) => setOtpCode(e.target.value.toUpperCase())}
+                  onChange={(e) => {
+                    const rawVal = e.target.value
+                    if (isBackupMode) {
+                      setOtpCode(rawVal.toUpperCase())
+                    } else {
+                      const digits = rawVal.replace(/\D/g, '').slice(0, 6)
+                      setOtpCode(digits)
+                      if (digits.length === 6 && !isSubmitting) {
+                        handleVerify2FASubmit(undefined, digits)
+                      }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleVerify2FASubmit()
+                    }
+                  }}
                   placeholder={isBackupMode ? 'เช่น A8F2-9X1B' : '000000'}
-                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-3 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition"
+                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-3 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition disabled:opacity-60"
                 />
               </div>
 
@@ -443,13 +468,27 @@ export const LoginPage: FC = () => {
                 </label>
                 <input
                   type="text"
+                  inputMode="numeric"
+                  autoComplete="one-time-code"
                   maxLength={6}
-                  required
                   autoFocus
+                  disabled={isSubmitting}
                   value={setupVerifyCode}
-                  onChange={(e) => setSetupVerifyCode(e.target.value)}
+                  onChange={(e) => {
+                    const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
+                    setSetupVerifyCode(digits)
+                    if (digits.length === 6 && !isSubmitting) {
+                      handleSetupConfirmSubmit(undefined, digits)
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      handleSetupConfirmSubmit()
+                    }
+                  }}
                   placeholder="000000"
-                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition"
+                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition disabled:opacity-60"
                 />
               </div>
 
