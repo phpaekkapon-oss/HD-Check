@@ -198,10 +198,10 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="lg:hidden p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
+            className="lg:hidden size-9 grid place-items-center rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer shrink-0 border border-slate-200/80 dark:border-white/10"
             aria-label="เปิดเมนู"
           >
-            <PanelLeft className="size-5" />
+            <PanelLeft className="size-4.5" />
           </button>
 
           {/* Clean Enterprise Title & Subtitle Hierarchy */}
@@ -300,15 +300,15 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           {/* Divider */}
           <div className="hidden sm:block h-5 w-px bg-slate-200 dark:bg-white/10" />
 
-          {/* PWA Install Button (Clean Outline Pill) */}
+          {/* PWA Install Button (Clean Responsive Size-9 / h-9 Pill) */}
           {!isInstalled && (
             <button
               type="button"
               onClick={handleInstallClick}
-              className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer flex items-center gap-1.5"
+              className="size-9 md:w-auto md:px-3 grid place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer shrink-0"
               title="ติดตั้ง SMART-HOSCHECK เป็นแอปพลิเคชันบนเครื่อง"
             >
-              <Smartphone className="size-3.5 text-teal-600 dark:text-teal-400" />
+              <Smartphone className="size-4 text-teal-600 dark:text-teal-400" />
               <span className="hidden md:inline">ติดตั้งแอป</span>
             </button>
           )}
@@ -325,25 +325,26 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             </span>
           )}
 
-          {/* Primary Action: HOSxP Sync Button (Standardized h-9 Height) */}
+          {/* Primary Action: HOSxP Sync Button (Strict Uniform h-9 Height & Responsive on Mobile) */}
           <button
             id="btn-sync-hosxp"
             type="button"
             onClick={onSync}
             disabled={isSyncing || Boolean(status?.isSyncing)}
-            className="btn-pill-action h-9 inline-flex items-center gap-1.5 px-3.5 sm:px-4 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs"
+            className="btn-pill-action size-9 sm:w-auto sm:px-3.5 grid place-items-center sm:flex sm:items-center sm:gap-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs shrink-0"
+            title={isSyncing || status?.isSyncing ? 'กำลังดึงข้อมูล HOSxP…' : 'ดึงข้อมูล HOSxP'}
           >
             {isSyncing || status?.isSyncing ? (
-              <Loader2 className="size-3.5 animate-spin shrink-0" />
+              <Loader2 className="size-4 animate-spin shrink-0" />
             ) : (
-              <CloudDownload className="size-3.5 shrink-0" />
+              <CloudDownload className="size-4 shrink-0" />
             )}
-            <span>
+            <span className="hidden sm:inline">
               {isSyncing || status?.isSyncing ? 'กำลังดึง…' : 'ดึง HOSxP'}
             </span>
           </button>
 
-          {/* Quick Lock Button (Clean Professional Standard) */}
+          {/* Quick Lock Button (Strict Uniform h-9 Height & Responsive on Mobile) */}
           <button
             type="button"
             onClick={() => {
@@ -354,25 +355,25 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                 setSecurityModalOpen(true)
               }
             }}
-            className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-amber-500/10 active:scale-95 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition"
+            className="size-9 md:w-auto md:px-3 grid place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-amber-500/10 active:scale-95 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-white/10 text-xs font-semibold cursor-pointer transition shrink-0"
             title={hasPin ? 'ล็อกหน้าจอทันที (Ctrl + L)' : 'ตั้งรหัส PIN ล็อกหน้าจอ'}
           >
-            <Lock className="size-3.5 text-slate-500 dark:text-slate-400" />
+            <Lock className="size-4 text-slate-500 dark:text-slate-400" />
             <span className="hidden md:inline">{hasPin ? 'ล็อกหน้าจอ' : 'ตั้ง PIN'}</span>
           </button>
 
           {/* Divider */}
-          <div className="h-5 w-px bg-slate-200 dark:bg-white/10" />
+          <div className="h-5 w-px bg-slate-200 dark:bg-white/10 shrink-0" />
 
-          {/* User Profile Pill (Standard 40px Avatar with Balanced Clean Layout) */}
-          <div className="relative">
+          {/* User Profile Pill (Strict Uniform h-9 Height with Proportional Avatar) */}
+          <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="group flex items-center gap-2.5 p-1 sm:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="group flex items-center gap-2 h-9 p-0.5 xl:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-11 sm:size-12 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-sm overflow-hidden ring-1 ring-black/5 dark:ring-white/10 transition-all duration-200 group-hover:ring-2"
+                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-xs overflow-hidden ring-1 ring-black/5 dark:ring-white/10 transition-all duration-200 group-hover:ring-2"
                 style={{
                   borderColor: accent.hex,
                   transform: 'translateZ(0)',
@@ -391,18 +392,18 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     }}
                   />
                 ) : (
-                  <User className="size-5.5 text-slate-400 dark:text-slate-300" />
+                  <User className="size-4 text-slate-400 dark:text-slate-300" />
                 )}
               </div>
               <div className="hidden xl:block text-left leading-tight">
                 <div
-                  className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[180px]"
+                  className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[170px]"
                   title={user?.name || ''}
                 >
                   {user?.name || 'นายเอกพล อันคำวงค์'}
                 </div>
                 <div
-                  className="text-[11px] text-slate-500 dark:text-slate-400 truncate max-w-[180px] mt-0.5"
+                  className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate max-w-[170px] mt-0.5"
                   title={user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                 >
                   {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
