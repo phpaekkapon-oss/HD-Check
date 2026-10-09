@@ -365,12 +365,12 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="group flex items-center gap-2.5 p-1 sm:px-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-9.5 sm:size-10 rounded-full bg-slate-100 dark:bg-white/15 border-2 border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-sm overflow-hidden"
+                className="grid place-items-center size-12 sm:size-12.5 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-md overflow-hidden ring-2 ring-black/5 dark:ring-white/15 transition-transform duration-200 group-hover:scale-105"
                 style={{
-                  borderColor: `${accent.hex}80`,
+                  borderColor: accent.hex,
                 }}
               >
                 {user?.avatar_url ? (
@@ -381,24 +381,24 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     style={{ imageRendering: '-webkit-optimize-contrast' }}
                   />
                 ) : (
-                  <User className="size-5" />
+                  <User className="size-6 text-slate-400 dark:text-slate-300" />
                 )}
               </div>
-              <div className="hidden xl:block text-left leading-tight">
+              <div className="hidden xl:block text-left leading-snug">
                 <div
-                  className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[180px]"
+                  className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[190px]"
                   title={user?.name || ''}
                 >
                   {user?.name || 'นายเอกพล อันคำวงค์'}
                 </div>
                 <div
-                  className="text-[10px] text-teal-700 dark:text-teal-200/80 truncate max-w-[180px]"
+                  className="text-[11px] text-teal-700 dark:text-teal-200/85 truncate max-w-[190px] mt-0.5"
                   title={user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                 >
                   {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                 </div>
               </div>
-              <ChevronDown className="size-3.5 text-slate-400 hidden xl:block" />
+              <ChevronDown className="size-3.5 text-slate-400 group-hover:text-slate-200 transition-colors hidden xl:block" />
             </button>
 
             {/* User Dropdown Menu */}
@@ -417,7 +417,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                           setUserDropdownOpen(false)
                           setAvatarModalOpen(true)
                         }}
-                        className="relative group size-12 rounded-full overflow-hidden border-2 border-teal-500/40 bg-slate-100 dark:bg-slate-800 grid place-items-center shadow-md shrink-0 cursor-pointer focus:outline-none"
+                        className="relative group size-14 rounded-full overflow-hidden border-2 border-teal-500/50 bg-slate-100 dark:bg-slate-800 grid place-items-center shadow-lg shrink-0 cursor-pointer focus:outline-none"
                         title="คลิกเพื่อเปลี่ยนหรือปรับแต่งรูปโปรไฟล์"
                       >
                         {user?.avatar_url ? (
@@ -427,10 +427,10 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         ) : (
-                          <User className="size-6 text-slate-400 dark:text-slate-500" />
+                          <User className="size-7 text-slate-400 dark:text-slate-500" />
                         )}
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
-                          <Camera className="size-4 drop-shadow" />
+                        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
+                          <Camera className="size-4.5 drop-shadow" />
                         </div>
                       </button>
                       <div className="min-w-0 flex-1">
