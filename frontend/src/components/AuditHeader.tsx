@@ -322,12 +322,12 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="flex items-center gap-2.5 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-xs overflow-hidden"
+                className="grid place-items-center size-9.5 sm:size-10 rounded-full bg-slate-100 dark:bg-white/15 border-2 border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-sm overflow-hidden"
                 style={{
-                  borderColor: `${accent.hex}55`,
+                  borderColor: `${accent.hex}80`,
                 }}
               >
                 {user?.avatar_url ? (
@@ -335,9 +335,10 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     src={user.avatar_url}
                     alt={user.name || 'Profile'}
                     className="w-full h-full object-cover"
+                    style={{ imageRendering: '-webkit-optimize-contrast' }}
                   />
                 ) : (
-                  <User className="size-4 sm:size-4.5" />
+                  <User className="size-5" />
                 )}
               </div>
               <div className="hidden xl:block text-left leading-tight">
