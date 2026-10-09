@@ -80,8 +80,8 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
   ]
 
   return (
-    <section className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-2.5 sm:gap-3.5">
-      {cards.map((card) => {
+    <section className="grid grid-cols-2 md:grid-cols-6 xl:grid-cols-5 gap-2.5 sm:gap-3.5">
+      {cards.map((card, idx) => {
         const selected = activeResult === card.id
         const isAllCard = card.id === 'ALL'
         const Icon = card.icon
@@ -95,7 +95,10 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
             className={cn(
               'text-left rounded-2xl p-3.5 sm:p-4 border transition-all cursor-pointer hover:-translate-y-0.5 hover:shadow-lg active:scale-[0.99] relative overflow-hidden',
               'bg-themed-card border-themed text-slate-900 dark:text-white shadow-xs dark:shadow-sm',
-              isAllCard && 'col-span-2 sm:col-span-1'
+              // Balanced rows: mobile 1+2+2, tablet/laptop 3+2, wide 5 in one row
+              isAllCard && 'col-span-2',
+              idx < 3 ? 'md:col-span-2' : 'md:col-span-3',
+              'xl:col-span-1'
             )}
             style={
               selected

@@ -18,15 +18,18 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
 
   return (
     <div
-      className="rounded-2xl bg-themed-card text-slate-900 dark:text-white p-4 sm:p-5 shadow-xs dark:shadow-sm border border-slate-200 dark:border-[#292440] flex flex-col md:flex-row md:items-center justify-between gap-4 transition-colors"
+      className="rounded-2xl bg-themed-card text-slate-900 dark:text-white p-4 sm:p-5 shadow-xs dark:shadow-sm border border-slate-200 dark:border-[#292440] flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors"
     >
       {/* Welcome Title & Hospital Details */}
       <div className="space-y-1.5 min-w-0">
         <div className="flex items-center gap-2">
-          <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-            <span>ยินดีต้อนรับ, {user?.name || 'นายเอกพล อันคำวงค์'}</span>
+          <h2 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <span>
+              ยินดีต้อนรับ,{' '}
+              <span className="whitespace-nowrap">{user?.name || 'นายเอกพล อันคำวงค์'}</span>
+            </span>
             <span
-              className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-mono"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-mono"
             >
               <Sparkles className="size-3 text-emerald-600 dark:text-emerald-300" />
               เกณฑ์อัตโนมัติ ICD-10 แพทย์แผนไทย
@@ -51,12 +54,12 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
 
       {/* Right Controls: Quick Status Badges */}
       <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-        <div className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300">
+        <div className="hidden sm:inline-flex h-9 items-center gap-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300">
           <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
           <span>Auto-Sync Real-Time</span>
         </div>
 
-        <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 text-xs font-mono font-medium text-slate-700 dark:text-white">
+        <div className="h-9 inline-flex items-center px-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 text-xs font-mono font-medium text-slate-700 dark:text-white">
           พ.ศ. 2569
         </div>
 
@@ -64,19 +67,10 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
           type="button"
           onClick={onSync}
           disabled={isSyncing}
-          className="p-2 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white active:scale-95 transition cursor-pointer disabled:opacity-50"
-          title="ซิงค์ข้อมูลใหม่ทันที"
+          className="btn-pill-action h-9 inline-flex items-center gap-2 px-4 text-xs font-bold text-white active:scale-95 transition cursor-pointer disabled:opacity-50"
         >
           <RefreshCw className={`size-4 ${isSyncing ? 'animate-spin' : ''}`} />
-        </button>
-
-        <button
-          type="button"
-          onClick={onSync}
-          disabled={isSyncing}
-          className="btn-pill-action inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-white active:scale-95 transition cursor-pointer disabled:opacity-50"
-        >
-          <span>ดึงข้อมูล HOSxP ทันที</span>
+          <span>{isSyncing ? 'กำลังดึงข้อมูล…' : 'ดึงข้อมูล HOSxP ทันที'}</span>
         </button>
 
         {status?.lastSync?.at && (
