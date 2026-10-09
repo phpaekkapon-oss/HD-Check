@@ -19,13 +19,13 @@ import {
   Camera,
   Trash2,
   User as UserIcon,
-  Sparkles,
   Monitor,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
 import { isAdminUser, type TotpSetupData, type User2FAAdminItem, type PinPolicy } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
+import { ProfileAvatarModal } from './ProfileAvatarModal'
 
 interface Security2FASettingsModalProps {
   readonly isOpen: boolean
@@ -46,7 +46,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   onClose,
   initialTab = 'my_profile',
 }) => {
-  const { user, init2FASetup, confirm2FASetup, disable2FA, uploadAvatar, deleteAvatar } = useAuth()
+  const { user, init2FASetup, confirm2FASetup, disable2FA, deleteAvatar } = useAuth()
   const isAdmin = isAdminUser(user)
   const {
     hasPin,
@@ -74,41 +74,13 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }, [isOpen, initialTab, isAdmin])
 
-  // Profile Avatar states
-  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
-  const [selectedAvatarBase64, setSelectedAvatarBase64] = useState<string | null>(null)
-  const [isAvatarProcessing, setIsAvatarProcessing] = useState(false)
+  // Profile Avatar cropper modal state
+  const [isCropperOpen, setIsCropperOpen] = useState(false)
+  const [cropperFile, setCropperFile] = useState<File | null>(null)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null)
 
-  const processImageFile = (file: File): Promise<string> => {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader()
-      reader.onload = (e) => {
-        const img = new Image()
-        img.onload = () => {
-          const canvas = document.createElement('canvas')
-          const size = 512
-          canvas.width = size
-          canvas.height = size
-          const ctx = canvas.getContext('2d')
-          if (!ctx) return reject(new Error('Canvas context error'))
-          const minDim = Math.min(img.width, img.height)
-          const sx = (img.width - minDim) / 2
-          const sy = (img.height - minDim) / 2
-          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
-          const base64 = canvas.toDataURL('image/jpeg', 0.9)
-          resolve(base64)
-        }
-        img.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์รูปภาพได้'))
-        img.src = e.target?.result as string
-      }
-      reader.onerror = () => reject(new Error('เกิดข้อผิดพลาดในการโหลดไฟล์'))
-      reader.readAsDataURL(file)
-    })
-  }
-
-  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
@@ -116,47 +88,19 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
       return
     }
     setAvatarError(null)
-    setAvatarSuccess(null)
-    setIsAvatarProcessing(true)
-    try {
-      const base64 = await processImageFile(file)
-      setSelectedAvatarBase64(base64)
-      setAvatarPreviewUrl(base64)
-    } catch (err) {
-      setAvatarError((err as Error).message || 'เกิดข้อผิดพลาดในการประมวลผลรูปภาพ')
-    } finally {
-      setIsAvatarProcessing(false)
-    }
-  }
-
-  const handleSaveAvatar = async () => {
-    if (!selectedAvatarBase64) return
-    setIsAvatarProcessing(true)
-    setAvatarError(null)
-    setAvatarSuccess(null)
-    const res = await uploadAvatar(selectedAvatarBase64, 'image/jpeg')
-    setIsAvatarProcessing(false)
-    if (!res.success) {
-      setAvatarError(res.error || 'บันทึกรูปภาพไม่สำเร็จ')
-    } else {
-      setAvatarSuccess('บันทึกรูปโปรไฟล์เรียบร้อยแล้ว!')
-      setSelectedAvatarBase64(null)
-      setTimeout(() => setAvatarSuccess(null), 4000)
-    }
+    setCropperFile(file)
+    setIsCropperOpen(true)
+    if (e.target) e.target.value = ''
   }
 
   const handleDeleteAvatar = async () => {
     if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพประจำตัว?')) return
-    setIsAvatarProcessing(true)
     setAvatarError(null)
     setAvatarSuccess(null)
     const res = await deleteAvatar()
-    setIsAvatarProcessing(false)
     if (!res.success) {
       setAvatarError(res.error || 'ลบรูปภาพไม่สำเร็จ')
     } else {
-      setAvatarPreviewUrl(null)
-      setSelectedAvatarBase64(null)
       setAvatarSuccess('ลบรูปภาพประจำตัวเรียบร้อยแล้ว')
       setTimeout(() => setAvatarSuccess(null), 4000)
     }
@@ -644,24 +588,35 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
               {/* Profile Card matching Hospital UI */}
               <div className="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-lg">
                 <div className="relative group shrink-0">
-                  <div className="size-24 sm:size-26 rounded-full overflow-hidden border-2 border-teal-500/40 bg-gradient-to-br from-blue-700/40 via-teal-700/30 to-slate-900 grid place-items-center shadow-xl">
-                    {(avatarPreviewUrl || user?.avatar_url) ? (
+                  <div
+                    onClick={() => {
+                      setCropperFile(null)
+                      setIsCropperOpen(true)
+                    }}
+                    className="size-24 sm:size-26 rounded-full overflow-hidden border-2 border-teal-500/40 bg-gradient-to-br from-blue-700/40 via-teal-700/30 to-slate-900 grid place-items-center shadow-xl cursor-pointer hover:border-purple-400 transition"
+                    title="คลิกเพื่อปรับตำแหน่ง / ซูมรูปโปรไฟล์"
+                  >
+                    {user?.avatar_url ? (
                       <img
-                        src={avatarPreviewUrl || user?.avatar_url || ''}
+                        src={user.avatar_url}
                         alt="Profile Preview"
-                        className="w-full h-full object-cover"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                       />
                     ) : (
                       <UserIcon className="size-12 text-slate-400" />
                     )}
                   </div>
-                  <label
-                    htmlFor="avatar-modal-input"
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCropperFile(null)
+                      setIsCropperOpen(true)
+                    }}
                     className="absolute bottom-0 right-0 size-8 sm:size-8.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg grid place-items-center cursor-pointer transition-transform hover:scale-110 border-2 border-slate-900"
-                    title="คลิกเพื่อเลือกรูปภาพประจำตัว"
+                    title="คลิกเพื่อเปลี่ยนรูปภาพประจำตัว (ปรับซูม/เลื่อนตำแหน่ง)"
                   >
                     <Camera className="size-4" />
-                  </label>
+                  </button>
                   <input
                     id="avatar-modal-input"
                     type="file"
@@ -711,7 +666,6 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       <button
                         type="button"
                         onClick={handleDeleteAvatar}
-                        disabled={isAvatarProcessing}
                         className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/25 transition cursor-pointer"
                         title="ลบรูปภาพประจำตัว"
                       >
@@ -722,41 +676,6 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   </div>
                 </div>
               </div>
-
-              {/* Action Buttons if new image chosen */}
-              {selectedAvatarBase64 && (
-                <div className="p-3.5 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-between gap-3 animate-fade-in shadow-md">
-                  <div className="text-xs text-purple-200 flex items-center gap-2">
-                    <Sparkles className="size-4 text-purple-400 shrink-0" />
-                    <span>เลือกรูปภาพเรียบร้อยแล้ว กดปุ่ม <strong>บันทึกรูปโปรไฟล์</strong> เพื่อจัดเก็บลงฐานข้อมูล</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setSelectedAvatarBase64(null)
-                        setAvatarPreviewUrl(null)
-                      }}
-                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
-                    >
-                      ยกเลิก
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleSaveAvatar}
-                      disabled={isAvatarProcessing}
-                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md transition cursor-pointer disabled:opacity-50"
-                    >
-                      {isAvatarProcessing ? (
-                        <Loader2 className="size-3.5 animate-spin" />
-                      ) : (
-                        <Check className="size-3.5" />
-                      )}
-                      <span>บันทึกรูปโปรไฟล์</span>
-                    </button>
-                  </div>
-                </div>
-              )}
 
               {/* Read-only notice */}
               <div className="text-[11.5px] text-slate-400 px-1 select-none">
@@ -1518,6 +1437,16 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Interactive Photo Cropper Modal */}
+      <ProfileAvatarModal
+        isOpen={isCropperOpen}
+        onClose={() => {
+          setIsCropperOpen(false)
+          setCropperFile(null)
+        }}
+        initialFile={cropperFile}
+      />
     </div>
   )
 }

@@ -377,8 +377,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                         type="button"
                         onClick={() => {
                           setUserDropdownOpen(false)
-                          setSecurityInitialTab('my_profile')
-                          setSecurityModalOpen(true)
+                          setAvatarModalOpen(true)
                         }}
                         className="relative group size-12 rounded-full overflow-hidden border-2 border-teal-500/40 bg-slate-100 dark:bg-slate-800 grid place-items-center shadow-md shrink-0 cursor-pointer focus:outline-none"
                         title="คลิกเพื่อเปลี่ยนรูปภาพประจำตัว"
@@ -472,8 +471,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     type="button"
                     onClick={() => {
                       setUserDropdownOpen(false)
-                      setSecurityInitialTab('my_profile')
-                      setSecurityModalOpen(true)
+                      setAvatarModalOpen(true)
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
                   >
