@@ -22,7 +22,7 @@ function getPaginationRange(currentPage: number, totalPages: number): (number | 
 
 export function DataTablePagination<TData>({
   table,
-  pageSizeOptions = [15, 25, 50, 100],
+  pageSizeOptions = [15, 25, 50, 100, 200],
 }: DataTablePaginationProps<TData>) {
   const pageIndex = table.getState().pagination.pageIndex
   const pageSize = table.getState().pagination.pageSize

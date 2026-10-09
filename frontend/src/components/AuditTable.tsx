@@ -422,7 +422,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records }) => {
       </Table>
 
       {/* Shadcn Data Table Pagination */}
-      <DataTablePagination table={table} pageSizeOptions={[15, 25, 50, 100]} />
+      <DataTablePagination table={table} pageSizeOptions={[15, 25, 50, 100, 200]} />
     </div>
   )
 }
