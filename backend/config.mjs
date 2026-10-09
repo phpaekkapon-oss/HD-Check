@@ -39,7 +39,7 @@ export const DW_DB_BASE = {
   user: process.env.DW_DB_USER ?? DB_BASE.user,
   password: process.env.DW_DB_PASSWORD ?? DB_BASE.password,
 }
-export const API_PORT = Number(process.env.API_PORT ?? 3001)
+export const API_PORT = Number(process.env.API_PORT ?? 3002)
 export const AUTO_SYNC_MINUTES = Number(process.env.AUTO_SYNC_MINUTES ?? 1)
 
 /** Herbal drug filter (same criteria as SQL Query 2) */

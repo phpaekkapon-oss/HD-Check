@@ -53,6 +53,9 @@ copy /y "package.json" "HD-Check\package.json" >nul
 if exist ".env" (
     copy /y ".env" "HD-Check\.env" >nul
 )
+if exist "ecosystem.config.cjs" (
+    copy /y "ecosystem.config.cjs" "HD-Check\ecosystem.config.cjs" >nul
+)
 if exist "README.md" (
     copy /y "README.md" "HD-Check\README.md" >nul
 )
@@ -92,9 +95,10 @@ echo   * Production Folder : %~dp0HD-Check
 echo   * Ready-to-Upload   : %~dp0HD-Check.zip
 echo ====================================================================
 echo.
-echo [*] Opening folder location for upload...
-if exist "HD-Check.zip" (
-    explorer /select,"%~dp0HD-Check.zip"
+if not "%1"=="--no-pause" (
+    echo [*] Opening folder location for upload...
+    if exist "HD-Check.zip" (
+        explorer /select,"%~dp0HD-Check.zip"
+    )
+    pause
 )
-
-pause
