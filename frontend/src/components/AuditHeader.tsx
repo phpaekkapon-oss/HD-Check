@@ -18,11 +18,13 @@ import {
   LogOut,
   ChevronDown,
   Lock,
+  Camera,
 } from 'lucide-react'
 import type { ActivePage, DbStatus, SyncResult } from '@/types/herbdx.types'
 import { NAV_ITEMS, type NavItem } from '@/components/Sidebar'
 import { ThemeCustomizerPopover } from '@/components/ThemeCustomizerModal'
 import { Security2FASettingsModal } from '@/components/Security2FASettingsModal'
+import { ProfileAvatarModal } from '@/components/ProfileAvatarModal'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
@@ -129,7 +131,8 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   const { lockNow, hasPin, pinEnabled, autoLockMinutes } = usePinLock()
   const [userDropdownOpen, setUserDropdownOpen] = useState(false)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
-  const [securityInitialTab, setSecurityInitialTab] = useState<'my_2fa' | 'my_pin' | 'admin_policy'>('my_2fa')
+  const [avatarModalOpen, setAvatarModalOpen] = useState(false)
+  const [securityInitialTab, setSecurityInitialTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'>('my_2fa')
 
   return (
     <header className="sticky top-0 z-30 bg-themed-header text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#30364b] select-none shadow-sm dark:shadow-md transition-colors">
@@ -322,15 +325,23 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-xs relative"
+                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-xs relative overflow-hidden"
                 style={{
                   borderColor: `${accent.hex}55`,
                 }}
               >
-                <User className="size-4 sm:size-4.5" />
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.name || 'Profile'}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <User className="size-4 sm:size-4.5" />
+                )}
                 {user?.two_factor_enabled && (
                   <span
-                    className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border border-white dark:border-slate-900 shadow-xs"
+                    className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border border-white dark:border-slate-900 shadow-xs z-10"
                     title="2FA เปิดใช้งานแล้ว"
                   />
                 )}
@@ -359,21 +370,51 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   className="fixed inset-0 z-40"
                   onClick={() => setUserDropdownOpen(false)}
                 />
-                <div className="absolute right-0 top-full mt-2 w-72 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 shadow-2xl z-50 p-2 text-slate-800 dark:text-white animate-scale-in">
+                <div className="absolute right-0 top-full mt-2 w-76 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 shadow-2xl z-50 p-2 text-slate-800 dark:text-white animate-scale-in">
                   <div className="p-3 border-b border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-white/[0.03] rounded-xl mb-1.5">
-                    <div className="text-xs font-bold truncate">
-                      {user?.name || 'ผู้ใช้งาน'}
+                    <div className="flex items-center gap-3 mb-2.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserDropdownOpen(false)
+                          setSecurityInitialTab('my_profile')
+                          setSecurityModalOpen(true)
+                        }}
+                        className="relative group size-12 rounded-full overflow-hidden border-2 border-teal-500/40 bg-slate-100 dark:bg-slate-800 grid place-items-center shadow-md shrink-0 cursor-pointer focus:outline-none"
+                        title="คลิกเพื่อเปลี่ยนรูปภาพประจำตัว"
+                      >
+                        {user?.avatar_url ? (
+                          <img
+                            src={user.avatar_url}
+                            alt=""
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                          />
+                        ) : (
+                          <User className="size-6 text-slate-400 dark:text-slate-500" />
+                        )}
+                        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
+                          <Camera className="size-4" />
+                        </div>
+                        <span className="absolute bottom-0 right-0 p-1 rounded-full bg-teal-600 text-white shadow-xs">
+                          <Camera className="size-2.5" />
+                        </span>
+                      </button>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-bold truncate">
+                          {user?.name || 'ผู้ใช้งาน'}
+                        </div>
+                        <div
+                          className="text-[11px] text-teal-600 dark:text-teal-300 font-medium truncate mt-0.5"
+                          title={user?.position || user?.entryposition || ''}
+                        >
+                          {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
+                          @{user?.loginname} {user?.groupname && user?.position && user.position !== user.groupname ? `• สิทธิ์ ${user.groupname}` : ''}
+                        </div>
+                      </div>
                     </div>
-                    <div
-                      className="text-[11px] text-teal-600 dark:text-teal-300 font-medium truncate mt-0.5"
-                      title={user?.position || user?.entryposition || ''}
-                    >
-                      {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
-                    </div>
-                    <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
-                      @{user?.loginname} {user?.groupname && user?.position && user.position !== user.groupname ? `• สิทธิ์ ${user.groupname}` : ''}
-                    </div>
-                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                    <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
                           'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
@@ -426,6 +467,20 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     )}
                   </button>
 
+                  {/* Change Profile Photo Button */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false)
+                      setSecurityInitialTab('my_profile')
+                      setSecurityModalOpen(true)
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <Camera className="size-4 text-teal-600 dark:text-teal-400" />
+                    <span>จัดการรูปโปรไฟล์ (Profile Photo)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
@@ -462,6 +517,12 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
         isOpen={securityModalOpen}
         onClose={() => setSecurityModalOpen(false)}
         initialTab={securityInitialTab}
+      />
+
+      {/* User Avatar Photo Modal */}
+      <ProfileAvatarModal
+        isOpen={avatarModalOpen}
+        onClose={() => setAvatarModalOpen(false)}
       />
 
       {/* PWA Install Tip Banner */}

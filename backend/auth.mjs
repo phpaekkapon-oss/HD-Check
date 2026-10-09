@@ -45,6 +45,15 @@ export async function initAuthTables(dwPool) {
       ) ENGINE=InnoDB DEFAULT CHARSET=tis620
     `),
     dwPool.query(`
+      CREATE TABLE IF NOT EXISTS dw_hd_check_user_avatar (
+        loginname VARCHAR(50) PRIMARY KEY,
+        image_blob MEDIUMBLOB NOT NULL,
+        mime_type VARCHAR(50) NOT NULL DEFAULT 'image/jpeg',
+        image_size INT NOT NULL DEFAULT 0,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=tis620
+    `),
+    dwPool.query(`
       INSERT IGNORE INTO dw_hd_check_system_settings (setting_key, setting_value)
       VALUES 
         ('enforce_2fa', 'N'),
@@ -256,8 +265,10 @@ export async function authenticateHosUser(hosPool, dwPool, loginname, password) 
 
   // 2FA not required - Issue full session token
   const token = generateToken()
+  const avatarUrl = await getUserAvatarUrl(dwPool, user.loginname)
   const authenticatedUser = {
     ...user,
+    avatar_url: avatarUrl,
     two_factor_enabled: false,
     has_pin: hasPin,
     pin_enabled: pinEnabled,
@@ -359,8 +370,10 @@ export async function verify2FALogin(dwPool, tempToken, code) {
   const pinPolicyMap = {}
   for (const s of extraSettings) pinPolicyMap[s.setting_key] = s.setting_value
 
+  const avatarUrl = await getUserAvatarUrl(dwPool, user.loginname)
   const authenticatedUser = {
     ...user,
+    avatar_url: avatarUrl,
     two_factor_enabled: true,
     has_pin: Boolean(rows[0]?.pin_hash),
     pin_enabled: Boolean(rows[0]?.pin_enabled === 1 && rows[0]?.pin_hash),
@@ -815,3 +828,52 @@ export function logoutSession(token) {
   if (token) activeSessions.delete(token)
   return { success: true }
 }
+
+/**
+ * Avatar Storage & Retrieval (Stored as MEDIUMBLOB in MySQL)
+ */
+export async function getUserAvatar(dwPool, loginname) {
+  const [rows] = await dwPool.query(
+    `SELECT image_blob, mime_type, image_size, updated_at FROM dw_hd_check_user_avatar WHERE loginname = ? LIMIT 1`,
+    [loginname]
+  )
+  if (rows.length === 0) return null
+  return rows[0]
+}
+
+export async function saveUserAvatar(dwPool, loginname, buffer, mimeType = 'image/jpeg') {
+  await dwPool.query(
+    `INSERT INTO dw_hd_check_user_avatar (loginname, image_blob, mime_type, image_size, updated_at)
+     VALUES (?, ?, ?, ?, NOW())
+     ON DUPLICATE KEY UPDATE
+       image_blob = VALUES(image_blob),
+       mime_type = VALUES(mime_type),
+       image_size = VALUES(image_size),
+       updated_at = NOW()`,
+    [loginname, buffer, mimeType, buffer.length]
+  )
+  return { success: true, size: buffer.length }
+}
+
+export async function deleteUserAvatar(dwPool, loginname) {
+  await dwPool.query(
+    `DELETE FROM dw_hd_check_user_avatar WHERE loginname = ?`,
+    [loginname]
+  )
+  return { success: true }
+}
+
+export async function getUserAvatarUrl(dwPool, loginname) {
+  try {
+    const [rows] = await dwPool.query(
+      `SELECT updated_at FROM dw_hd_check_user_avatar WHERE loginname = ? LIMIT 1`,
+      [loginname]
+    )
+    if (rows.length === 0) return null
+    const timestamp = new Date(rows[0].updated_at).getTime()
+    return `/api/auth/avatar/${encodeURIComponent(loginname)}?t=${timestamp}`
+  } catch (_) {
+    return null
+  }
+}
+

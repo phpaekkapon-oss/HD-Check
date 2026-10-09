@@ -27,6 +27,10 @@ import {
   verifyTempSession,
   logoutSession,
   parsePosition,
+  getUserAvatar,
+  saveUserAvatar,
+  deleteUserAvatar,
+  getUserAvatarUrl,
 } from './auth.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -71,10 +75,10 @@ app.use((req, res, next) => {
       res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains')
     }
   }
-  if (req.path.startsWith('/api')) res.setHeader('Cache-Control', 'no-store')
+  if (req.path.startsWith('/api') && !req.path.startsWith('/api/auth/avatar')) res.setHeader('Cache-Control', 'no-store')
   next()
 })
-app.use(express.json({ limit: '50kb' }))
+app.use(express.json({ limit: '10mb' }))
 
 function readCookie(req, name) {
   const cookies = String(req.headers.cookie ?? '').split(';')
@@ -514,11 +518,13 @@ app.post('/api/auth/logout', (req, res) => {
   res.json({ success: true })
 })
 
-app.get('/api/auth/me', (req, res) => {
+app.get('/api/auth/me', async (req, res) => {
   const session = getSession(req)
   if (!session) {
     return res.json({ success: false, user: null })
   }
+  const avatarUrl = await getUserAvatarUrl(dwPool, session.user.loginname)
+  session.user.avatar_url = avatarUrl
   res.json({ success: true, user: session.user })
 })
 
@@ -604,6 +610,90 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
     }
 
     res.json({ success: true, profile })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+/* ---------------- User Avatar Management (BLOB) ---------------- */
+app.get('/api/auth/avatar/:loginname', async (req, res) => {
+  try {
+    const loginname = String(req.params.loginname ?? '').trim()
+    if (!loginname) return res.status(400).send('Missing loginname')
+    const avatar = await getUserAvatar(dwPool, loginname)
+    if (!avatar || !avatar.image_blob) {
+      return res.status(404).send('Avatar not found')
+    }
+    res.setHeader('Content-Type', avatar.mime_type || 'image/jpeg')
+    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200')
+    res.setHeader('Content-Length', avatar.image_blob.length)
+    res.send(avatar.image_blob)
+  } catch (err) {
+    console.error('[AVATAR GET]', err?.message)
+    res.status(500).send('Error loading avatar')
+  }
+})
+
+app.post('/api/auth/avatar', requireSession, async (req, res) => {
+  try {
+    const { image, mimeType = 'image/jpeg', targetLogin } = req.body ?? {}
+    if (!image) {
+      return res.status(400).json({ success: false, error: 'กรุณาเลือกไฟล์รูปภาพ' })
+    }
+
+    const loginname = (targetLogin && isAdminUser(req.authUser))
+      ? String(targetLogin).trim()
+      : req.authUser.loginname
+
+    // Parse base64 string
+    let cleanBase64 = String(image).trim()
+    let detectedMime = mimeType
+    const matches = cleanBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
+    if (matches) {
+      detectedMime = matches[1]
+      cleanBase64 = matches[2]
+    }
+
+    const buffer = Buffer.from(cleanBase64, 'base64')
+    if (buffer.length > 8 * 1024 * 1024) {
+      return res.status(400).json({ success: false, error: 'ขนาดรูปภาพเกิน 8 MB กรุณาเลือกรูปขนาดเล็กลง' })
+    }
+
+    await saveUserAvatar(dwPool, loginname, buffer, detectedMime)
+    const newAvatarUrl = `/api/auth/avatar/${encodeURIComponent(loginname)}?t=${Date.now()}`
+
+    if (loginname === req.authUser.loginname) {
+      req.authUser.avatar_url = newAvatarUrl
+      const session = getSession(req)
+      if (session) session.user.avatar_url = newAvatarUrl
+    }
+
+    res.json({
+      success: true,
+      avatarUrl: newAvatarUrl,
+      message: 'บันทึกรูปโปรไฟล์เรียบร้อยแล้ว',
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.delete('/api/auth/avatar/:loginname?', requireSession, async (req, res) => {
+  try {
+    const paramLogin = req.params.loginname
+    const loginname = (paramLogin && isAdminUser(req.authUser))
+      ? String(paramLogin).trim()
+      : req.authUser.loginname
+
+    await deleteUserAvatar(dwPool, loginname)
+
+    if (loginname === req.authUser.loginname) {
+      req.authUser.avatar_url = null
+      const session = getSession(req)
+      if (session) session.user.avatar_url = null
+    }
+
+    res.json({ success: true, message: 'ลบรูปโปรไฟล์เรียบร้อยแล้ว' })
   } catch (err) {
     fail(res, err)
   }

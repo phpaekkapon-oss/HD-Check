@@ -17,6 +17,11 @@ import {
   Info,
   Clock,
   Shield,
+  Camera,
+  Upload,
+  Trash2,
+  User as UserIcon,
+  Sparkles,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
@@ -26,7 +31,7 @@ import { cn } from '@/lib/utils'
 interface Security2FASettingsModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly initialTab?: 'my_2fa' | 'my_pin' | 'admin_policy'
+  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'
 }
 
 const lockIntervals = [
@@ -40,9 +45,9 @@ const lockIntervals = [
 export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   isOpen,
   onClose,
-  initialTab = 'my_2fa',
+  initialTab = 'my_profile',
 }) => {
-  const { user, init2FASetup, confirm2FASetup, disable2FA } = useAuth()
+  const { user, init2FASetup, confirm2FASetup, disable2FA, uploadAvatar, deleteAvatar } = useAuth()
   const isAdmin = isAdminUser(user)
   const {
     hasPin,
@@ -55,20 +60,108 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     updatePinSettings,
   } = usePinLock()
 
-  const [activeTab, setActiveTab] = useState<'my_2fa' | 'my_pin' | 'admin_policy'>(() => {
-    if (initialTab === 'admin_policy' && !isAdmin) return 'my_2fa'
+  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'>(() => {
+    if (initialTab === 'admin_policy' && !isAdmin) return 'my_profile'
     return initialTab
   })
 
   useEffect(() => {
     if (isOpen) {
       if (initialTab === 'admin_policy' && !isAdmin) {
-        setActiveTab('my_2fa')
+        setActiveTab('my_profile')
       } else {
         setActiveTab(initialTab)
       }
     }
   }, [isOpen, initialTab, isAdmin])
+
+  // Profile Avatar states
+  const [avatarPreviewUrl, setAvatarPreviewUrl] = useState<string | null>(null)
+  const [selectedAvatarBase64, setSelectedAvatarBase64] = useState<string | null>(null)
+  const [isAvatarProcessing, setIsAvatarProcessing] = useState(false)
+  const [avatarError, setAvatarError] = useState<string | null>(null)
+  const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null)
+
+  const processImageFile = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = (e) => {
+        const img = new Image()
+        img.onload = () => {
+          const canvas = document.createElement('canvas')
+          const size = 512
+          canvas.width = size
+          canvas.height = size
+          const ctx = canvas.getContext('2d')
+          if (!ctx) return reject(new Error('Canvas context error'))
+          const minDim = Math.min(img.width, img.height)
+          const sx = (img.width - minDim) / 2
+          const sy = (img.height - minDim) / 2
+          ctx.drawImage(img, sx, sy, minDim, minDim, 0, 0, size, size)
+          const base64 = canvas.toDataURL('image/jpeg', 0.9)
+          resolve(base64)
+        }
+        img.onerror = () => reject(new Error('ไม่สามารถอ่านไฟล์รูปภาพได้'))
+        img.src = e.target?.result as string
+      }
+      reader.onerror = () => reject(new Error('เกิดข้อผิดพลาดในการโหลดไฟล์'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handleAvatarFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('กรุณาเลือกไฟล์รูปภาพ (JPEG, PNG, WebP)')
+      return
+    }
+    setAvatarError(null)
+    setAvatarSuccess(null)
+    setIsAvatarProcessing(true)
+    try {
+      const base64 = await processImageFile(file)
+      setSelectedAvatarBase64(base64)
+      setAvatarPreviewUrl(base64)
+    } catch (err) {
+      setAvatarError((err as Error).message || 'เกิดข้อผิดพลาดในการประมวลผลรูปภาพ')
+    } finally {
+      setIsAvatarProcessing(false)
+    }
+  }
+
+  const handleSaveAvatar = async () => {
+    if (!selectedAvatarBase64) return
+    setIsAvatarProcessing(true)
+    setAvatarError(null)
+    setAvatarSuccess(null)
+    const res = await uploadAvatar(selectedAvatarBase64, 'image/jpeg')
+    setIsAvatarProcessing(false)
+    if (!res.success) {
+      setAvatarError(res.error || 'บันทึกรูปภาพไม่สำเร็จ')
+    } else {
+      setAvatarSuccess('บันทึกรูปโปรไฟล์เรียบร้อยแล้ว!')
+      setSelectedAvatarBase64(null)
+      setTimeout(() => setAvatarSuccess(null), 4000)
+    }
+  }
+
+  const handleDeleteAvatar = async () => {
+    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพประจำตัว?')) return
+    setIsAvatarProcessing(true)
+    setAvatarError(null)
+    setAvatarSuccess(null)
+    const res = await deleteAvatar()
+    setIsAvatarProcessing(false)
+    if (!res.success) {
+      setAvatarError(res.error || 'ลบรูปภาพไม่สำเร็จ')
+    } else {
+      setAvatarPreviewUrl(null)
+      setSelectedAvatarBase64(null)
+      setAvatarSuccess('ลบรูปภาพประจำตัวเรียบร้อยแล้ว')
+      setTimeout(() => setAvatarSuccess(null), 4000)
+    }
+  }
 
   // My 2FA states
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null)
@@ -453,6 +546,24 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         {/* Modern Segmented Tab Bar */}
         <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
           <div className="flex p-1 rounded-xl bg-slate-950 border border-slate-800/80 gap-1 overflow-x-auto">
+            {/* Tab: Profile Avatar */}
+            <button
+              type="button"
+              onClick={() => setActiveTab('my_profile')}
+              className={cn(
+                'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                activeTab === 'my_profile'
+                  ? 'bg-slate-800 text-white shadow-xs'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+              )}
+            >
+              <Camera className={cn('size-3.5', activeTab === 'my_profile' ? 'text-teal-400' : 'text-slate-400')} />
+              <span>รูปโปรไฟล์</span>
+              {user?.avatar_url && (
+                <span className="size-1.5 rounded-full bg-teal-400" />
+              )}
+            </button>
+
             {/* Tab 1: 2FA */}
             <button
               type="button"
@@ -515,6 +626,134 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
         {/* Modal Body */}
         <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+          {/* ========================================================= */}
+          {/* TAB: PROFILE PHOTO                                        */}
+          {/* ========================================================= */}
+          {activeTab === 'my_profile' && (
+            <div className="space-y-5">
+              {avatarError && (
+                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs font-medium flex items-center gap-2 shadow-xs">
+                  <AlertCircle className="size-4 shrink-0 text-rose-400" />
+                  <span>{avatarError}</span>
+                </div>
+              )}
+              {avatarSuccess && (
+                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-medium flex items-center gap-2 shadow-xs">
+                  <Check className="size-4 shrink-0 text-emerald-400" />
+                  <span>{avatarSuccess}</span>
+                </div>
+              )}
+
+              {/* Profile Card */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row items-center gap-6">
+                <div className="relative group shrink-0">
+                  <div className="size-32 rounded-full overflow-hidden border-3 border-teal-500/50 bg-slate-900 grid place-items-center shadow-xl">
+                    {(avatarPreviewUrl || user?.avatar_url) ? (
+                      <img
+                        src={avatarPreviewUrl || user?.avatar_url || ''}
+                        alt="Profile Preview"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <UserIcon className="size-16 text-slate-500" />
+                    )}
+                  </div>
+                  <label
+                    htmlFor="avatar-modal-input"
+                    className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white cursor-pointer"
+                    title="คลิกเพื่อเลือกไฟล์รูปใหม่"
+                  >
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <Camera className="size-6" />
+                      <span className="text-[11px] font-bold">เปลี่ยนรูป</span>
+                    </div>
+                  </label>
+                  <label
+                    htmlFor="avatar-modal-input"
+                    className="absolute bottom-1 right-1 p-2 rounded-full bg-teal-600 hover:bg-teal-500 text-white shadow-md cursor-pointer transition-transform hover:scale-110"
+                    title="เลือกรูปภาพ"
+                  >
+                    <Camera className="size-4" />
+                  </label>
+                  <input
+                    id="avatar-modal-input"
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={handleAvatarFileSelect}
+                  />
+                </div>
+
+                <div className="flex-1 text-center sm:text-left space-y-2">
+                  <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <h3 className="text-base font-bold text-white">{user?.name || 'ผู้ใช้งาน'}</h3>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">
+                      {user?.position || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-400 font-mono">
+                    @{user?.loginname} • ฐานข้อมูล HOSxP / dw_hd-check
+                  </p>
+                  <p className="text-xs text-slate-300 leading-relaxed pt-1">
+                    รูปภาพประจำตัวจะแสดงที่มุมขวาบนของระบบ และถูกจัดเก็บแบบ <strong>BLOB (Binary)</strong> ในฐานข้อมูลอัตโนมัติ โดยระบบจะย่อและ Crop เป็นสี่เหลี่ยมจัตุรัส 512×512 พิกเซลให้สวยงาม
+                  </p>
+
+                  <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
+                    <label
+                      htmlFor="avatar-modal-input"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
+                    >
+                      <Upload className="size-3.5" />
+                      <span>เลือกไฟล์รูปภาพ</span>
+                    </label>
+
+                    {selectedAvatarBase64 && (
+                      <button
+                        type="button"
+                        onClick={handleSaveAvatar}
+                        disabled={isAvatarProcessing}
+                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isAvatarProcessing ? (
+                          <Loader2 className="size-3.5 animate-spin" />
+                        ) : (
+                          <Check className="size-3.5" />
+                        )}
+                        <span>บันทึกรูปโปรไฟล์</span>
+                      </button>
+                    )}
+
+                    {user?.avatar_url && (
+                      <button
+                        type="button"
+                        onClick={handleDeleteAvatar}
+                        disabled={isAvatarProcessing}
+                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/15 border border-rose-500/25 transition cursor-pointer disabled:opacity-50"
+                        title="ลบรูปภาพประจำตัวออกและกลับไปใช้ไอคอนมาตรฐาน"
+                      >
+                        <Trash2 className="size-3.5" />
+                        <span>ลบรูปภาพ</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Upload Tips Box */}
+              <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-xs text-slate-400 space-y-1.5">
+                <div className="font-semibold text-slate-300 flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-amber-400" />
+                  คำแนะนำรูปภาพประจำตัว
+                </div>
+                <ul className="list-disc list-inside space-y-1 text-[11.5px] text-slate-400">
+                  <li>แนะนำรูปหน้าตรง พื้นหลังเรียบ หรือภาพถ่ายชุดทำงานราชการ/โรงพยาบาล</li>
+                  <li>รองรับไฟล์นามสกุล .jpg, .png, .webp (ระบบรองรับขนาดไฟล์สูงสุด 8 MB)</li>
+                  <li>ระบบจะบีบอัดและปรับสัดส่วนอัตโนมัติ เพื่อให้โหลดได้เร็วและไม่เปลืองพื้นที่ฐานข้อมูล</li>
+                </ul>
+              </div>
+            </div>
+          )}
+
           {/* ========================================================= */}
           {/* TAB 1: MY 2FA                                             */}
           {/* ========================================================= */}

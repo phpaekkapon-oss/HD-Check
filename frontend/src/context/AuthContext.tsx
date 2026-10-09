@@ -18,6 +18,8 @@ interface AuthContextType {
   readonly disable2FA: (loginname: string) => Promise<{ success: boolean; error?: string }>
   readonly logout: () => void
   readonly updateUser: (u: User) => void
+  readonly uploadAvatar: (base64Image: string, mimeType?: string) => Promise<{ success: boolean; avatarUrl?: string; error?: string }>
+  readonly deleteAvatar: () => Promise<{ success: boolean; error?: string }>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -193,6 +195,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(u)
   }
 
+  const uploadAvatar = async (base64Image: string, mimeType?: string) => {
+    try {
+      const res = await fetch('/api/auth/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ image: base64Image, mimeType }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'บันทึกรูปโปรไฟล์ไม่สำเร็จ' }
+      }
+      if (user) {
+        setUser({ ...user, avatar_url: data.avatarUrl })
+      }
+      return { success: true, avatarUrl: data.avatarUrl }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  }
+
+  const deleteAvatar = async () => {
+    try {
+      const res = await fetch('/api/auth/avatar', {
+        method: 'DELETE',
+        credentials: 'same-origin',
+      })
+      const data = await res.json()
+      if (!res.ok || !data.success) {
+        return { success: false, error: data.error || 'ลบรูปโปรไฟล์ไม่สำเร็จ' }
+      }
+      if (user) {
+        setUser({ ...user, avatar_url: null })
+      }
+      return { success: true }
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -206,6 +248,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         disable2FA,
         logout,
         updateUser,
+        uploadAvatar,
+        deleteAvatar,
       }}
     >
       {children}

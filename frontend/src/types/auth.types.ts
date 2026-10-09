@@ -13,6 +13,7 @@ export interface User {
   readonly auto_lock_minutes?: number
   readonly enforce_pin_lock?: boolean
   readonly default_auto_lock_minutes?: number
+  readonly avatar_url?: string | null
 }
 
 export interface LoginResult {

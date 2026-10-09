@@ -89,10 +89,13 @@ export const AUDIT_RESULT_META: Record<AuditResult, { label: string; short: stri
 export function downloadExcel(
   filename: string,
   headers: readonly string[],
-  rows: readonly (string | number | null | undefined)[][],
+  rows: readonly (readonly (string | number | null | undefined)[])[],
   sheetName = 'ตรวจสอบการจ่ายยาสมุนไพร'
 ): void {
-  const aoa = [headers, ...rows]
+  const aoa: (string | number | null | undefined)[][] = [
+    [...headers],
+    ...rows.map((r) => [...r]),
+  ]
   const ws = XLSX.utils.aoa_to_sheet(aoa)
 
   // Auto-fit column widths
