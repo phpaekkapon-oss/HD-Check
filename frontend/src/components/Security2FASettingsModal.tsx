@@ -13,15 +13,14 @@ import {
   Lock,
   Loader2,
   CheckCircle2,
-  Building2,
   Info,
   Clock,
   Shield,
   Camera,
-  Upload,
   Trash2,
   User as UserIcon,
   Sparkles,
+  Monitor,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
@@ -526,10 +525,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                ศูนย์ตั้งค่าความปลอดภัย (Security & Access Control)
+                ศูนย์ตั้งค่าความปลอดภัย
               </h2>
               <p className="text-xs text-slate-400 font-normal mt-0.5">
-                ระบบยืนยันตัวตน 2FA • รหัส PIN ล็อกหน้าจอ • นโยบายคุ้มครองข้อมูลเวชระเบียน
+                ยืนยันตัวตน 2FA • PIN ล็อกหน้าจอ • นโยบายคุ้มครองข้อมูลผู้ป่วย
               </p>
             </div>
           </div>
@@ -546,7 +545,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         {/* Modern Segmented Tab Bar */}
         <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
           <div className="flex p-1 rounded-xl bg-slate-950 border border-slate-800/80 gap-1 overflow-x-auto">
-            {/* Tab: Profile Avatar */}
+            {/* Tab: Profile */}
             <button
               type="button"
               onClick={() => setActiveTab('my_profile')}
@@ -557,11 +556,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
               )}
             >
-              <Camera className={cn('size-3.5', activeTab === 'my_profile' ? 'text-teal-400' : 'text-slate-400')} />
-              <span>รูปโปรไฟล์</span>
-              {user?.avatar_url && (
-                <span className="size-1.5 rounded-full bg-teal-400" />
-              )}
+              <UserIcon className={cn('size-3.5', activeTab === 'my_profile' ? 'text-teal-400' : 'text-slate-400')} />
+              <span>โปรไฟล์</span>
             </button>
 
             {/* Tab 1: 2FA */}
@@ -644,10 +640,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 </div>
               )}
 
-              {/* Profile Card */}
-              <div className="p-5 sm:p-6 rounded-2xl bg-slate-950/60 border border-slate-800 flex flex-col sm:flex-row items-center gap-6">
+              {/* Profile Card matching Hospital UI */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-slate-950/70 border border-slate-800/90 flex flex-col sm:flex-row items-center sm:items-start gap-5 shadow-lg">
                 <div className="relative group shrink-0">
-                  <div className="size-32 rounded-full overflow-hidden border-3 border-teal-500/50 bg-slate-900 grid place-items-center shadow-xl">
+                  <div className="size-24 sm:size-26 rounded-full overflow-hidden border-2 border-teal-500/40 bg-gradient-to-br from-blue-700/40 via-teal-700/30 to-slate-900 grid place-items-center shadow-xl">
                     {(avatarPreviewUrl || user?.avatar_url) ? (
                       <img
                         src={avatarPreviewUrl || user?.avatar_url || ''}
@@ -655,23 +651,13 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <UserIcon className="size-16 text-slate-500" />
+                      <UserIcon className="size-12 text-slate-400" />
                     )}
                   </div>
                   <label
                     htmlFor="avatar-modal-input"
-                    className="absolute inset-0 rounded-full bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white cursor-pointer"
-                    title="คลิกเพื่อเลือกไฟล์รูปใหม่"
-                  >
-                    <div className="flex flex-col items-center gap-1 text-center">
-                      <Camera className="size-6" />
-                      <span className="text-[11px] font-bold">เปลี่ยนรูป</span>
-                    </div>
-                  </label>
-                  <label
-                    htmlFor="avatar-modal-input"
-                    className="absolute bottom-1 right-1 p-2 rounded-full bg-teal-600 hover:bg-teal-500 text-white shadow-md cursor-pointer transition-transform hover:scale-110"
-                    title="เลือกรูปภาพ"
+                    className="absolute bottom-0 right-0 size-8 sm:size-8.5 rounded-full bg-purple-600 hover:bg-purple-500 text-white shadow-lg grid place-items-center cursor-pointer transition-transform hover:scale-110 border-2 border-slate-900"
+                    title="คลิกเพื่อเลือกรูปภาพประจำตัว"
                   >
                     <Camera className="size-4" />
                   </label>
@@ -684,72 +670,119 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   />
                 </div>
 
-                <div className="flex-1 text-center sm:text-left space-y-2">
-                  <div className="flex items-center justify-center sm:justify-start gap-2">
-                    <h3 className="text-base font-bold text-white">{user?.name || 'ผู้ใช้งาน'}</h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                      {user?.position || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
-                    </span>
+                <div className="flex-1 text-center sm:text-left space-y-1">
+                  <h3 className="text-base sm:text-lg font-bold text-white tracking-tight">
+                    {user?.name || 'นายเอกพล อันคำวงค์'}
+                  </h3>
+                  <div className="text-xs text-teal-400 font-medium">
+                    {user?.position || user?.entryposition || user?.groupname || 'นักวิชาการคอมพิวเตอร์ปฏิบัติการ'}
                   </div>
-                  <p className="text-xs text-slate-400 font-mono">
-                    @{user?.loginname} • ฐานข้อมูล HOSxP / dw_hd-check
-                  </p>
-                  <p className="text-xs text-slate-300 leading-relaxed pt-1">
-                    รูปภาพประจำตัวจะแสดงที่มุมขวาบนของระบบ และถูกจัดเก็บแบบ <strong>BLOB (Binary)</strong> ในฐานข้อมูลอัตโนมัติ โดยระบบจะย่อและ Crop เป็นสี่เหลี่ยมจัตุรัส 512×512 พิกเซลให้สวยงาม
-                  </p>
+                  <div className="text-xs text-slate-400 font-mono">
+                    @{user?.loginname} • สิทธิ์ {user?.groupname || 'ผู้ดูแลระบบ (IT)'}
+                  </div>
 
-                  <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2.5">
-                    <label
-                      htmlFor="avatar-modal-input"
-                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 transition cursor-pointer"
+                  <div className="pt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border',
+                        user?.two_factor_enabled
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30'
+                          : 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                      )}
                     >
-                      <Upload className="size-3.5" />
-                      <span>เลือกไฟล์รูปภาพ</span>
-                    </label>
+                      <ShieldCheck className="size-3.5" />
+                      {user?.two_factor_enabled ? '2FA: เปิดใช้งาน' : '2FA: ยังไม่เปิด'}
+                    </span>
 
-                    {selectedAvatarBase64 && (
-                      <button
-                        type="button"
-                        onClick={handleSaveAvatar}
-                        disabled={isAvatarProcessing}
-                        className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white shadow-md transition cursor-pointer disabled:opacity-50"
-                      >
-                        {isAvatarProcessing ? (
-                          <Loader2 className="size-3.5 animate-spin" />
-                        ) : (
-                          <Check className="size-3.5" />
-                        )}
-                        <span>บันทึกรูปโปรไฟล์</span>
-                      </button>
-                    )}
+                    <span
+                      className={cn(
+                        'inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border',
+                        hasPin && pinEnabled
+                          ? 'bg-teal-500/10 text-teal-300 border-teal-500/30'
+                          : 'bg-slate-500/10 text-slate-400 border-slate-500/30'
+                      )}
+                    >
+                      <Lock className="size-3.5" />
+                      {hasPin && pinEnabled ? `PIN: เปิดใช้งาน - ${autoLockMinutes} น.` : hasPin ? 'PIN: ปิดชั่วคราว' : 'PIN: ยังไม่ตั้ง'}
+                    </span>
 
                     {user?.avatar_url && (
                       <button
                         type="button"
                         onClick={handleDeleteAvatar}
                         disabled={isAvatarProcessing}
-                        className="inline-flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/15 border border-rose-500/25 transition cursor-pointer disabled:opacity-50"
-                        title="ลบรูปภาพประจำตัวออกและกลับไปใช้ไอคอนมาตรฐาน"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 border border-rose-500/25 transition cursor-pointer"
+                        title="ลบรูปภาพประจำตัว"
                       >
-                        <Trash2 className="size-3.5" />
-                        <span>ลบรูปภาพ</span>
+                        <Trash2 className="size-3" />
+                        <span>ลบรูป</span>
                       </button>
                     )}
                   </div>
                 </div>
               </div>
 
-              {/* Upload Tips Box */}
-              <div className="p-4 rounded-xl bg-slate-950/40 border border-slate-800/80 text-xs text-slate-400 space-y-1.5">
-                <div className="font-semibold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-amber-400" />
-                  คำแนะนำรูปภาพประจำตัว
+              {/* Action Buttons if new image chosen */}
+              {selectedAvatarBase64 && (
+                <div className="p-3.5 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-between gap-3 animate-fade-in shadow-md">
+                  <div className="text-xs text-purple-200 flex items-center gap-2">
+                    <Sparkles className="size-4 text-purple-400 shrink-0" />
+                    <span>เลือกรูปภาพเรียบร้อยแล้ว กดปุ่ม <strong>บันทึกรูปโปรไฟล์</strong> เพื่อจัดเก็บลงฐานข้อมูล</span>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedAvatarBase64(null)
+                        setAvatarPreviewUrl(null)
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-800 transition cursor-pointer"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleSaveAvatar}
+                      disabled={isAvatarProcessing}
+                      className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-md transition cursor-pointer disabled:opacity-50"
+                    >
+                      {isAvatarProcessing ? (
+                        <Loader2 className="size-3.5 animate-spin" />
+                      ) : (
+                        <Check className="size-3.5" />
+                      )}
+                      <span>บันทึกรูปโปรไฟล์</span>
+                    </button>
+                  </div>
                 </div>
-                <ul className="list-disc list-inside space-y-1 text-[11.5px] text-slate-400">
-                  <li>แนะนำรูปหน้าตรง พื้นหลังเรียบ หรือภาพถ่ายชุดทำงานราชการ/โรงพยาบาล</li>
-                  <li>รองรับไฟล์นามสกุล .jpg, .png, .webp (ระบบรองรับขนาดไฟล์สูงสุด 8 MB)</li>
-                  <li>ระบบจะบีบอัดและปรับสัดส่วนอัตโนมัติ เพื่อให้โหลดได้เร็วและไม่เปลืองพื้นที่ฐานข้อมูล</li>
-                </ul>
+              )}
+
+              {/* Read-only notice */}
+              <div className="text-[11.5px] text-slate-400 px-1 select-none">
+                ชื่อ ตำแหน่ง และรหัสผ่านมาจาก HOSxP — แก้ไขที่ HOSxP (ระบบนี้อ่านอย่างเดียว ไม่แตะตาราง opduser / doctor)
+              </div>
+
+              {/* Active Device Box */}
+              <div className="p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 space-y-2.5 shadow-sm">
+                <div className="text-xs font-bold text-slate-300 flex items-center justify-between">
+                  <span>อุปกรณ์ที่เข้าระบบอยู่ (1)</span>
+                </div>
+                <div className="flex items-center justify-between p-3 rounded-lg bg-slate-900/80 border border-slate-800 text-xs">
+                  <div className="flex items-center gap-3">
+                    <Monitor className="size-5 text-slate-400 shrink-0" />
+                    <div>
+                      <div className="font-semibold text-white flex items-center gap-2">
+                        <span>Chrome • Windows</span>
+                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                          เครื่องนี้
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        {window.location.hostname} • เข้าระบบวันนี้
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -1458,9 +1491,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-slate-950 shrink-0 text-xs">
-          <div className="flex items-center gap-2 text-slate-300 font-medium">
-            <Building2 className="size-3.5 text-emerald-400" />
-            <span>SMART-HOSCHECK • แผนกการแพทย์แผนไทย</span>
+          <div className="text-slate-400 font-normal">
+            PIN/2FA เก็บในฐาน dw_hd-check เท่านั้น — ไม่แตะฐาน HOSxP
           </div>
           <button
             type="button"

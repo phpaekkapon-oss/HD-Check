@@ -678,9 +678,9 @@ app.post('/api/auth/avatar', requireSession, async (req, res) => {
   }
 })
 
-app.delete('/api/auth/avatar/:loginname?', requireSession, async (req, res) => {
+const handleDeleteAvatarRoute = async (req, res) => {
   try {
-    const paramLogin = req.params.loginname
+    const paramLogin = req.params?.loginname
     const loginname = (paramLogin && isAdminUser(req.authUser))
       ? String(paramLogin).trim()
       : req.authUser.loginname
@@ -697,7 +697,10 @@ app.delete('/api/auth/avatar/:loginname?', requireSession, async (req, res) => {
   } catch (err) {
     fail(res, err)
   }
-})
+}
+
+app.delete('/api/auth/avatar', requireSession, handleDeleteAvatarRoute)
+app.delete('/api/auth/avatar/:loginname', requireSession, handleDeleteAvatarRoute)
 
 /* ---------------- Hospital 2FA Policy & Admin Management ---------------- */
 app.get('/api/admin/2fa-policy', requireAdmin, async (_req, res) => {
