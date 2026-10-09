@@ -231,6 +231,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
             : 'บันทึกนโยบายแล้ว: เปลี่ยนเป็นโหมดไม่บังคับ 2FA (ตามความสมัครใจ)'
         )
         setTimeout(() => setAdminNotice(null), 5000)
+      } else {
+        setAdminNotice(data.error || 'ไม่สามารถบันทึกนโยบายได้')
+        setTimeout(() => setAdminNotice(null), 5000)
       }
     } catch (err) {
       setAdminNotice(`เกิดข้อผิดพลาด: ${(err as Error).message}`)
@@ -260,6 +263,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
             ? `บันทึกนโยบายแล้ว: บังคับใช้ PIN Auto-Lock ทุกคน (ตั้งเวลา ${defaultHospitalMinutes} นาที)`
             : 'บันทึกนโยบายแล้ว: เปลี่ยนเป็นโหมดไม่บังคับ PIN Lock'
         )
+        setTimeout(() => setAdminNotice(null), 5000)
+      } else {
+        setAdminNotice(data.error || 'ไม่สามารถบันทึกนโยบาย PIN ได้')
         setTimeout(() => setAdminNotice(null), 5000)
       }
     } catch (err) {
@@ -545,7 +551,12 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
             {isAdmin && (
               <button
                 type="button"
-                onClick={() => setActiveTab('admin_policy')}
+                onClick={() => {
+                  setActiveTab('admin_policy')
+                  fetchPolicy()
+                  fetchPinPolicy()
+                  fetchUsers()
+                }}
                 className={cn(
                   'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
                   activeTab === 'admin_policy'
@@ -1276,6 +1287,15 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-800/80 text-emerald-400 border border-slate-700/60 font-mono">
                       {filteredUsers.length.toLocaleString()} คน
                     </span>
+                    <button
+                      type="button"
+                      onClick={() => fetchUsers()}
+                      disabled={usersLoading}
+                      className="p-1 rounded-lg bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-slate-400 hover:text-white transition cursor-pointer"
+                      title="รีเฟรชรายชื่อ"
+                    >
+                      <RotateCcw className={cn("size-3", usersLoading && "animate-spin text-emerald-400")} />
+                    </button>
                   </div>
 
                   {/* Search Bar with Clear Button */}

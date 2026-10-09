@@ -106,8 +106,21 @@ function clearSessionCookie(res) {
 }
 
 function isAdminUser(user) {
-  const group = String(user?.groupname ?? '').toLowerCase()
-  return group.includes('administrator') || group.includes('ผู้ดูแลระบบ')
+  if (!user) return false
+  const login = String(user.loginname ?? '').toLowerCase().trim()
+  const group = String(user.groupname ?? '').toLowerCase().trim()
+  const pos = String(user.position || user.entryposition || '').toLowerCase().trim()
+
+  // Named admin logins
+  if (login === 'admin' || login === 'adminpk' || login === 'aekkapon') return true
+
+  // HOSxP admin groups (admin, administrator, ผู้ดูแลระบบ, it)
+  if (group.includes('admin') || group.includes('administrator') || group.includes('ผู้ดูแลระบบ') || group.includes('it')) return true
+
+  // IT & Computer positions
+  if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('it') || pos.includes('โปรแกรมเมอร์')) return true
+
+  return false
 }
 
 function requireSession(req, res, next) {
