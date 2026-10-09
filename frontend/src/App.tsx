@@ -11,7 +11,7 @@ import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
 import { useAuditRecords, useDbStatus, useDrugSummaries, useSyncHerbDx } from '@/hooks/useHerbDx'
 import type { ActivePage, AuditFilterParams, AuditResultFilter, DateRange } from '@/types/herbdx.types'
-import { downloadCsv, toThaiDate } from '@/lib/format'
+import { downloadExcel, toThaiDate } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
 import { PinLockProvider } from '@/context/PinLockContext'
 import { LoginPage } from '@/components/LoginPage'
@@ -95,7 +95,7 @@ const DashboardView: FC = () => {
       r.audit_result === 'PASS' ? 'ผ่าน' : 'ไม่ผ่าน',
       r.audit_reason,
     ])
-    downloadCsv(`ตรวจสอบการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.csv`, headers, rows)
+    downloadExcel(`ตรวจสอบการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`, headers, rows, 'ผลตรวจการจ่ายยาสมุนไพร')
   }
 
   return (

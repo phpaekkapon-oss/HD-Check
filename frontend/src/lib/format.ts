@@ -1,4 +1,5 @@
 import type { AuditResult, DateRange } from '@/types/herbdx.types'
+import * as XLSX from 'xlsx'
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
@@ -82,6 +83,37 @@ export const AUDIT_RESULT_META: Record<AuditResult, { label: string; short: stri
     badge: 'bg-amber-50 text-amber-700 ring-amber-600/20',
     row: 'bg-amber-50/70 hover:bg-amber-50 shadow-[inset_3px_0_0_0_var(--color-amber-400)]',
   },
+}
+
+/** Download rows as Microsoft Excel (.xlsx) file with formatting and column auto-width */
+export function downloadExcel(
+  filename: string,
+  headers: readonly string[],
+  rows: readonly (string | number | null | undefined)[][],
+  sheetName = 'ตรวจสอบการจ่ายยาสมุนไพร'
+): void {
+  const aoa = [headers, ...rows]
+  const ws = XLSX.utils.aoa_to_sheet(aoa)
+
+  // Auto-fit column widths
+  const colWidths = headers.map((h, colIdx) => {
+    let maxLen = String(h).length
+    for (const r of rows) {
+      const val = r[colIdx]
+      if (val !== undefined && val !== null) {
+        const str = String(val)
+        if (str.length > maxLen) maxLen = Math.min(str.length, 50)
+      }
+    }
+    return { wch: Math.max(maxLen + 4, 10) }
+  })
+  ws['!cols'] = colWidths
+
+  const wb = XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb, ws, sheetName.substring(0, 31))
+
+  const finalFilename = filename.endsWith('.xlsx') ? filename : `${filename.replace(/\.csv$/i, '')}.xlsx`
+  XLSX.writeFile(wb, finalFilename)
 }
 
 /** Download rows as UTF-8 CSV with BOM (opens correctly in Thai Excel) */

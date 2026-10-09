@@ -23,7 +23,7 @@ import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { DataTableViewOptions } from '@/components/DataTableViewOptions'
 import { DateRangeFields } from '@/components/AuditFilterBar'
-import { downloadCsv, fmtNum } from '@/lib/format'
+import { downloadExcel, fmtNum } from '@/lib/format'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 
 interface DrugSummaryViewProps {
@@ -214,7 +214,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
       d.total_cost.toFixed(2),
       d.nhso_adp_code,
     ])
-    downloadCsv(`สรุปการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.csv`, headers, rows)
+    downloadExcel(`สรุปการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`, headers, rows, 'สรุปการจ่ายยาสมุนไพร')
   }
 
   return (
