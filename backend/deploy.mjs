@@ -13,7 +13,7 @@ const CONFIG = {
   port: Number(process.env.DEPLOY_PORT || 22),
   username: process.env.DEPLOY_USER || 'srimuang',
   password: process.env.DEPLOY_PASSWORD || "Fi'rpk[k]ry'F8o",
-  remoteDir: process.env.DEPLOY_REMOTE_DIR || '/home/srimuang/hd-check',
+  remoteDir: process.env.DEPLOY_REMOTE_DIR || '/var/www/html/hd-check',
   appName: 'hd-check',
 }
 
@@ -118,7 +118,8 @@ with zipfile.ZipFile('HD-Check.zip', 'r') as z:
         echo "[3/4] Checking and restarting with PM2..."
         cd "${CONFIG.remoteDir}"
         if command -v pm2 >/dev/null 2>&1; then
-          pm2 restart ${CONFIG.appName} || pm2 start backend/index.mjs --name ${CONFIG.appName}
+          pm2 delete ${CONFIG.appName} 2>/dev/null || true
+          pm2 start backend/index.mjs --name ${CONFIG.appName}
           pm2 save || true
         else
           echo "[NOTICE] PM2 not installed. Starting with Node.js in background..."
