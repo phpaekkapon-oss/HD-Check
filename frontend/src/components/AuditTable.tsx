@@ -104,11 +104,15 @@ export const AuditTable: FC<AuditTableProps> = ({ records }) => {
       {
         id: 'index',
         header: () => <div className="text-center w-8">ลำดับ</div>,
-        cell: ({ row }) => (
-          <div className="text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
-            {row.index + 1}
-          </div>
-        ),
+        cell: ({ row, table }) => {
+          const pageIndex = table.getState().pagination.pageIndex
+          const pageSize = table.getState().pagination.pageSize
+          return (
+            <div className="text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+              {pageIndex * pageSize + row.index + 1}
+            </div>
+          )
+        },
         enableSorting: false,
         enableHiding: false,
       },

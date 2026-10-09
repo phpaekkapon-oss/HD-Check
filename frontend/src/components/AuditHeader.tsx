@@ -225,11 +225,11 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               ) : last ? (
                 <div className="flex items-center gap-2 truncate">
                   <span className="text-slate-500 dark:text-slate-400">
-                    ข้อมูล {toThaiDate(last.start_date)} – {toThaiDate(last.end_date)}
+                    ซิงก์ล่าสุด: {toThaiDate(last.start_date)} – {toThaiDate(last.end_date)}
                   </span>
                   <span className="text-slate-300 dark:text-slate-600 select-none">•</span>
-                  <span className="font-semibold text-slate-700 dark:text-slate-200">
-                    <AnimatedNumber value={status?.totalPrescriptions ?? 0} /> รายการ
+                  <span className="text-slate-600 dark:text-slate-300">
+                    สะสมในระบบ <strong className="text-slate-800 dark:text-slate-100 font-bold"><AnimatedNumber value={status?.totalPrescriptions ?? 0} /></strong> รายการ
                   </span>
                   <span className="text-slate-300 dark:text-slate-600 select-none hidden md:inline">•</span>
                   <span className="text-emerald-600 dark:text-emerald-400 font-medium hidden md:inline">

@@ -86,14 +86,18 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
     }
   }
 
-  // Quick Preset Handlers
-  const applyPreset = (start: string, end: string) => {
+  // Quick Preset Handlers (Auto-applies and closes modal immediately)
+  const applyPreset = (start: string, end: string, autoApply = true) => {
     setTempStart(start)
     setTempEnd(end)
     const y = Number(start.split('-')[0])
     const m = Number(start.split('-')[1]) - 1
     setViewYear(y)
     setViewMonth(m)
+    if (autoApply) {
+      onChange({ startDate: start, endDate: end })
+      setIsOpen(false)
+    }
   }
 
   return (
@@ -146,27 +150,34 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
 
             {/* Quick Presets Bar */}
             <div className="bg-slate-50 dark:bg-[#1d2035] border-b border-slate-100 dark:border-[#292440] p-2.5 flex items-center gap-1.5 overflow-x-auto scrollbar-none text-xs">
-              <span className="text-[11px] font-semibold text-slate-400 pl-1 shrink-0">ลัด:</span>
+              <span className="text-[11px] font-semibold text-slate-400 pl-1 shrink-0">เลือกด่วน:</span>
               <button
                 type="button"
-                onClick={() => applyPreset('2026-10-01', '2026-10-31')}
-                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10"
+                onClick={() => applyPreset('2026-10-01', '2026-10-31', true)}
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
-                ตุลาคม 2569 (ข้อมูลจริง)
+                ตุลาคม 2569 (เดือนนี้)
               </button>
               <button
                 type="button"
-                onClick={() => applyPreset('2026-09-01', '2026-09-30')}
-                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10"
+                onClick={() => applyPreset('2026-09-01', '2026-09-30', true)}
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
-                กันยายน 2569
+                กันยายน 2569 (เดือนก่อน)
               </button>
               <button
                 type="button"
-                onClick={() => applyPreset('2025-10-01', '2026-09-30')}
-                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10"
+                onClick={() => applyPreset('2025-10-01', '2026-09-30', true)}
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
               >
                 ปีงบฯ 2569
+              </button>
+              <button
+                type="button"
+                onClick={() => applyPreset('2026-10-01', '2027-09-30', true)}
+                className="shrink-0 px-2.5 py-1 rounded-lg bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] text-slate-700 dark:text-slate-200 font-medium hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
+              >
+                ปีงบฯ 2570
               </button>
             </div>
 
