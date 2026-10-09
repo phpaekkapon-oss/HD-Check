@@ -1,7 +1,6 @@
 import { useState, type FC } from 'react'
 import {
   ClipboardCheck,
-  Database,
   Leaf,
   Pill,
   Settings2,
@@ -58,6 +57,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const { user } = useAuth()
   const isAdmin = isAdminUser(user)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const [aboutModalOpen, setAboutModalOpen] = useState(false)
 
   const content = (isMobileView: boolean, isCollapsedView: boolean) => (
     <div
@@ -267,80 +267,41 @@ export const Sidebar: FC<SidebarProps> = ({
             )}
           </button>
         )}
-
-        {/* Database Health Pill */}
-        <div
-          className={cn(
-            'rounded-xl bg-slate-50 dark:bg-black/30 p-2.5 text-[11px] border border-slate-200 dark:border-white/[0.08] transition-colors',
-            isCollapsedView ? 'flex justify-center p-2' : 'space-y-1'
-          )}
-          title={isCollapsedView ? (statusError ? 'ฐานข้อมูล HOSxP: ไม่สามารถเชื่อมต่อได้' : 'ฐานข้อมูล HOSxP: พร้อมใช้งาน') : undefined}
-        >
-          <div className="flex items-center gap-2 font-medium text-slate-700 dark:text-slate-300">
-            <Database className="size-3.5 text-slate-500 dark:text-slate-400 shrink-0" />
-            {!isCollapsedView && (
-              <>
-                <span className="text-[11px] truncate">ฐานข้อมูล HOSxP</span>
-                <span
-                  className={cn(
-                    'ml-auto size-2 rounded-full shrink-0',
-                    statusError
-                      ? 'bg-rose-500'
-                      : status
-                      ? 'bg-emerald-500 dark:bg-emerald-400 animate-pulse'
-                      : 'bg-slate-300 dark:bg-white/40'
-                  )}
-                />
-              </>
-            )}
-          </div>
-          {!isCollapsedView && (
-            <div className={cn(
-              'text-[10px] truncate font-medium',
-              statusError ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400'
-            )}>
-              {statusError ? 'ไม่สามารถเชื่อมต่อได้' : 'พร้อมใช้งาน (Online)'}
-            </div>
-          )}
-        </div>
       </div>
 
-      {/* Hospital Footer Branding & Developer Credit */}
-      <div
-        className={cn(
-          'p-3 border-t border-slate-200 dark:border-white/[0.08] bg-slate-100/60 dark:bg-black/25 flex items-start transition-colors',
-          isCollapsedView ? 'justify-center' : 'gap-2.5'
-        )}
-      >
-        <Building2 className="size-5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
-        {!isCollapsedView && (
-          <div className="min-w-0 flex-1 leading-tight animate-fade-in space-y-1.5">
-            <div>
-              <div className="text-[11.5px] font-bold text-slate-900 dark:text-white truncate">
-                โรงพยาบาล<span className="text-amber-600 dark:text-amber-300">พังโคน</span>
-              </div>
-              <div className="text-[9.5px] text-slate-600 dark:text-slate-400 truncate mt-0.5">
-                กลุ่มงานการแพทย์แผนไทย (PHANG KHON)
-              </div>
-            </div>
-
-            <div className="pt-1 border-t border-slate-200/80 dark:border-white/10 text-[9.5px] text-slate-600 dark:text-slate-300">
-              <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
-                👨‍💻 ผู้พัฒนา: นายเอกพล อันคำวงค์
-              </div>
-              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                นักวิชาการคอมพิวเตอร์ปฏิบัติการ
-              </div>
-              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
-                โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล
-              </div>
-            </div>
-
-            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">
-              SMART-HOSCHECK v1.0.8 (2026)
-            </div>
+      {/* Hospital Footer Branding (Standard Clean Enterprise Card) */}
+      <div className="p-2 border-t border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+        <button
+          type="button"
+          onClick={() => setAboutModalOpen(true)}
+          className={cn(
+            'w-full flex items-center rounded-xl p-2 text-left hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer group',
+            isCollapsedView ? 'justify-center' : 'gap-2.5'
+          )}
+          title="ข้อมูลโรงพยาบาลและผู้พัฒนาระบบ (คลิกเพื่อดูรายละเอียด)"
+        >
+          <div className="size-8 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0 group-hover:scale-105 transition-transform">
+            <Building2 className="size-4" />
           </div>
-        )}
+          {!isCollapsedView && (
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                  โรงพยาบาลพังโคน
+                </span>
+                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
+                  v1.0.8
+                </span>
+              </div>
+              <div className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center justify-between">
+                <span>แพทย์แผนไทย</span>
+                <span className="text-[10px] text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                  เกี่ยวกับระบบ →
+                </span>
+              </div>
+            </div>
+          )}
+        </button>
       </div>
     </div>
   )
@@ -369,6 +330,88 @@ export const Sidebar: FC<SidebarProps> = ({
           </div>
         </div>
       )}
+
+      {/* About System & Developer Modal (Clean Hospital Enterprise Standard) */}
+      {aboutModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-fade-in"
+          onClick={() => setAboutModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 p-5 shadow-2xl space-y-4 animate-scale-in text-slate-800 dark:text-slate-100"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 grid place-items-center">
+                  <Building2 className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    โรงพยาบาลพังโคน
+                  </h3>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    กลุ่มงานการแพทย์แผนไทยและการแพทย์ทางเลือก
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAboutModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <div className="space-y-2.5 text-xs">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1">
+                <div className="font-semibold text-slate-900 dark:text-white flex items-center justify-between">
+                  <span>SMART-HOSCHECK</span>
+                  <span className="font-mono text-[11px] text-teal-600 dark:text-teal-400 font-bold">v1.0.8 (2026)</span>
+                </div>
+                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                  ระบบตรวจสอบเวชระเบียนการสั่งใช้ยาสมุนไพรตามเงื่อนไขข้อบ่งใช้ ICD-10 / ICD-10-TM
+                </p>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1">
+                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
+                  ข้อมูลผู้พัฒนา & ฝ่ายเทคโนโลยี
+                </div>
+                <div className="font-bold text-slate-900 dark:text-white text-xs">
+                  👨‍💻 นายเอกพล อันคำวงศ์
+                </div>
+                <div className="text-slate-600 dark:text-slate-300 text-[11px]">
+                  นักวิชาการคอมพิวเตอร์ปฏิบัติการ
+                </div>
+                <div className="text-slate-500 dark:text-slate-400 text-[11px]">
+                  กลุ่มงานสุขภาพดิจิทัล • โทร. 257 IT
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11.5px]">
+                <span className="text-slate-500 dark:text-slate-400">การเชื่อมต่อ HOSxP</span>
+                <span className={cn('font-semibold inline-flex items-center gap-1.5', statusError ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400')}>
+                  <span className={cn('size-1.5 rounded-full', statusError ? 'bg-rose-500' : status ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400')} />
+                  {statusError ? 'ขาดการเชื่อมต่อ' : status ? 'Online พร้อมใช้งาน' : 'กำลังตรวจสอบ…'}
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-1 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setAboutModalOpen(false)}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 2FA Security Modal */}
       <Security2FASettingsModal
         isOpen={securityModalOpen}
