@@ -325,7 +325,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               className="flex items-center gap-2 p-1 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-xs relative overflow-hidden"
+                className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border border-slate-200 dark:border-white/20 shrink-0 text-slate-700 dark:text-white shadow-xs overflow-hidden"
                 style={{
                   borderColor: `${accent.hex}55`,
                 }}
@@ -338,12 +338,6 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   />
                 ) : (
                   <User className="size-4 sm:size-4.5" />
-                )}
-                {user?.two_factor_enabled && (
-                  <span
-                    className="absolute -top-0.5 -right-0.5 size-2.5 rounded-full bg-emerald-500 border border-white dark:border-slate-900 shadow-xs z-10"
-                    title="2FA เปิดใช้งานแล้ว"
-                  />
                 )}
               </div>
               <div className="hidden xl:block text-left leading-tight">
@@ -380,7 +374,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                           setAvatarModalOpen(true)
                         }}
                         className="relative group size-12 rounded-full overflow-hidden border-2 border-teal-500/40 bg-slate-100 dark:bg-slate-800 grid place-items-center shadow-md shrink-0 cursor-pointer focus:outline-none"
-                        title="คลิกเพื่อเปลี่ยนรูปภาพประจำตัว"
+                        title="คลิกเพื่อเปลี่ยนหรือปรับแต่งรูปโปรไฟล์"
                       >
                         {user?.avatar_url ? (
                           <img
@@ -391,12 +385,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                         ) : (
                           <User className="size-6 text-slate-400 dark:text-slate-500" />
                         )}
-                        <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
-                          <Camera className="size-4" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
+                          <Camera className="size-4 drop-shadow" />
                         </div>
-                        <span className="absolute bottom-0 right-0 p-1 rounded-full bg-teal-600 text-white shadow-xs">
-                          <Camera className="size-2.5" />
-                        </span>
                       </button>
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-bold truncate">
