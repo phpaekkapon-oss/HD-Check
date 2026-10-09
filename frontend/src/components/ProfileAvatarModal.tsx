@@ -10,6 +10,7 @@ import {
   ZoomOut,
   Image as ImageIcon,
   RotateCcw,
+  Upload,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 
@@ -173,7 +174,7 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault()
     const delta = -e.deltaY * 0.0015
-    setZoom((prev) => Math.min(3.5, Math.max(1, +(prev + delta).toFixed(2))))
+    setZoom((prev) => Math.min(3.5, Math.max(0.5, +(prev + delta).toFixed(2))))
   }
 
   // Save cropped high-definition image (640x640 Retina quality)
@@ -403,7 +404,7 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
               <div className="flex items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setZoom((z) => Math.max(1, +(z - 0.1).toFixed(2)))}
+                  onClick={() => setZoom((z) => Math.max(0.5, +(z - 0.1).toFixed(2)))}
                   className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition cursor-pointer"
                   title="ซูมออก (-10%)"
                 >
@@ -412,8 +413,8 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
 
                 <input
                   type="range"
-                  min="1"
-                  max="3"
+                  min="0.5"
+                  max="3.5"
                   step="0.01"
                   value={zoom}
                   onChange={(e) => setZoom(parseFloat(e.target.value))}
@@ -422,7 +423,7 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
 
                 <button
                   type="button"
-                  onClick={() => setZoom((z) => Math.min(3, +(z + 0.1).toFixed(2)))}
+                  onClick={() => setZoom((z) => Math.min(3.5, +(z + 0.1).toFixed(2)))}
                   className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-white/5 transition cursor-pointer"
                   title="ซูมเข้า (+10%)"
                 >
@@ -432,10 +433,11 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
                 <button
                   type="button"
                   onClick={handleResetFraming}
-                  className="text-slate-400 hover:text-purple-300 p-1 rounded-lg hover:bg-white/5 transition cursor-pointer ml-1"
-                  title="รีเซ็ตตำแหน่ง/ซูม"
+                  className="flex items-center gap-1 text-slate-300 hover:text-white px-2 py-1 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 transition cursor-pointer text-xs ml-1"
+                  title="รีเซ็ตตำแหน่งและซูมกลับค่าเริ่มต้น (1.0x)"
                 >
-                  <RotateCcw className="size-3.5" />
+                  <RotateCcw className="size-3 text-purple-400" />
+                  <span className="text-[11px] font-medium">รีเซ็ต</span>
                 </button>
               </div>
 
@@ -477,9 +479,11 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               disabled={isProcessing}
-              className="px-4 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/60 transition cursor-pointer active:scale-95"
+              className="px-3.5 py-2 rounded-xl text-xs font-bold text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700/60 transition cursor-pointer active:scale-95 flex items-center gap-1.5"
+              title="เลือกไฟล์รูปภาพต้นฉบับใหม่จากคอมพิวเตอร์"
             >
-              เลือกรูปอื่น
+              <Upload className="size-3.5 text-slate-400" />
+              <span>เลือกรูปต้นฉบับ</span>
             </button>
 
             <button
