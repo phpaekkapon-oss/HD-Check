@@ -14,12 +14,24 @@ const tempSessions = new Map() // For 2FA verification step (expires in 5 mins)
 const pending2FASetups = new Map()
 const SESSION_TTL_MS = 8 * 60 * 60 * 1000
 
-function generateToken() {
+export function generateToken() {
   return crypto.randomBytes(32).toString('hex')
 }
 
 export async function initAuthTables(dwPool) {
   await Promise.all([
+    dwPool.query(`
+      CREATE TABLE IF NOT EXISTS dw_hd_check_user_sessions (
+        session_token VARCHAR(64) PRIMARY KEY,
+        loginname VARCHAR(50) NOT NULL,
+        user_json MEDIUMTEXT NOT NULL,
+        expires_at BIGINT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_loginname (loginname),
+        INDEX idx_expires (expires_at)
+      ) ENGINE=InnoDB DEFAULT CHARSET=tis620
+    `),
     dwPool.query(`
       CREATE TABLE IF NOT EXISTS dw_hd_check_system_settings (
         setting_key VARCHAR(50) PRIMARY KEY,
@@ -277,7 +289,8 @@ export async function authenticateHosUser(hosPool, dwPool, loginname, password) 
     enforce_pin_lock: isPinEnforced,
     default_auto_lock_minutes: defaultAutoLock,
   }
-  activeSessions.set(token, { user: authenticatedUser, loginAt: new Date().toISOString(), expiresAt: Date.now() + SESSION_TTL_MS })
+  const sessionData = { user: authenticatedUser, loginAt: new Date().toISOString(), expiresAt: Date.now() + SESSION_TTL_MS }
+  await saveSession(dwPool, token, sessionData)
 
   // Record login timestamp in dw_hd_check_user_2fa
   await dwPool.query(
@@ -382,7 +395,8 @@ export async function verify2FALogin(dwPool, tempToken, code) {
     enforce_pin_lock: pinPolicyMap.enforce_pin_lock === 'Y',
     default_auto_lock_minutes: Number(pinPolicyMap.default_auto_lock_minutes || 5),
   }
-  activeSessions.set(token, { user: authenticatedUser, loginAt: new Date().toISOString(), expiresAt: Date.now() + SESSION_TTL_MS })
+  const sessionData = { user: authenticatedUser, loginAt: new Date().toISOString(), expiresAt: Date.now() + SESSION_TTL_MS }
+  await saveSession(dwPool, token, sessionData)
 
   return {
     success: true,
@@ -800,17 +814,65 @@ export async function resetUserPin(dwPool, targetLoginname) {
 }
 
 /**
- * Verify session token middleware helper
+ * Save session to in-memory cache and persistent database
  */
-export function verifySession(token) {
-  if (!token) return null
-  const session = activeSessions.get(token)
-  if (!session) return null
-  if (Date.now() > session.expiresAt) {
-    activeSessions.delete(token)
-    return null
+export async function saveSession(dwPool, token, session) {
+  if (!token || !session) return
+  activeSessions.set(token, session)
+  if (dwPool) {
+    try {
+      await dwPool.query(
+        `INSERT INTO dw_hd_check_user_sessions (session_token, loginname, user_json, expires_at)
+         VALUES (?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE user_json = VALUES(user_json), expires_at = VALUES(expires_at)`,
+        [token, session.user?.loginname || '', JSON.stringify(session), session.expiresAt]
+      )
+    } catch (err) {
+      console.error('[AUTH] saveSession db error:', err.message)
+    }
   }
-  return session
+}
+
+/**
+ * Verify session token helper (checks memory first, then MySQL if restarted)
+ */
+export async function verifySession(token, dwPool = null) {
+  if (!token) return null
+  const cached = activeSessions.get(token)
+  if (cached) {
+    if (Date.now() > cached.expiresAt) {
+      activeSessions.delete(token)
+      if (dwPool) {
+        dwPool.query(`DELETE FROM dw_hd_check_user_sessions WHERE session_token = ?`, [token]).catch(() => {})
+      }
+      return null
+    }
+    return cached
+  }
+
+  // Not in memory (e.g. server process restarted or reloaded): check persistent DB
+  if (dwPool) {
+    try {
+      const [rows] = await dwPool.query(
+        `SELECT user_json, expires_at FROM dw_hd_check_user_sessions WHERE session_token = ? LIMIT 1`,
+        [token]
+      )
+      if (rows.length > 0) {
+        const { user_json, expires_at } = rows[0]
+        if (Date.now() > Number(expires_at)) {
+          dwPool.query(`DELETE FROM dw_hd_check_user_sessions WHERE session_token = ?`, [token]).catch(() => {})
+          return null
+        }
+        const session = JSON.parse(user_json)
+        activeSessions.set(token, session)
+        return session
+      }
+    } catch (err) {
+      console.error('[AUTH] verifySession db error:', err.message)
+    }
+  }
+
+  return null
 }
 
 export function verifyTempSession(token) {
@@ -824,9 +886,114 @@ export function verifyTempSession(token) {
   return session
 }
 
-export function logoutSession(token) {
-  if (token) activeSessions.delete(token)
+export async function logoutSession(token, dwPool = null) {
+  if (token) {
+    activeSessions.delete(token)
+    if (dwPool) {
+      try {
+        await dwPool.query(`DELETE FROM dw_hd_check_user_sessions WHERE session_token = ?`, [token])
+      } catch (_) {}
+    }
+  }
   return { success: true }
+}
+
+/**
+ * Retrieve full user profile & permissions by loginname (used to re-issue session on PIN unlock)
+ */
+export async function getAuthenticatedUserByLoginname(hosPool, dwPool, loginname) {
+  const cleanLogin = String(loginname ?? '').trim()
+  if (!cleanLogin) return null
+
+  let user = null
+  try {
+    const [opdRows] = await hosPool.query(
+      `SELECT loginname, name, doctorcode, groupname, account_disable, entryposition, departmentposition
+       FROM opduser WHERE loginname = ? LIMIT 1`,
+      [cleanLogin]
+    )
+    if (opdRows.length > 0) {
+      const row = opdRows[0]
+      if (row.account_disable === 'Y') return null
+      const { position, entryposition } = parsePosition(row)
+      user = {
+        loginname: row.loginname,
+        name: row.name,
+        doctorcode: row.doctorcode ?? null,
+        groupname: row.groupname ?? 'เจ้าหน้าที่ HOSxP',
+        position,
+        entryposition,
+        user_type: 'opduser',
+      }
+    }
+  } catch (err) {
+    console.error('[AUTH] lookup opduser failed:', err.message)
+  }
+
+  if (!user) {
+    try {
+      const [docRows] = await hosPool.query(
+        `SELECT code, name, licenseno, departmentposition FROM doctor WHERE code = ? LIMIT 1`,
+        [cleanLogin]
+      )
+      if (docRows.length > 0) {
+        const row = docRows[0]
+        const { position, entryposition } = parsePosition(row)
+        user = {
+          loginname: row.code,
+          name: row.name,
+          doctorcode: row.code,
+          groupname: 'แพทย์',
+          position: position || 'แพทย์ประจำโรงพยาบาล',
+          entryposition,
+          user_type: 'doctor',
+        }
+      }
+    } catch (err) {
+      console.error('[AUTH] lookup doctor failed:', err.message)
+    }
+  }
+
+  if (!user) return null
+
+  // System Policies
+  let isPinEnforced = false
+  let defaultAutoLock = 5
+  try {
+    const [sysSettings] = await dwPool.query(
+      `SELECT setting_key, setting_value FROM dw_hd_check_system_settings 
+       WHERE setting_key IN ('enforce_pin_lock', 'default_auto_lock_minutes')`
+    )
+    const settingsMap = {}
+    for (const s of sysSettings) settingsMap[s.setting_key] = s.setting_value
+    isPinEnforced = settingsMap.enforce_pin_lock === 'Y'
+    defaultAutoLock = Number(settingsMap.default_auto_lock_minutes || 5)
+  } catch (_) {}
+
+  // 2FA & PIN Details
+  let user2fa = null
+  try {
+    const [user2faRows] = await dwPool.query(
+      `SELECT two_factor_enabled, totp_secret, pin_hash, pin_enabled, pin_length, auto_lock_minutes 
+       FROM dw_hd_check_user_2fa WHERE loginname = ? LIMIT 1`,
+      [cleanLogin]
+    )
+    user2fa = user2faRows[0] ?? null
+  } catch (_) {}
+
+  const avatarUrl = await getUserAvatarUrl(dwPool, cleanLogin)
+
+  return {
+    ...user,
+    avatar_url: avatarUrl,
+    two_factor_enabled: Boolean(user2fa && user2fa.two_factor_enabled === 1 && user2fa.totp_secret),
+    has_pin: Boolean(user2fa && user2fa.pin_hash),
+    pin_enabled: Boolean(user2fa && user2fa.pin_enabled === 1 && user2fa.pin_hash),
+    pin_length: Number(user2fa?.pin_length || 6),
+    auto_lock_minutes: Number(user2fa?.auto_lock_minutes ?? defaultAutoLock),
+    enforce_pin_lock: isPinEnforced,
+    default_auto_lock_minutes: defaultAutoLock,
+  }
 }
 
 /**

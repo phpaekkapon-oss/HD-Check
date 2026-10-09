@@ -31,6 +31,9 @@ import {
   saveUserAvatar,
   deleteUserAvatar,
   getUserAvatarUrl,
+  generateToken,
+  saveSession,
+  getAuthenticatedUserByLoginname,
 } from './auth.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -91,8 +94,8 @@ function readCookie(req, name) {
   }
 }
 
-function getSession(req) {
-  return verifySession(readCookie(req, SESSION_COOKIE))
+async function getSession(req) {
+  return await verifySession(readCookie(req, SESSION_COOKIE), dwPool)
 }
 
 function setSessionCookie(res, token) {
@@ -124,11 +127,17 @@ function isAdminUser(user) {
 }
 
 function requireSession(req, res, next) {
-  const session = getSession(req)
-  if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
-  req.authSession = session
-  req.authUser = session.user
-  next()
+  getSession(req)
+    .then((session) => {
+      if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+      req.authSession = session
+      req.authUser = session.user
+      next()
+    })
+    .catch((err) => {
+      console.error('[AUTH Middleware Error]', err)
+      res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+    })
 }
 
 function requireAdmin(req, res, next) {
@@ -477,7 +486,7 @@ app.post('/api/auth/setup-2fa/init', async (req, res) => {
   try {
     const { loginname } = req.body ?? {}
     if (!loginname) return res.status(400).json({ success: false, error: 'ระบุ loginname' })
-    const activeSession = getSession(req)
+    const activeSession = await getSession(req)
     const tempSession = verifyTempSession(req.body?.tempToken)
     const isSelf = activeSession && String(activeSession.user.loginname).toLowerCase() === String(loginname).trim().toLowerCase()
     const isFirstSetup = tempSession?.mode === 'setup_required' &&
@@ -496,7 +505,7 @@ app.post('/api/auth/setup-2fa/confirm', async (req, res) => {
     if (!loginname || !secret || !code) {
       return res.status(400).json({ success: false, error: 'ข้อมูลไม่ครบถ้วน' })
     }
-    const activeSession = getSession(req)
+    const activeSession = await getSession(req)
     const tempSession = verifyTempSession(req.body?.tempToken)
     const isSelf = activeSession && String(activeSession.user.loginname).toLowerCase() === String(loginname).trim().toLowerCase()
     const isFirstSetup = tempSession?.mode === 'setup_required' &&
@@ -514,7 +523,7 @@ app.post('/api/auth/disable-2fa', async (req, res) => {
   try {
     const { loginname } = req.body ?? {}
     if (!loginname) return res.status(400).json({ success: false, error: 'ระบุ loginname' })
-    const session = getSession(req)
+    const session = await getSession(req)
     if (!session || !canManageLogin(session.user, loginname)) {
       return res.status(session ? 403 : 401).json({ success: false, error: 'ไม่มีสิทธิ์จัดการ 2FA ของบัญชีนี้' })
     }
@@ -525,14 +534,14 @@ app.post('/api/auth/disable-2fa', async (req, res) => {
   }
 })
 
-app.post('/api/auth/logout', (req, res) => {
-  logoutSession(readCookie(req, SESSION_COOKIE))
+app.post('/api/auth/logout', async (req, res) => {
+  await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
   clearSessionCookie(res)
   res.json({ success: true })
 })
 
 app.get('/api/auth/me', async (req, res) => {
-  const session = getSession(req)
+  const session = await getSession(req)
   if (!session) {
     return res.json({ success: false, user: null })
   }
@@ -677,7 +686,7 @@ app.post('/api/auth/avatar', requireSession, async (req, res) => {
 
     if (loginname === req.authUser.loginname) {
       req.authUser.avatar_url = newAvatarUrl
-      const session = getSession(req)
+      const session = req.authSession || await getSession(req)
       if (session) session.user.avatar_url = newAvatarUrl
     }
 
@@ -702,7 +711,7 @@ const handleDeleteAvatarRoute = async (req, res) => {
 
     if (loginname === req.authUser.loginname) {
       req.authUser.avatar_url = null
-      const session = getSession(req)
+      const session = req.authSession || await getSession(req)
       if (session) session.user.avatar_url = null
     }
 
@@ -763,11 +772,46 @@ app.post('/api/auth/pin/setup', requireSession, async (req, res) => {
   }
 })
 
-app.post('/api/auth/pin/verify', requireSession, async (req, res) => {
+app.post('/api/auth/pin/verify', async (req, res) => {
   try {
-    const { pin } = req.body ?? {}
+    const { pin, loginname } = req.body ?? {}
     if (!pin) return res.status(400).json({ success: false, error: 'กรุณากรอกรหัส PIN' })
-    res.json(await verifyUserPin(dwPool, req.authUser.loginname, pin))
+
+    const session = await getSession(req)
+    const targetLogin = session?.user?.loginname || loginname
+    if (!targetLogin) {
+      return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+    }
+
+    // Verify PIN against DW database
+    const pinResult = await verifyUserPin(dwPool, targetLogin, pin)
+
+    // If session was missing or expired (e.g. server was restarted while locked),
+    // but PIN was successfully verified, re-issue a valid session automatically!
+    let activeUser = session?.user
+    if (!session || !activeUser) {
+      activeUser = await getAuthenticatedUserByLoginname(hosPool, dwPool, targetLogin)
+      if (activeUser) {
+        const token = generateToken()
+        const newSession = {
+          user: activeUser,
+          loginAt: new Date().toISOString(),
+          expiresAt: Date.now() + SESSION_MAX_AGE * 1000,
+        }
+        await saveSession(dwPool, token, newSession)
+        setSessionCookie(res, token)
+        return res.json({
+          success: true,
+          message: 'ปลดล็อกหน้าจอสำเร็จ',
+          user: activeUser,
+        })
+      }
+    }
+
+    res.json({
+      ...pinResult,
+      user: activeUser || undefined,
+    })
   } catch (err) {
     fail(res, err, 401)
   }

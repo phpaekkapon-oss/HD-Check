@@ -216,8 +216,24 @@ export const LockScreenOverlay: FC = () => {
 
         {/* Error Feedback */}
         {error && (
-          <div className="text-xs text-rose-400 font-bold mb-3 animate-in fade-in">
-            {error}
+          <div className="flex flex-col items-center gap-1.5 mb-3 animate-in fade-in">
+            <div className="text-xs text-rose-400 font-bold flex items-center gap-1">
+              <ShieldAlert className="size-3.5 shrink-0" />
+              <span>{error}</span>
+            </div>
+            {(error.includes('เข้าสู่ระบบ') || error.includes('เซสชัน')) && (
+              <button
+                type="button"
+                onClick={() => {
+                  sessionStorage.removeItem('smarthoscheck_pin_locked')
+                  logout()
+                }}
+                className="mt-1 px-3 py-1 text-xs rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
+              >
+                <LogOut className="size-3" />
+                คลิกเพื่อเข้าสู่ระบบใหม่
+              </button>
+            )}
           </div>
         )}
 

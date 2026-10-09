@@ -66,6 +66,9 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
         return { success: false, error: data.error || 'รหัส PIN ไม่ถูกต้อง' }
       }
 
+      if (data.user) {
+        updateUser(data.user)
+      }
       setIsLocked(false)
       sessionStorage.removeItem(STORAGE_LOCK_KEY)
       lastActivityRef.current = Date.now()
