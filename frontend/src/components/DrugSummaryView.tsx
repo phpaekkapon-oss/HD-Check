@@ -259,36 +259,36 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         </div>
       </div>
 
-      {/* Filter toolbar */}
-      <div className="rounded-2xl bg-themed-card border-themed border p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3 shadow-xs">
-        <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
-          <DateRangeFields range={range} onChange={onRangeChange} />
+      {/* Main Shadcn Data Table (Desktop View - Unified Card) */}
+      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
+        {/* Integrated Table Toolbar Header */}
+        <div className="p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-[#1d2035]/70 border-b border-slate-200 dark:border-[#292440]">
+          <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
+            <DateRangeFields range={range} onChange={onRangeChange} />
 
-          <div className="relative flex-1 min-w-[200px]">
-            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหารหัสยา, ชื่อยา, รหัส 24 หลัก…"
-              className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs"
-            />
+            <div className="relative flex-1 min-w-[200px]">
+              <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหารหัสยา, ชื่อยา, รหัส 24 หลัก…"
+                className="w-full rounded-xl bg-white dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs"
+              />
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <DataTableViewOptions table={table} columnLabels={DRUG_COLUMN_LABELS} />
+            <button
+              type="button"
+              onClick={handleExport}
+              className="btn-pill-action inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold active:scale-95 transition cursor-pointer shadow-sm"
+            >
+              <Download className="size-4 text-white" /> Export Excel
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <DataTableViewOptions table={table} columnLabels={DRUG_COLUMN_LABELS} />
-          <button
-            type="button"
-            onClick={handleExport}
-            className="btn-pill-action inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-bold active:scale-95 transition cursor-pointer shadow-sm"
-          >
-            <Download className="size-4 text-white" /> Export Excel
-          </button>
-        </div>
-      </div>
-
-      {/* Main Shadcn Data Table (Desktop View) */}
-      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
         <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
           <TableHeader className="bg-slate-50 dark:bg-[#1d2035]">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -331,6 +331,26 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
 
       {/* Mobile Drug Cards List View */}
       <div className="block md:hidden space-y-3">
+        {/* Mobile Filter Toolbar */}
+        <div className="rounded-2xl bg-themed-card border-themed border p-3 flex flex-col gap-2.5 shadow-xs">
+          <DateRangeFields range={range} onChange={onRangeChange} />
+          <div className="relative">
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหารหัสยา, ชื่อยา, รหัส 24 หลัก…"
+              className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1"
+            />
+          </div>
+          <button
+            type="button"
+            onClick={handleExport}
+            className="btn-pill-action flex items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-bold active:scale-95 transition cursor-pointer shadow-sm w-full"
+          >
+            <Download className="size-4 text-white" /> Export Excel
+          </button>
+        </div>
         {table.getRowModel().rows.length === 0 ? (
           <div className="rounded-2xl bg-themed-card border-themed border p-8 text-center text-slate-500 dark:text-slate-400">
             ไม่พบรายการยาตามคำค้นหา
