@@ -163,22 +163,24 @@ export const LoginPage: FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-[#070b14] relative overflow-hidden select-none">
+    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 relative overflow-hidden select-none">
       {/* Dynamic Background Atmosphere Glow */}
       <div
-        className="absolute top-1/4 -left-32 w-96 h-96 rounded-full blur-[120px] pointer-events-none opacity-20"
+        className="absolute -top-40 left-1/2 -translate-x-1/2 w-[850px] h-[700px] rounded-full blur-[140px] pointer-events-none opacity-40"
         style={{ backgroundColor: accent.hex }}
       />
       <div
-        className="absolute -bottom-20 -right-20 w-[500px] h-[500px] rounded-full blur-[140px] pointer-events-none opacity-15"
-        style={{ backgroundColor: accent.darkText }}
+        className="absolute -bottom-40 -left-20 w-[600px] h-[600px] rounded-full blur-[150px] pointer-events-none opacity-30 bg-teal-500"
+      />
+      <div
+        className="absolute -bottom-20 -right-20 w-[600px] h-[600px] rounded-full blur-[150px] pointer-events-none opacity-30 bg-indigo-500"
       />
 
       {/* Main Glass Card */}
       <div className="w-full max-w-md relative z-10 animate-fade-in">
         {/* Hospital Brand Badge Header */}
         <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.06] border border-white/10 text-xs text-slate-300 font-mono shadow-xs mb-3">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] border border-white/15 text-xs text-slate-200 font-mono shadow-xs mb-3">
             <Building2 className="size-3.5 text-emerald-400" />
             <span>โรงพยาบาลพังโคน • แพทย์แผนไทย</span>
           </div>
@@ -197,7 +199,7 @@ export const LoginPage: FC = () => {
               <h1 className="text-2xl font-black text-white tracking-tight leading-tight">
                 SMART-HOSCHECK
               </h1>
-              <p className="text-xs text-slate-400 font-medium">
+              <p className="text-xs text-slate-300 font-medium">
                 ระบบตรวจสอบการจ่ายยาสมุนไพร (HOSxP)
               </p>
             </div>
@@ -205,7 +207,7 @@ export const LoginPage: FC = () => {
         </div>
 
         {/* Form Container Card */}
-        <div className="rounded-2xl bg-[#0f1424]/90 backdrop-blur-xl border border-white/10 p-6 sm:p-8 shadow-2xl relative">
+        <div className="rounded-2xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 p-6 sm:p-8 shadow-2xl relative ring-1 ring-white/10">
           {/* STEP 1: HOSxP LOGIN FORM */}
           {step === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">
@@ -213,9 +215,6 @@ export const LoginPage: FC = () => {
                 <div className="text-base font-bold text-white flex items-center gap-2">
                   <Lock className="size-4 text-emerald-400" />
                   เข้าสู่ระบบด้วยบัญชี HOSxP
-                </div>
-                <div className="text-xs text-slate-400 mt-0.5">
-                  เชื่อมโยงสิทธิ์การใช้งานจากตาราง <code className="text-teal-300">opduser</code> และ <code className="text-teal-300">doctor</code>
                 </div>
               </div>
 
@@ -239,7 +238,7 @@ export const LoginPage: FC = () => {
                     onChange={(e) => setLoginname(e.target.value)}
                     placeholder="เช่น admin, doctor, phar"
                     autoFocus
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/10 transition"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white placeholder-slate-400 text-sm focus:outline-hidden focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition shadow-inner"
                   />
                 </div>
               </div>
@@ -256,7 +255,7 @@ export const LoginPage: FC = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-white/[0.05] border border-white/10 text-white placeholder-slate-500 text-sm focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/10 transition"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white placeholder-slate-400 text-sm focus:outline-hidden focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition shadow-inner"
                   />
                 </div>
               </div>
