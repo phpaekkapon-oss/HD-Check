@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="th">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="description" content="SMART-HOSCHECK • ระบบตรวจสอบเวชระเบียนการสั่งใช้ยาสมุนไพรตามเงื่อนไขข้อบ่งใช้ ICD-10 / ICD-10-TM สำหรับโรงพยาบาล HOSxP" />
+
+    <meta name="theme-color" content="#0d0f22" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="SMART-HOSCHECK" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+
+    <script>
+      (() => {
+        const presets = ['herbal', 'clinical', 'modern', 'executive', 'violet'];
+        const presetHeaderColors = {
+          violet: '#0d0f22',
+          herbal: '#091724',
+          clinical: '#081924',
+          modern: '#08121c',
+          executive: '#0b1120',
+        };
+        const accents = {
+          violet: ['#9333ea', '#d8b4fe', 'rgba(147, 51, 234, 0.35)', '#7e22ce'],
+          indigo: ['#4f46e5', '#a5b4fc', 'rgba(79, 70, 229, 0.35)', '#4338ca'],
+          blue: ['#2563eb', '#93c5fd', 'rgba(37, 99, 235, 0.35)', '#1d4ed8'],
+          sky: ['#0284c7', '#7dd3fc', 'rgba(2, 132, 199, 0.35)', '#0369a1'],
+          cyan: ['#0891b2', '#67e8f9', 'rgba(8, 145, 178, 0.35)', '#0e7490'],
+          teal: ['#0d9488', '#5eead4', 'rgba(13, 148, 136, 0.35)', '#0f766e'],
+          emerald: ['#059669', '#6ee7b7', 'rgba(5, 150, 105, 0.35)', '#047857'],
+          green: ['#16a34a', '#86efac', 'rgba(22, 163, 74, 0.35)', '#15803d'],
+          lime: ['#65a30d', '#bef264', 'rgba(101, 163, 13, 0.35)', '#4d7c0f'],
+          amber: ['#d97706', '#fcd34d', 'rgba(217, 119, 6, 0.35)', '#b45309'],
+          orange: ['#ea580c', '#fdba74', 'rgba(234, 88, 12, 0.35)', '#c2410c'],
+          rose: ['#e11d48', '#fda4af', 'rgba(225, 29, 72, 0.35)', '#be123c'],
+        };
+        let mode = 'dark';
+        let preset = 'violet';
+        let accentId = 'violet';
+        try {
+          const savedMode = localStorage.getItem('theme_mode_v4');
+          const savedPreset = localStorage.getItem('theme_dark_preset_v4');
+          const savedAccent = localStorage.getItem('theme_accent_v4');
+          if (savedMode === 'light' || savedMode === 'dark') mode = savedMode;
+          if (presets.includes(savedPreset)) preset = savedPreset;
+          if (Object.hasOwn(accents, savedAccent)) accentId = savedAccent;
+        } catch (_) {}
+
+        const root = document.documentElement;
+        const accent = accents[accentId] || accents.violet;
+        root.classList.toggle('dark', mode === 'dark');
+        root.dataset.themeMode = mode;
+        root.dataset.darkPreset = preset;
+        root.dataset.accent = accentId;
+        root.style.setProperty('--accent-hex', accent[0]);
+        root.style.setProperty('--accent-foreground', '#ffffff');
+        root.style.setProperty('--accent-text', mode === 'dark' ? accent[1] : accent[0]);
+        root.style.setProperty('--accent-glow', accent[2]);
+        root.style.setProperty('--sidebar-accent', mode === 'dark' ? accent[1] : accent[0]);
+        root.style.setProperty(
+          '--sidebar-active-bg',
+          mode === 'dark'
+            ? `linear-gradient(90deg, color-mix(in srgb, ${accent[0]} 18%, transparent) 0%, color-mix(in srgb, ${accent[0]} 7%, transparent) 100%)`
+            : `linear-gradient(90deg, color-mix(in srgb, ${accent[0]} 14%, white) 0%, color-mix(in srgb, ${accent[0]} 5%, white) 100%)`
+        );
+        root.style.setProperty(
+          '--sidebar-bg',
+          mode === 'dark'
+            ? `color-mix(in srgb, #0b0f19 92%, ${accent[0]} 8%)`
+            : '#ffffff'
+        );
+        root.style.setProperty(
+          '--sidebar-border',
+          mode === 'dark'
+            ? `color-mix(in srgb, ${accent[0]} 15%, rgba(255, 255, 255, 0.08))`
+            : '#e2e8f0'
+        );
+        const titleBarColor = accent[3] || '#7e22ce';
+        const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+        if (themeColorMeta) themeColorMeta.content = titleBarColor;
+      })();
+    </script>
+    
+    <title>SMART-HOSCHECK • ระบบตรวจสอบการจ่ายยาสมุนไพร (HOSxP)</title>
+
+    <!-- Modern Thai Typography: Prompt (Google Fonts) & JetBrains Mono -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Prompt:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="min-h-screen antialiased selection:bg-violet-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+    <script>
+      // Only register PWA Service Worker in production; clean up on localhost
+      if ('serviceWorker' in navigator) {
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const r of registrations) r.unregister();
+          });
+          if ('caches' in window) {
+            caches.keys().then((names) => {
+              for (const name of names) caches.delete(name);
+            });
+          }
+        } else {
+          window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(() => {});
+          });
+        }
+      }
+    </script>
+  </body>
+</html>

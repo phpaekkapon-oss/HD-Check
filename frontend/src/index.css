@@ -1,0 +1,310 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@layer base {
+  body {
+    background-color: var(--app-bg);
+    color: var(--text-main);
+  }
+
+  /* ========================================================
+     1. LIGHT MODE (Default root when not .dark)
+     Crisp, clean, professional hospital daylight theme
+     ======================================================== */
+  :root,
+  html[data-theme-mode="light"],
+  html:not(.dark) {
+    font-family: 'Prompt', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    letter-spacing: -0.01em;
+    color-scheme: light;
+    --app-bg: #f6f4fb;
+    --card-bg: #ffffff;
+    --card-border: #e8e2f2;
+    --card-header: #f5f1fa;
+    --card-sub: #fbf9fd;
+    --text-main: #0f172a;
+    --text-muted: #64748b;
+    --text-sub: #475569;
+    --header-bg: #ffffff;
+    --header-border: #e8e2f2;
+    --header-text: #0f172a;
+    --sidebar-bg: #fdfcff;
+    --sidebar-border: #e8e2f2;
+    --sidebar-text: #514663;
+    --sidebar-hover: #f5f1fa;
+    --sidebar-active-bg: #f0e7fb;
+    --input-bg: #ffffff;
+    --input-border: #d8cfe5;
+    --table-header-bg: #f2edf8;
+    --table-header-text: #403650;
+    --table-border: #e8e2f2;
+    --table-row-hover: #f8f5fc;
+    --badge-bg: #f0e7fb;
+    --badge-text: #5b347a;
+  }
+
+  /* ========================================================
+     2. DARK MODE PRESETS (When html.dark is present)
+     ======================================================== */
+  html.dark {
+    color-scheme: dark;
+  }
+
+  /* Preset 1: 🌿 แพทย์แผนไทย (Herbal Emerald) */
+  html.dark,
+  html.dark[data-dark-preset="herbal"] {
+    --app-bg: #07131d;
+    --card-bg: #0e1f30;
+    --card-border: #162f46;
+    --card-header: #0a1826;
+    --card-sub: #07131e;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-sub: #cbd5e1;
+    --header-bg: #091724;
+    --header-border: #162f46;
+    --header-text: #ffffff;
+    --sidebar-bg: #07121c;
+    --sidebar-border: #152a3d;
+    --sidebar-text: #94a3b8;
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
+    --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+    --input-bg: #07131e;
+    --input-border: #162f46;
+    --table-header-bg: #0a1826;
+    --table-header-text: #cbd5e1;
+    --table-border: #162f46;
+    --table-row-hover: rgba(255, 255, 255, 0.05);
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-text: #e2e8f0;
+  }
+
+  /* Preset 2: 🏥 HOSxP คลาสสิก (Clinical Teal) */
+  html.dark[data-dark-preset="clinical"] {
+    --app-bg: #07151e;
+    --card-bg: #0d212d;
+    --card-border: #143242;
+    --card-header: #091924;
+    --card-sub: #07151f;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-sub: #cbd5e1;
+    --header-bg: #081924;
+    --header-border: #143242;
+    --header-text: #ffffff;
+    --sidebar-bg: #06151f;
+    --sidebar-border: #112d3c;
+    --sidebar-text: #94a3b8;
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
+    --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+    --input-bg: #06151f;
+    --input-border: #143242;
+    --table-header-bg: #091924;
+    --table-header-text: #cbd5e1;
+    --table-border: #143242;
+    --table-row-hover: rgba(255, 255, 255, 0.05);
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-text: #e2e8f0;
+  }
+
+  /* Preset 3: 🔷 คลินิกทันสมัย (Modern Cyan) */
+  html.dark[data-dark-preset="modern"] {
+    --app-bg: #070e17;
+    --card-bg: #0d1824;
+    --card-border: #142738;
+    --card-header: #0a131e;
+    --card-sub: #060e17;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-sub: #cbd5e1;
+    --header-bg: #08121c;
+    --header-border: #142738;
+    --header-text: #ffffff;
+    --sidebar-bg: #060e17;
+    --sidebar-border: #102130;
+    --sidebar-text: #94a3b8;
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
+    --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+    --input-bg: #060e17;
+    --input-border: #142738;
+    --table-header-bg: #0a131e;
+    --table-header-text: #cbd5e1;
+    --table-border: #142738;
+    --table-row-hover: rgba(255, 255, 255, 0.05);
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-text: #e2e8f0;
+  }
+
+  /* Preset 4: 💼 ผู้บริหารราชการ (Executive Blue) */
+  html.dark[data-dark-preset="executive"] {
+    --app-bg: #090e1a;
+    --card-bg: #11192b;
+    --card-border: #1a2842;
+    --card-header: #0c1322;
+    --card-sub: #080d19;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --text-sub: #cbd5e1;
+    --header-bg: #0b1120;
+    --header-border: #1a2842;
+    --header-text: #ffffff;
+    --sidebar-bg: #080d19;
+    --sidebar-border: #141e34;
+    --sidebar-text: #94a3b8;
+    --sidebar-hover: rgba(255, 255, 255, 0.05);
+    --sidebar-active-bg: rgba(255, 255, 255, 0.1);
+    --input-bg: #080d19;
+    --input-border: #1a2842;
+    --table-header-bg: #0c1322;
+    --table-header-text: #cbd5e1;
+    --table-border: #1a2842;
+    --table-row-hover: rgba(255, 255, 255, 0.05);
+    --badge-bg: rgba(255, 255, 255, 0.08);
+    --badge-text: #e2e8f0;
+  }
+
+  /* Preset 5: 💜 Modern Violet — deep ink surfaces with a vivid orchid accent */
+  html.dark[data-dark-preset="violet"] {
+    --app-bg: #0b0d1b;
+    --card-bg: #14172a;
+    --card-border: #292440;
+    --card-header: #1d2035;
+    --card-sub: #101326;
+    --text-main: #f8f7ff;
+    --text-muted: #a7a3bb;
+    --text-sub: #ded9ef;
+    --header-bg: #202e40;
+    --header-border: #30364b;
+    --header-text: #ffffff;
+    --sidebar-bg: #17162b;
+    --sidebar-border: #302a46;
+    --sidebar-text: #eee9f8;
+    --sidebar-hover: rgba(255, 255, 255, 0.06);
+    --sidebar-active-bg: rgba(192, 132, 252, 0.14);
+    --input-bg: #101326;
+    --input-border: #34304a;
+    --table-header-bg: #1d2035;
+    --table-header-text: #e9e4f7;
+    --table-border: #2b2843;
+    --table-row-hover: rgba(168, 85, 247, 0.08);
+    --badge-bg: rgba(168, 85, 247, 0.14);
+    --badge-text: #eadcff;
+  }
+
+  code, pre, kbd, .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Dynamic Theme CSS Helper Classes */
+.bg-themed-app {
+  background-color: var(--app-bg) !important;
+}
+
+.bg-themed-card {
+  background-color: var(--card-bg) !important;
+}
+
+.border-themed {
+  border-color: var(--card-border) !important;
+}
+
+.bg-themed-header {
+  background-color: var(--card-header) !important;
+}
+
+.bg-themed-sub {
+  background-color: var(--card-sub) !important;
+}
+
+.text-themed-main {
+  color: var(--text-main) !important;
+}
+
+.text-themed-muted {
+  color: var(--text-muted) !important;
+}
+
+.text-sidebar-accent {
+  color: var(--sidebar-accent, var(--accent-text, var(--accent-hex))) !important;
+}
+.bg-sidebar-accent {
+  background-color: var(--sidebar-accent, var(--accent-hex)) !important;
+}
+
+/* Dynamic Accent Color Utility Classes */
+.bg-accent {
+  background-color: var(--accent-hex) !important;
+  color: var(--accent-foreground, #ffffff) !important;
+}
+
+.text-accent {
+  color: var(--accent-text, var(--accent-hex)) !important;
+}
+
+.border-accent {
+  border-color: var(--accent-hex) !important;
+}
+
+.ring-accent {
+  --tw-ring-color: var(--accent-hex) !important;
+}
+
+/* Signature Pill Action Button: Adapts to Active Accent with Smooth Medical Gradient */
+.btn-pill-action {
+  background: linear-gradient(120deg, var(--accent-hex, #a855f7) 0%, color-mix(in srgb, var(--accent-hex, #a855f7) 78%, #4c1d95) 100%) !important;
+  box-shadow: 0 4px 14px var(--accent-glow, rgba(16, 185, 129, 0.4)) !important;
+  color: var(--accent-foreground, #ffffff) !important;
+  border-radius: 9999px !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  font-weight: 700 !important;
+}
+
+html:not(.dark) .bg-themed-app { background-color: var(--app-bg) !important; }
+html:not(.dark) .bg-themed-card { background-color: var(--card-bg) !important; }
+html:not(.dark) .border-themed { border-color: var(--card-border) !important; }
+html:not(.dark) .bg-themed-header { background-color: var(--card-header) !important; }
+html:not(.dark) .text-themed-main { color: var(--text-main) !important; }
+html:not(.dark) .text-themed-muted { color: var(--text-muted) !important; }
+
+/* Inputs share a clear, accessible focus color in both appearance modes. */
+input:focus-visible, select:focus-visible, textarea:focus-visible, button:focus-visible {
+  outline-color: var(--accent-hex, #a855f7);
+}
+.btn-pill-action:hover {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 18px var(--accent-glow, rgba(16, 185, 129, 0.6)) !important;
+}
+
+/* iOS Safe Area Insets for iPhone Dynamic Island, Home Bar & iPad */
+.safe-bottom {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 0.5rem);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Smooth Touch Scrolling */
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Sleek Minimalist Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #334155;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

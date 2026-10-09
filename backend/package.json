@@ -1,0 +1,19 @@
+{
+  "name": "hd-check-backend",
+  "version": "1.0.0",
+  "description": "HerbDx (SMART-HOSCHECK) Backend API & Data Sync Engine",
+  "type": "module",
+  "main": "index.mjs",
+  "scripts": {
+    "start": "node index.mjs",
+    "dev": "node --watch index.mjs",
+    "sync": "node sync.mjs",
+    "init-db": "node init-db.mjs"
+  },
+  "dependencies": {
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.6",
+    "express": "^5.2.1",
+    "mysql2": "^3.24.5"
+  }
+}
