@@ -180,8 +180,8 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   return (
     <header className="sticky top-0 z-30 bg-themed-header text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#30364b] select-none shadow-sm dark:shadow-md transition-colors">
       <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 min-h-16 py-2">
-        {/* Left Section: Sidebar Toggle & Page Title */}
-        <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0 mr-auto">
+        {/* Left Section: Sidebar Toggle, Standardized Clean Title & Metadata */}
+        <div className="flex items-center gap-3 min-w-0 mr-auto">
           {/* Desktop Toggle Button: แสดงเฉพาะตอน Sidebar ย่ออยู่เพื่อกดขยายกลับมา */}
           {collapsed && (
             <button
@@ -204,36 +204,35 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             <PanelLeft className="size-5" />
           </button>
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h1 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight truncate">
+          {/* Clean Enterprise Title & Subtitle Hierarchy */}
+          <div className="min-w-0 flex flex-col justify-center">
+            <div className="flex items-center gap-2.5">
+              <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
                 {current?.label}
               </h1>
-              <span className="hidden md:inline-flex items-center gap-1.5 text-[10.5px] font-mono px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25">
-                <span className="size-1.5 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-                HOSxP Online • แพทย์แผนไทย
+              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-medium font-sans">
+                <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                HOSxP Online
               </span>
             </div>
 
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5 font-mono flex-wrap sm:flex-nowrap">
+            {/* Clean Metadata Line (แทนที่กล่องป้ายซ้อนทับกันหลายชิ้นแบบเดิม) */}
+            <div className="text-[11.5px] text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 font-sans truncate">
               {statusError ? (
                 <span className="inline-flex items-center gap-1 text-rose-500 dark:text-rose-400 truncate">
-                  <AlertCircle className="size-3 shrink-0" /> {statusError}
+                  <AlertCircle className="size-3.5 shrink-0" /> {statusError}
                 </span>
               ) : last ? (
-                <div className="flex items-center gap-1.5 min-w-0">
-                  <span
-                    className="truncate text-slate-500 dark:text-slate-400"
-                    title={`ซิงค์ล่าสุด ${toThaiDate(last.start_date)}–${toThaiDate(last.end_date)} (${fmtNum(status?.totalPrescriptions ?? 0)} รายการ)`}
-                  >
-                    <span className="hidden xs:inline">ซิงค์ล่าสุด </span>
-                    {toThaiDate(last.start_date)}–{toThaiDate(last.end_date)}
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-slate-500 dark:text-slate-400">
+                    ข้อมูล {toThaiDate(last.start_date)} – {toThaiDate(last.end_date)}
                   </span>
-                  <span className="shrink-0 font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 dark:bg-emerald-400/15 border border-emerald-500/20 px-1.5 py-0.5 rounded text-[10.5px]">
+                  <span className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-200">
                     <AnimatedNumber value={status?.totalPrescriptions ?? 0} /> รายการ
                   </span>
-                  <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-mono text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 rounded-full">
-                    <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                  <span className="text-slate-300 dark:text-slate-600 select-none hidden md:inline">•</span>
+                  <span className="text-emerald-600 dark:text-emerald-400 font-medium hidden md:inline">
                     Auto-Sync
                   </span>
                 </div>
@@ -244,131 +243,136 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           </div>
         </div>
 
-        {/* Right Section: Live Thai Clock, Actions, User Profile Pill */}
-        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
-          {/* Live Thai Date & Clock Pill with Pulsing Status (Matching Screenshot) */}
-          <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-[#1d2035] border border-slate-200 dark:border-[#292440] text-xs font-mono text-slate-700 dark:text-slate-200 shadow-xs">
+        {/* Right Section: Standardized Professional Utilities, Actions & Profile */}
+        <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+          {/* Live Thai Date & Clock (Clean Subtle Pill) */}
+          <div className="hidden xl:flex items-center gap-2 px-3 h-9 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200 dark:border-white/10 text-xs font-mono text-slate-700 dark:text-slate-300">
             <Clock className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-            <span className="font-semibold tracking-wide">{liveDateTimeStr}</span>
-            <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse shadow-xs shadow-emerald-400" />
+            <span className="font-medium tracking-wide">{liveDateTimeStr}</span>
+            <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-400" />
           </div>
 
-          {/* Fullscreen Toggle */}
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="hidden md:flex p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
-            title={isFullscreen ? 'ออกจากเต็มจอ' : 'เปิดเต็มจอ'}
-          >
-            {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
-          </button>
-
-          {/* Quick Light/Dark Toggle */}
-          <button
-            type="button"
-            onClick={toggleMode}
-            className="p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
-            title={mode === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Dark Mode)'}
-          >
-            {mode === 'dark' ? (
-              <Moon className="size-4 text-amber-300" />
-            ) : (
-              <Sun className="size-4 text-amber-500" />
-            )}
-          </button>
-
-          {/* Theme Customizer Palette Popover */}
-          <div className="relative">
+          {/* Utility Icon Group (Fullscreen, Theme Toggle, Palette Customizer) */}
+          <div className="hidden sm:flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
             <button
               type="button"
-              onClick={() => setThemeCustomizerOpen((prev) => !prev)}
-              className="p-2 rounded-xl border border-slate-200 dark:border-[#292440] bg-slate-100 dark:bg-[#1d2035] text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer relative"
-              title="ปรับแต่งธีมระดับโรงพยาบาลมืออาชีพ (5 ธีม + 12 เฉดสี)"
+              onClick={toggleFullscreen}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
+              title={isFullscreen ? 'ออกจากเต็มจอ' : 'เปิดเต็มจอ'}
             >
-              <Palette className="size-4 transition-transform hover:scale-110" style={{ color: accent.hex }} />
-              <span
-                className="absolute -top-1 -right-1 size-2 rounded-full border border-white dark:border-[#091724]"
-                style={{ backgroundColor: accent.hex }}
-              />
+              {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
             </button>
 
-            {/* The Dropdown Popover */}
-            <ThemeCustomizerPopover
-              isOpen={themeCustomizerOpen}
-              onClose={() => setThemeCustomizerOpen(false)}
-            />
+            <button
+              type="button"
+              onClick={toggleMode}
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
+              title={mode === 'dark' ? 'เปลี่ยนเป็นโหมดสว่าง (Light Mode)' : 'เปลี่ยนเป็นโหมดมืด (Dark Mode)'}
+            >
+              {mode === 'dark' ? (
+                <Moon className="size-4 text-amber-300" />
+              ) : (
+                <Sun className="size-4 text-amber-500" />
+              )}
+            </button>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setThemeCustomizerOpen((prev) => !prev)}
+                className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10 active:scale-95 transition cursor-pointer relative"
+                title="ปรับแต่งธีม (5 ธีม + 12 เฉดสี)"
+              >
+                <Palette className="size-4 transition-transform hover:scale-110" style={{ color: accent.hex }} />
+                <span
+                  className="absolute top-1 right-1 size-1.5 rounded-full"
+                  style={{ backgroundColor: accent.hex }}
+                />
+              </button>
+
+              <ThemeCustomizerPopover
+                isOpen={themeCustomizerOpen}
+                onClose={() => setThemeCustomizerOpen(false)}
+              />
+            </div>
           </div>
 
-          {/* PWA Install Button */}
+          {/* Divider */}
+          <div className="hidden sm:block h-5 w-px bg-slate-200 dark:bg-white/10" />
+
+          {/* PWA Install Button (Clean Outline Pill) */}
           {!isInstalled && (
             <button
               type="button"
               onClick={handleInstallClick}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 text-teal-800 dark:text-teal-100 px-2.5 py-1.5 text-xs font-semibold active:scale-95 transition cursor-pointer"
+              className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer flex items-center gap-1.5"
               title="ติดตั้ง SMART-HOSCHECK เป็นแอปพลิเคชันบนเครื่อง"
             >
-              <Smartphone className="size-3.5 text-teal-600 dark:text-teal-300" />
+              <Smartphone className="size-3.5 text-teal-600 dark:text-teal-400" />
               <span className="hidden md:inline">ติดตั้งแอป</span>
             </button>
           )}
 
           {/* Sync Result / Error feedback */}
           {syncError && (
-            <span className="hidden xl:inline text-xs text-rose-500 dark:text-rose-400 font-mono truncate max-w-xs" title={syncError}>
+            <span className="hidden 2xl:inline text-xs text-rose-500 dark:text-rose-400 font-mono truncate max-w-xs" title={syncError}>
               {syncError}
             </span>
           )}
           {syncResult && !syncError && !isSyncing && (
-            <span className="hidden xl:inline text-xs text-emerald-600 dark:text-emerald-300 font-mono">
-              +{fmtNum(syncResult.totalPrescriptions)} รายการ
+            <span className="hidden 2xl:inline text-xs text-emerald-600 dark:text-emerald-400 font-mono">
+              +{fmtNum(syncResult.totalPrescriptions)}
             </span>
           )}
 
-          {/* HOSxP Sync Button (Matching user cropped image: Cyan/Teal Gradient Pill with Cloud Icon) */}
+          {/* Primary Action: HOSxP Sync Button (Standardized h-9 Height) */}
           <button
             id="btn-sync-hosxp"
             type="button"
             onClick={onSync}
             disabled={isSyncing || Boolean(status?.isSyncing)}
-            className="btn-pill-action inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer"
+            className="btn-pill-action h-9 inline-flex items-center gap-1.5 px-3.5 sm:px-4 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs"
           >
             {isSyncing || status?.isSyncing ? (
               <Loader2 className="size-3.5 animate-spin shrink-0" />
             ) : (
               <CloudDownload className="size-3.5 shrink-0" />
             )}
-            <span className="hidden xs:inline">
+            <span>
               {isSyncing || status?.isSyncing ? 'กำลังดึง…' : 'ดึง HOSxP'}
             </span>
           </button>
 
-          {/* User Profile & Security Menu */}
-          <div className="relative pl-1 sm:pl-2 border-l border-slate-200 dark:border-white/10 flex items-center gap-1.5">
-            {/* Quick Lock Button (Header Bar - Always Available) */}
-            <button
-              type="button"
-              onClick={() => {
-                if (hasPin) {
-                  lockNow()
-                } else {
-                  setSecurityInitialTab('my_pin')
-                  setSecurityModalOpen(true)
-                }
-              }}
-              className="h-9 px-2.5 sm:px-3 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 active:scale-95 text-amber-700 dark:text-amber-300 border border-amber-500/30 flex items-center gap-1.5 text-xs font-bold cursor-pointer transition shadow-xs"
-              title={hasPin ? 'ล็อกหน้าจอทันที ไม่ให้ผู้อื่นเข้าดูข้อมูล (Ctrl + L)' : 'คลิกเพื่อตั้งรหัส PIN สำหรับล็อกหน้าจอ'}
-            >
-              <Lock className="size-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="hidden sm:inline">{hasPin ? 'ล็อกหน้าจอทันที' : 'ตั้ง PIN ล็อกจอ'}</span>
-            </button>
+          {/* Quick Lock Button (Clean Professional Standard) */}
+          <button
+            type="button"
+            onClick={() => {
+              if (hasPin) {
+                lockNow()
+              } else {
+                setSecurityInitialTab('my_pin')
+                setSecurityModalOpen(true)
+              }
+            }}
+            className="h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-amber-500/10 active:scale-95 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-white/10 flex items-center gap-1.5 text-xs font-semibold cursor-pointer transition"
+            title={hasPin ? 'ล็อกหน้าจอทันที (Ctrl + L)' : 'ตั้งรหัส PIN ล็อกหน้าจอ'}
+          >
+            <Lock className="size-3.5 text-slate-500 dark:text-slate-400" />
+            <span className="hidden md:inline">{hasPin ? 'ล็อกหน้าจอ' : 'ตั้ง PIN'}</span>
+          </button>
 
+          {/* Divider */}
+          <div className="h-5 w-px bg-slate-200 dark:bg-white/10" />
+
+          {/* User Profile Pill (Standard 40px Avatar with Balanced Clean Layout) */}
+          <div className="relative">
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="group flex items-center gap-2.5 p-1 sm:px-2 rounded-2xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="group flex items-center gap-2.5 p-1 sm:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
-                className="grid place-items-center size-12 sm:size-12.5 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-md overflow-hidden ring-2 ring-black/5 dark:ring-white/15 transition-transform duration-200 group-hover:scale-105"
+                className="grid place-items-center size-10 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-xs overflow-hidden ring-1 ring-black/5 dark:ring-white/10 transition-transform duration-200 group-hover:scale-105"
                 style={{
                   borderColor: accent.hex,
                 }}
@@ -381,18 +385,18 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     style={{ imageRendering: '-webkit-optimize-contrast' }}
                   />
                 ) : (
-                  <User className="size-6 text-slate-400 dark:text-slate-300" />
+                  <User className="size-5 text-slate-400 dark:text-slate-300" />
                 )}
               </div>
-              <div className="hidden xl:block text-left leading-snug">
+              <div className="hidden xl:block text-left leading-tight">
                 <div
-                  className="text-xs sm:text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[190px]"
+                  className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[170px]"
                   title={user?.name || ''}
                 >
                   {user?.name || 'นายเอกพล อันคำวงค์'}
                 </div>
                 <div
-                  className="text-[11px] text-teal-700 dark:text-teal-200/85 truncate max-w-[190px] mt-0.5"
+                  className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate max-w-[170px] mt-0.5"
                   title={user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                 >
                   {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
