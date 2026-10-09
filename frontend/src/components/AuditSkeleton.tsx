@@ -14,8 +14,8 @@ export const AuditKpiSkeleton: FC = () => (
   </div>
 )
 
-export const AuditTableSkeleton: FC<{ rows?: number }> = ({ rows = 12 }) => (
-  <div className="rounded-2xl bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#292440] overflow-hidden animate-pulse">
+export const AuditTableSkeleton: FC<{ rows?: number; embedded?: boolean }> = ({ rows = 12, embedded = false }) => (
+  <div className={`overflow-hidden animate-pulse ${embedded ? '' : 'rounded-2xl bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#292440]'}`}>
     <div className="h-10 bg-slate-100 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]" />
     {Array.from({ length: rows }, (_, i) => (
       <div key={i} className="h-10 flex items-center gap-4 px-4 border-b border-slate-100 dark:border-[#292440]">

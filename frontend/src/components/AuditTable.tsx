@@ -27,6 +27,7 @@ import { toThaiDate } from '@/lib/format'
 
 interface AuditTableProps {
   readonly records: readonly AuditRecord[]
+  readonly embedded?: boolean
 }
 
 function DxCodeCell({ code, record }: { readonly code: string; readonly record: AuditRecord }) {
@@ -88,7 +89,7 @@ const COLUMN_LABELS: Record<string, string> = {
   audit_result: 'สถานะผลตรวจ',
 }
 
-export const AuditTable: FC<AuditTableProps> = ({ records }) => {
+export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     dx2: true,
@@ -359,26 +360,26 @@ export const AuditTable: FC<AuditTableProps> = ({ records }) => {
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  if (records.length === 0) {
-    return (
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-12 text-center shadow-xs dark:shadow-sm">
-        <AlertCircle className="mx-auto size-10 text-amber-500 mb-3" />
-        <h3 className="text-sm font-bold text-slate-900 dark:text-white">ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา</h3>
-        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">โปรดลองเลือกช่วงวันที่ใหม่ หรือปรับตัวกรองค้นหา</p>
-      </div>
-    )
-  }
-
   return (
-    <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden space-y-0 transition-colors">
+    <div
+      className={cn(
+        'space-y-0 transition-colors overflow-hidden',
+        !embedded && 'rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm'
+      )}
+    >
       {/* Table Toolbar Header with Column Toggle */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
+      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 dark:bg-[#1d2035]/80 border-b border-slate-200 dark:border-[#292440]">
         <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
           <span className="font-semibold text-slate-900 dark:text-white">Shadcn Data Table</span>
           <span className="text-slate-400 dark:text-slate-500">•</span>
           <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
         </div>
-        <DataTableViewOptions table={table} columnLabels={COLUMN_LABELS} />
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
+            {records.length.toLocaleString('th-TH')} รายการ
+          </span>
+          <DataTableViewOptions table={table} columnLabels={COLUMN_LABELS} />
+        </div>
       </div>
 
       {/* Main Shadcn Data Table with sticky header and vertical scroll */}
@@ -398,30 +399,42 @@ export const AuditTable: FC<AuditTableProps> = ({ records }) => {
         </TableHeader>
 
         <TableBody>
-          {table.getRowModel().rows.map((row) => {
-            const isNoDx = row.original.audit_result === 'NO_DX'
-            const isFail = row.original.audit_result === 'FAIL'
-            const isNoMap = row.original.audit_result === 'NO_MAP'
-            const isPass = row.original.audit_result === 'PASS'
+          {table.getRowModel().rows.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-32 text-center text-slate-500 dark:text-slate-400">
+                <div className="flex flex-col items-center justify-center gap-1.5 py-8">
+                  <AlertCircle className="size-8 text-amber-500 mb-1" />
+                  <span className="font-semibold text-slate-800 dark:text-slate-200 text-sm">ไม่พบข้อมูลตามเงื่อนไขที่ค้นหา</span>
+                  <span className="text-xs text-slate-400">โปรดลองเลือกช่วงวันที่ใหม่ หรือปรับตัวกรองค้นหา</span>
+                </div>
+              </TableCell>
+            </TableRow>
+          ) : (
+            table.getRowModel().rows.map((row) => {
+              const isNoDx = row.original.audit_result === 'NO_DX'
+              const isFail = row.original.audit_result === 'FAIL'
+              const isNoMap = row.original.audit_result === 'NO_MAP'
+              const isPass = row.original.audit_result === 'PASS'
 
-            const rowClass = cn(
-              'transition-colors border-slate-100 dark:border-[#292440]/70 text-slate-800 dark:text-slate-200',
-              isNoDx && 'bg-rose-50/70 hover:bg-rose-100/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 border-l-4 border-l-rose-600',
-              isFail && 'bg-rose-50/50 hover:bg-rose-100/50 dark:bg-rose-950/15 dark:hover:bg-rose-950/30 border-l-4 border-l-rose-500',
-              isNoMap && 'bg-amber-50/60 hover:bg-amber-100/60 dark:bg-amber-950/15 dark:hover:bg-amber-950/30 border-l-4 border-l-amber-500 dark:border-l-amber-400',
-              isPass && 'bg-emerald-50/50 hover:bg-emerald-100/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35 border-l-4 border-l-emerald-500'
-            )
+              const rowClass = cn(
+                'transition-colors border-slate-100 dark:border-[#292440]/70 text-slate-800 dark:text-slate-200',
+                isNoDx && 'bg-rose-50/70 hover:bg-rose-100/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 border-l-4 border-l-rose-600',
+                isFail && 'bg-rose-50/50 hover:bg-rose-100/50 dark:bg-rose-950/15 dark:hover:bg-rose-950/30 border-l-4 border-l-rose-500',
+                isNoMap && 'bg-amber-50/60 hover:bg-amber-100/60 dark:bg-amber-950/15 dark:hover:bg-amber-950/30 border-l-4 border-l-amber-500 dark:border-l-amber-400',
+                isPass && 'bg-emerald-50/50 hover:bg-emerald-100/60 dark:bg-emerald-950/20 dark:hover:bg-emerald-950/35 border-l-4 border-l-emerald-500'
+              )
 
-            return (
-              <TableRow key={row.id} className={rowClass}>
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
-                ))}
-              </TableRow>
-            )
-          })}
+              return (
+                <TableRow key={row.id} className={rowClass}>
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              )
+            })
+          )}
         </TableBody>
       </Table>
 

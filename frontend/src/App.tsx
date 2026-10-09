@@ -131,40 +131,48 @@ const DashboardView: FC = () => {
             />
           )}
 
-          {/* Filter Controls Bar (Buddhist Era Date Picker, HN, Search, Quick Tabs, Export) */}
-          <AuditFilterBar
-            range={range}
-            onRangeChange={setRange}
-            hn={hn}
-            onHnChange={setHn}
-            search={search}
-            onSearchChange={setSearch}
-            result={resultFilter}
-            onResultChange={setResultFilter}
-            onExport={handleExportAudit}
-            canExport={Boolean(auditResponse && auditResponse.data.length > 0)}
-          />
+          {/* Desktop Unified Audit Card (Filter Toolbar + Table) */}
+          <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
+            <AuditFilterBar
+              range={range}
+              onRangeChange={setRange}
+              hn={hn}
+              onHnChange={setHn}
+              search={search}
+              onSearchChange={setSearch}
+              result={resultFilter}
+              onResultChange={setResultFilter}
+              onExport={handleExportAudit}
+              canExport={Boolean(auditResponse && auditResponse.data.length > 0)}
+              embedded
+            />
+            {isAuditLoading ? (
+              <AuditTableSkeleton embedded />
+            ) : auditResponse ? (
+              <AuditTable records={auditResponse.data} embedded />
+            ) : null}
+          </div>
 
-          {/* Audit Grid (Desktop Table / Mobile Card List) */}
-          {isAuditLoading ? (
-            <>
-              <div className="hidden md:block">
-                <AuditTableSkeleton />
-              </div>
-              <div className="block md:hidden">
-                <AuditCardListSkeleton />
-              </div>
-            </>
-          ) : auditResponse ? (
-            <>
-              <div className="hidden md:block">
-                <AuditTable records={auditResponse.data} />
-              </div>
-              <div className="block md:hidden">
-                <AuditCardList records={auditResponse.data} />
-              </div>
-            </>
-          ) : null}
+          {/* Mobile View: Standalone Filter Bar & Cards List */}
+          <div className="block md:hidden space-y-3">
+            <AuditFilterBar
+              range={range}
+              onRangeChange={setRange}
+              hn={hn}
+              onHnChange={setHn}
+              search={search}
+              onSearchChange={setSearch}
+              result={resultFilter}
+              onResultChange={setResultFilter}
+              onExport={handleExportAudit}
+              canExport={Boolean(auditResponse && auditResponse.data.length > 0)}
+            />
+            {isAuditLoading ? (
+              <AuditCardListSkeleton />
+            ) : auditResponse ? (
+              <AuditCardList records={auditResponse.data} />
+            ) : null}
+          </div>
         </>
       )}
 

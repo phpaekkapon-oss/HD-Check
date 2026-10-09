@@ -35,6 +35,7 @@ interface AuditFilterBarProps {
   readonly onResultChange: (r: AuditResultFilter) => void
   readonly onExport: () => void
   readonly canExport: boolean
+  readonly embedded?: boolean
 }
 
 export const AuditFilterBar: FC<AuditFilterBarProps> = ({
@@ -48,11 +49,19 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
   onResultChange,
   onExport,
   canExport,
+  embedded = false,
 }) => {
   const { accent } = useTheme()
 
   return (
-    <section className="rounded-2xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] p-3 sm:p-3.5 space-y-3 shadow-xs transition-colors">
+    <section
+      className={cn(
+        'p-3 sm:p-3.5 space-y-3 transition-colors',
+        embedded
+          ? 'bg-slate-50/70 dark:bg-[#181b30]/70 border-b border-slate-200 dark:border-[#292440]'
+          : 'rounded-2xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] shadow-xs'
+      )}
+    >
       <div className="flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2">
         <DateRangeFields range={range} onChange={onRangeChange} />
 
