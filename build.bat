@@ -1,5 +1,5 @@
 @echo off
-title SMART-HOSCHECK Build & Package (HD-Check)
+title SMART-HOSCHECK Build ^& Package (HD-Check)
 color 0B
 
 echo ====================================================================
@@ -10,7 +10,7 @@ echo.
 where node >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] Node.js not found. Please install Node.js first.
-    pause
+    if not "%1"=="--no-pause" pause
     exit /b 1
 )
 
@@ -37,7 +37,7 @@ cd ..
 if %BUILD_STATUS% neq 0 (
     echo.
     echo [ERROR] Build failed. Please check the logs above.
-    pause
+    if not "%1"=="--no-pause" pause
     exit /b %BUILD_STATUS%
 )
 

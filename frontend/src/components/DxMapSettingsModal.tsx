@@ -1,8 +1,28 @@
-import { Fragment, useState, type FC } from 'react'
+import { Fragment, useState, useMemo, type FC } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  type ColumnDef,
+  type SortingState,
+  flexRender,
+} from '@tanstack/react-table'
 import { Edit3, Check, X, Search, Info, FlaskConical } from 'lucide-react'
 import { herbDxApi } from '@/api/herbdx.api'
 import { useDxMap, useUpdateDxMap } from '@/hooks/useHerbDx'
 import type { DxMapPreview, DxMapRecord } from '@/types/herbdx.types'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
+import { DataTablePagination } from '@/components/DataTablePagination'
+import { cn } from '@/lib/utils'
 
 function PreviewStat({ label, value, tone }: { readonly label: string; readonly value: number; readonly tone: 'neutral' | 'green' | 'red' | 'amber' }) {
   const toneClass = {
@@ -27,6 +47,7 @@ export const DxMapSettingsModal: FC = () => {
   const [prefixes, setPrefixes] = useState('')
   const [indication, setIndication] = useState('')
   const [search, setSearch] = useState('')
+  const [sorting, setSorting] = useState<SortingState>([])
   const [preview, setPreview] = useState<DxMapPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
@@ -70,15 +91,189 @@ export const DxMapSettingsModal: FC = () => {
     )
   }
 
-  const filtered = dxMap.filter((item) => {
-    if (!search.trim()) return true
+  const filtered = useMemo(() => {
+    if (!search.trim()) return dxMap
     const q = search.toLowerCase()
-    return (
-      item.icode.includes(q) ||
-      item.drug_name.toLowerCase().includes(q) ||
-      item.dx_prefixes.toLowerCase().includes(q) ||
-      item.indication.toLowerCase().includes(q)
+    return dxMap.filter(
+      (item) =>
+        item.icode.includes(q) ||
+        item.drug_name.toLowerCase().includes(q) ||
+        item.dx_prefixes.toLowerCase().includes(q) ||
+        item.indication.toLowerCase().includes(q)
     )
+  }, [dxMap, search])
+
+  const columns = useMemo<ColumnDef<DxMapRecord>[]>(
+    () => [
+      {
+        id: 'index',
+        header: () => <div className="text-center w-10">ลำดับ</div>,
+        cell: ({ row, table }) => {
+          const pageIndex = table.getState().pagination.pageIndex
+          const pageSize = table.getState().pagination.pageSize
+          return (
+            <div className="text-center font-mono text-slate-400 dark:text-slate-400 text-xs font-semibold">
+              {pageIndex * pageSize + row.index + 1}
+            </div>
+          )
+        },
+        enableSorting: false,
+      },
+      {
+        accessorKey: 'icode',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รหัสยา" />
+        ),
+        cell: ({ row }) => (
+          <span className="font-mono font-bold text-slate-700 dark:text-slate-300">
+            {row.original.icode}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'drug_name',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รายการยาสมุนไพร" />
+        ),
+        cell: ({ row }) => (
+          <span className="font-semibold text-slate-900 dark:text-white">
+            {row.original.drug_name}
+          </span>
+        ),
+      },
+      {
+        accessorKey: 'dx_prefixes',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)" />
+        ),
+        cell: ({ row }) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          if (isEditing) {
+            return (
+              <input
+                type="text"
+                value={prefixes}
+                onChange={(e) => {
+                  setPrefixes(e.target.value)
+                  setPreview(null)
+                }}
+                placeholder="เช่น M, S หรือ K30, R14"
+                className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
+                autoFocus
+              />
+            )
+          }
+          return (
+            <div className="flex flex-wrap gap-1 font-mono">
+              {item.dx_prefixes ? (
+                item.dx_prefixes.split(',').map((p) => (
+                  <span
+                    key={p}
+                    className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[11px] font-semibold"
+                  >
+                    {p.trim()}
+                  </span>
+                ))
+              ) : (
+                <span className="text-rose-500 italic">ยังไม่กำหนดรหัส</span>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: 'indication',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="ข้อบ่งใช้ / สรรพคุณ" />
+        ),
+        cell: ({ row }) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          if (isEditing) {
+            return (
+              <input
+                type="text"
+                value={indication}
+                onChange={(e) => setIndication(e.target.value)}
+                placeholder="ข้อบ่งใช้ของยา"
+                className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
+              />
+            )
+          }
+          return (
+            <span className="text-slate-600 dark:text-slate-300">
+              {item.indication || '-'}
+            </span>
+          )
+        },
+      },
+      {
+        id: 'actions',
+        header: () => <div className="text-center w-24">จัดการ</div>,
+        cell: ({ row }) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          if (isEditing) {
+            return (
+              <div className="flex items-center justify-center gap-1">
+                <button
+                  type="button"
+                  disabled={isPending}
+                  onClick={handleSave}
+                  className="btn-pill-action p-1 rounded-lg text-white cursor-pointer"
+                  title="บันทึก"
+                >
+                  <Check className="size-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditingIcode(null)
+                    setPreview(null)
+                    setPreviewError(null)
+                  }}
+                  className="p-1 rounded-lg bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 cursor-pointer"
+                  title="ยกเลิก"
+                >
+                  <X className="size-3.5" />
+                </button>
+              </div>
+            )
+          }
+          return (
+            <div className="text-center whitespace-nowrap">
+              <button
+                type="button"
+                onClick={() => handleStartEdit(item)}
+                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium text-xs transition-colors"
+              >
+                <Edit3 className="size-3" /> แก้ไข
+              </button>
+            </div>
+          )
+        },
+        enableSorting: false,
+      },
+    ],
+    [editingIcode, prefixes, indication, isPending]
+  )
+
+  const table = useReactTable({
+    data: filtered as DxMapRecord[],
+    columns,
+    state: {
+      sorting,
+    },
+    initialState: {
+      pagination: {
+        pageSize: 15,
+      },
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
   })
 
   return (
@@ -117,195 +312,145 @@ export const DxMapSettingsModal: FC = () => {
         </div>
       </div>
 
-      {/* Settings Grid */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse text-xs">
-          <thead>
-            <tr className="bg-slate-100 dark:bg-[#1d2035] text-slate-700 dark:text-slate-200 font-bold border-b border-slate-200 dark:border-[#292440] select-none whitespace-nowrap">
-              <th className="py-2.5 px-3 w-20">รหัสยา</th>
-              <th className="py-2.5 px-4 min-w-[220px]">รายการยาสมุนไพร</th>
-              <th className="py-2.5 px-4 min-w-[220px]">รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)</th>
-              <th className="py-2.5 px-4 min-w-[200px]">ข้อบ่งใช้ / สรรพคุณ</th>
-              <th className="py-2.5 px-3 text-center w-24">จัดการ</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100 dark:divide-[#292440]/70">
+      {/* Settings Grid with Shadcn Data Table */}
+      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden space-y-0 transition-colors">
+        {/* Table Toolbar Header with Shadcn title */}
+        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
+          <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
+            <span className="font-semibold text-slate-900 dark:text-white">Shadcn Data Table</span>
+            <span className="text-slate-400 dark:text-slate-500">•</span>
+            <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
+          </div>
+          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+            ค้นพบ {filtered.length} จาก {dxMap.length} รายการ
+          </div>
+        </div>
+
+        {/* Scrollable table container */}
+        <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-100 dark:bg-[#1d2035]">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="text-slate-700 dark:text-slate-300 font-bold">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
+                ))}
+              </TableRow>
+            ))}
+          </TableHeader>
+          <TableBody>
             {isLoading ? (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400">
+              <TableRow>
+                <TableCell colSpan={columns.length} className="py-8 text-center text-slate-400">
                   กำลังโหลดข้อมูลการตั้งค่า…
-                </td>
-              </tr>
-            ) : filtered.length === 0 ? (
-              <tr>
-                <td colSpan={5} className="py-8 text-center text-slate-400">
+                </TableCell>
+              </TableRow>
+            ) : table.getRowModel().rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="py-8 text-center text-slate-400">
                   ไม่พบรายการยาที่ค้นหา
-                </td>
-              </tr>
+                </TableCell>
+              </TableRow>
             ) : (
-              filtered.map((item) => {
+              table.getRowModel().rows.map((row) => {
+                const item = row.original
                 const isEditing = editingIcode === item.icode
 
                 return (
                   <Fragment key={item.icode}>
-                  <tr className="hover:bg-slate-50 dark:hover:bg-white/5 transition-colors">
-                    <td className="py-2.5 px-3 font-mono font-bold text-slate-700 dark:text-slate-300">
-                      {item.icode}
-                    </td>
-                    <td className="py-2.5 px-4 font-semibold text-slate-900 dark:text-white">
-                      {item.drug_name}
-                    </td>
-                    <td className="py-2.5 px-4">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={prefixes}
-                          onChange={(e) => { setPrefixes(e.target.value); setPreview(null) }}
-                          placeholder="เช่น M, S หรือ K30, R14"
-                          className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
-                        />
-                      ) : (
-                        <div className="flex flex-wrap gap-1 font-mono">
-                          {item.dx_prefixes ? (
-                            item.dx_prefixes.split(',').map((p) => (
-                              <span
-                                key={p}
-                                className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[11px] font-semibold"
+                    <TableRow className={cn('hover:bg-slate-50 dark:hover:bg-white/5 transition-colors border-slate-100 dark:border-[#292440]/70', isEditing && 'bg-violet-50/40 dark:bg-violet-950/20')}>
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-2.5 px-3">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                    {isEditing && (
+                      <TableRow className="bg-violet-50/60 dark:bg-violet-950/15 border-b border-violet-200 dark:border-violet-500/25">
+                        <TableCell colSpan={columns.length} className="px-4 py-4">
+                          <div className="space-y-3">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-xs font-bold text-slate-800 dark:text-slate-100">ทดลองเกณฑ์กับประวัติการจ่ายยานี้</span>
+                              <select
+                                value={periodDays}
+                                onChange={(e) => { setPeriodDays(Number(e.target.value)); setPreview(null) }}
+                                className="rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 text-xs text-slate-800 dark:text-slate-100"
                               >
-                                {p}
-                              </span>
-                            ))
-                          ) : (
-                            <span className="text-rose-500 italic">ยังไม่กำหนดรหัส</span>
-                          )}
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300">
-                      {isEditing ? (
-                        <input
-                          type="text"
-                          value={indication}
-                          onChange={(e) => setIndication(e.target.value)}
-                          placeholder="ข้อบ่งใช้ของยา"
-                          className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
-                        />
-                      ) : (
-                        item.indication || '-'
-                      )}
-                    </td>
-                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
-                      {isEditing ? (
-                        <div className="flex items-center justify-center gap-1">
-                          <button
-                            type="button"
-                            disabled={isPending}
-                            onClick={handleSave}
-                            className="btn-pill-action p-1 rounded-lg text-white cursor-pointer"
-                            title="บันทึก"
-                          >
-                            <Check className="size-3.5" />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => { setEditingIcode(null); setPreview(null); setPreviewError(null) }}
-                            className="p-1 rounded-lg bg-slate-200 dark:bg-white/10 text-slate-700 dark:text-slate-300 hover:bg-slate-300 dark:hover:bg-white/20 cursor-pointer"
-                            title="ยกเลิก"
-                          >
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleStartEdit(item)}
-                          className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white cursor-pointer font-medium"
-                        >
-                          <Edit3 className="size-3" /> แก้ไข
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                  {isEditing && (
-                    <tr className="bg-violet-50/60 dark:bg-violet-950/15">
-                      <td colSpan={5} className="px-4 py-4">
-                        <div className="space-y-3">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-xs font-bold text-slate-800 dark:text-slate-100">ทดลองเกณฑ์กับประวัติการจ่ายยานี้</span>
-                            <select
-                              value={periodDays}
-                              onChange={(e) => { setPeriodDays(Number(e.target.value)); setPreview(null) }}
-                              className="rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 text-xs text-slate-800 dark:text-slate-100"
-                            >
-                              <option value={30}>30 วันล่าสุด</option>
-                              <option value={90}>90 วันล่าสุด</option>
-                              <option value={365}>365 วันล่าสุด</option>
-                              <option value={0}>ข้อมูลทั้งหมด</option>
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => void handlePreview(item.icode)}
-                              disabled={previewLoading}
-                              className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60"
-                            >
-                              <FlaskConical className="size-3.5" /> {previewLoading ? 'กำลังคำนวณ…' : 'ทดลองเกณฑ์'}
-                            </button>
-                          </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                            ผลนี้เป็นการจำลองจากข้อมูลย้อนหลังเพื่อช่วยตรวจผลกระทบ ไม่ใช่คำแนะนำว่ารหัสใดถูกต้องทางคลินิก กรุณายืนยันรหัสกับข้อบ่งใช้และแนวทางที่หน่วยงานรับรองก่อนบันทึก
-                          </p>
-                          {broadPrefixes.length > 0 && (
-                            <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
-                              คำนำหน้า {broadPrefixes.join(', ')} เป็นรหัสกว้าง อาจครอบคลุมหลายโรค ควรตรวจรายการรหัสที่ระบบจำลองให้ละเอียดก่อนบันทึก
-                            </p>
-                          )}
-                          {previewError && <p className="text-xs font-medium text-rose-600 dark:text-rose-300">{previewError}</p>}
-                          {preview && preview.icode === item.icode && (
-                            <div className="space-y-3 rounded-xl border border-violet-200 dark:border-violet-500/25 bg-white/80 dark:bg-[#101326]/80 p-3">
-                              <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
-                                <PreviewStat label={`รายการใน ${preview.periodDays || 'ทุก'} วัน`} value={preview.total} tone="neutral" />
-                                <PreviewStat label="ผ่าน" value={preview.pass} tone="green" />
-                                <PreviewStat label="ไม่ผ่าน" value={preview.fail} tone="red" />
-                                <PreviewStat label="ไม่มี DX" value={preview.noDx} tone="amber" />
-                                <PreviewStat label="ยังไม่มีเกณฑ์" value={preview.noMap} tone="amber" />
-                              </div>
-                              <div>
-                                <p className="mb-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">รหัสวินิจฉัยที่พบในประวัติ (สูงสุด 12 รหัส)</p>
-                                {preview.frequentDx.length ? (
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {preview.frequentDx.map(({ code, count, matches }) => (
-                                      <span key={code} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] ${matches ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-300'}`}>
-                                        {code} · {count} ครั้ง · {matches ? 'ตรงกับเกณฑ์ทดลอง' : 'ไม่ตรง'}
-                                        {!matches && (
-                                          <button
-                                            type="button"
-                                            disabled={previewLoading}
-                                            onClick={() => handleTryObservedCode(item.icode, code)}
-                                            className="ml-1 rounded bg-white/80 px-1.5 py-0.5 font-sans font-semibold text-violet-700 hover:bg-white disabled:opacity-50 dark:bg-black/20 dark:text-violet-300"
-                                            title={`นำ ${code} ไปทดลองเป็นรหัสที่อนุญาต`}
-                                          >
-                                            ทดลองรหัสนี้
-                                          </button>
-                                        )}
-                                      </span>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">ไม่พบประวัติยานี้ในช่วงเวลาที่เลือก</p>
-                                )}
-                              </div>
+                                <option value={30}>30 วันล่าสุด</option>
+                                <option value={90}>90 วันล่าสุด</option>
+                                <option value={365}>365 วันล่าสุด</option>
+                                <option value={0}>ข้อมูลทั้งหมด</option>
+                              </select>
+                              <button
+                                type="button"
+                                onClick={() => void handlePreview(item.icode)}
+                                disabled={previewLoading}
+                                className="inline-flex items-center gap-1 rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-violet-700 disabled:opacity-60 cursor-pointer"
+                              >
+                                <FlaskConical className="size-3.5" /> {previewLoading ? 'กำลังคำนวณ…' : 'ทดลองเกณฑ์'}
+                              </button>
                             </div>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                              ผลนี้เป็นการจำลองจากข้อมูลย้อนหลังเพื่อช่วยตรวจผลกระทบ ไม่ใช่คำแนะนำว่ารหัสใดถูกต้องทางคลินิก กรุณายืนยันรหัสกับข้อบ่งใช้และแนวทางที่หน่วยงานรับรองก่อนบันทึก
+                            </p>
+                            {broadPrefixes.length > 0 && (
+                              <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                                คำนำหน้า {broadPrefixes.join(', ')} เป็นรหัสกว้าง อาจครอบคลุมหลายโรค ควรตรวจรายการรหัสที่ระบบจำลองให้ละเอียดก่อนบันทึก
+                              </p>
+                            )}
+                            {previewError && <p className="text-xs font-medium text-rose-600 dark:text-rose-300">{previewError}</p>}
+                            {preview && preview.icode === item.icode && (
+                              <div className="space-y-3 rounded-xl border border-violet-200 dark:border-violet-500/25 bg-white/80 dark:bg-[#101326]/80 p-3">
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+                                  <PreviewStat label={`รายการใน ${preview.periodDays || 'ทุก'} วัน`} value={preview.total} tone="neutral" />
+                                  <PreviewStat label="ผ่าน" value={preview.pass} tone="green" />
+                                  <PreviewStat label="ไม่ผ่าน" value={preview.fail} tone="red" />
+                                  <PreviewStat label="ไม่มี DX" value={preview.noDx} tone="amber" />
+                                  <PreviewStat label="ยังไม่มีเกณฑ์" value={preview.noMap} tone="amber" />
+                                </div>
+                                <div>
+                                  <p className="mb-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">รหัสวินิจฉัยที่พบในประวัติ (สูงสุด 12 รหัส)</p>
+                                  {preview.frequentDx.length ? (
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {preview.frequentDx.map(({ code, count, matches }) => (
+                                        <span key={code} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] ${matches ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-300'}`}>
+                                          {code} · {count} ครั้ง · {matches ? 'ตรงกับเกณฑ์ทดลอง' : 'ไม่ตรง'}
+                                          {!matches && (
+                                            <button
+                                              type="button"
+                                              disabled={previewLoading}
+                                              onClick={() => handleTryObservedCode(item.icode, code)}
+                                              className="ml-1 rounded bg-white/80 px-1.5 py-0.5 font-sans font-semibold text-violet-700 hover:bg-white disabled:opacity-50 dark:bg-black/20 dark:text-violet-300 cursor-pointer"
+                                              title={`นำ ${code} ไปทดลองเป็นรหัสที่อนุญาต`}
+                                            >
+                                              ทดลองรหัสนี้
+                                            </button>
+                                          )}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <p className="text-xs text-slate-500 dark:text-slate-400">ไม่พบประวัติยานี้ในช่วงเวลาที่เลือก</p>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )}
                   </Fragment>
                 )
               })
             )}
-          </tbody>
-        </table>
+          </TableBody>
+        </Table>
+
+        {/* Shadcn Data Table Pagination */}
+        <DataTablePagination table={table} pageSizeOptions={[10, 15, 25, 50, 100]} />
       </div>
     </div>
   )
