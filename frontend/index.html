@@ -17,6 +17,20 @@
     <link rel="manifest" href="./manifest.webmanifest" />
 
     <script>
+      // Capture beforeinstallprompt as early as possible
+      window.__pwaInstallPrompt = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        try { e.preventDefault(); } catch (_) {}
+        window.__pwaInstallPrompt = e;
+        window.dispatchEvent(new CustomEvent('pwa-prompt-ready'));
+      });
+      window.addEventListener('appinstalled', () => {
+        window.__pwaInstallPrompt = null;
+        window.dispatchEvent(new CustomEvent('pwa-installed'));
+      });
+    </script>
+
+    <script>
       (() => {
         const presets = ['herbal', 'clinical', 'modern', 'executive', 'violet'];
         const presetHeaderColors = {

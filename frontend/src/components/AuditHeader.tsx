@@ -99,26 +99,69 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   const [showPwaTip, setShowPwaTip] = useState(false)
 
   useEffect(() => {
-    if (window.matchMedia('(display-mode: standalone)').matches || ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone)) {
+    if (typeof window === 'undefined') return
+
+    if (
+      window.matchMedia('(display-mode: standalone)').matches ||
+      ('standalone' in navigator && (navigator as { standalone?: boolean }).standalone)
+    ) {
       setIsInstalled(true)
     }
-    const handler = (e: Event) => {
-      e.preventDefault()
-      setDeferredPrompt(e as BeforeInstallPromptEvent)
+
+    const win = window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }
+    if (win.__pwaInstallPrompt) {
+      setDeferredPrompt(win.__pwaInstallPrompt)
     }
+
+    const onPromptReady = () => {
+      if (win.__pwaInstallPrompt) {
+        setDeferredPrompt(win.__pwaInstallPrompt)
+      }
+    }
+
+    const onAppInstalled = () => {
+      setIsInstalled(true)
+      setDeferredPrompt(null)
+      win.__pwaInstallPrompt = null
+    }
+
+    const handler = (e: Event) => {
+      try { e.preventDefault() } catch (_) {}
+      const pe = e as BeforeInstallPromptEvent
+      win.__pwaInstallPrompt = pe
+      setDeferredPrompt(pe)
+    }
+
+    window.addEventListener('pwa-prompt-ready', onPromptReady)
+    window.addEventListener('pwa-installed', onAppInstalled)
     window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+
+    return () => {
+      window.removeEventListener('pwa-prompt-ready', onPromptReady)
+      window.removeEventListener('pwa-installed', onAppInstalled)
+      window.removeEventListener('beforeinstallprompt', handler)
+    }
   }, [])
 
   const handleInstallClick = async () => {
-    if (deferredPrompt) {
-      await deferredPrompt.prompt()
-      const { outcome } = await deferredPrompt.userChoice
-      if (outcome === 'accepted') setIsInstalled(true)
-      setDeferredPrompt(null)
+    const win = window as unknown as { __pwaInstallPrompt?: BeforeInstallPromptEvent | null }
+    const prompt = deferredPrompt || win.__pwaInstallPrompt
+    if (prompt) {
+      try {
+        await prompt.prompt()
+        const { outcome } = await prompt.userChoice
+        if (outcome === 'accepted') {
+          setIsInstalled(true)
+        }
+      } catch (err) {
+        console.error('PWA prompt error:', err)
+      } finally {
+        setDeferredPrompt(null)
+        win.__pwaInstallPrompt = null
+      }
     } else {
       setShowPwaTip(true)
-      setTimeout(() => setShowPwaTip(false), 8000)
+      setTimeout(() => setShowPwaTip(false), 12000)
     }
   }
 
