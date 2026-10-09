@@ -117,20 +117,27 @@ export const AppLayout: FC<AppLayoutProps> = ({
       </nav>
 
       {/* Hospital System Desktop Bottom Status Bar */}
-      <footer className="hidden lg:flex bg-themed-card border-t border-themed py-1.5 px-4 text-[11px] font-mono text-slate-600 dark:text-slate-300 flex-wrap items-center justify-between gap-3 select-none">
-        <div className="flex items-center gap-4">
+      <footer className="hidden lg:flex bg-themed-card border-t border-themed py-2 px-4 text-[11px] text-slate-600 dark:text-slate-300 flex-wrap items-center justify-between gap-3 select-none">
+        <div className="flex items-center gap-3">
           <span>
             HOSxP Database :{' '}
             <strong className="text-teal-700 dark:text-teal-300">เชื่อมต่อแล้ว (Connected)</strong>
           </span>
           <span className="text-slate-300 dark:text-white/20">|</span>
           <span>ระบบ : <strong className="text-slate-900 dark:text-white">แผนกการแพทย์แผนไทย</strong></span>
+          <span className="text-slate-300 dark:text-white/20">|</span>
+          <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+            <span className="font-bold text-violet-600 dark:text-violet-400">ผู้พัฒนา:</span>
+            <strong className="text-slate-900 dark:text-white">นายเอกพล อันคำวงค์</strong>
+            <span className="text-slate-500 dark:text-slate-400">(นักวิชาการคอมพิวเตอร์ปฏิบัติการ)</span>
+            <span className="text-slate-500 dark:text-slate-400 font-sans">• โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล</span>
+          </span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 font-mono">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-            เชื่อมต่อฐานข้อมูล HOSxP เรียบร้อย
+            Online
           </span>
           <span className="text-slate-300 dark:text-white/20">|</span>
           <span>SMART-HOSCHECK • HerbDx v1.0</span>

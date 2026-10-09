@@ -526,8 +526,16 @@ export const LoginPage: FC = () => {
         </div>
 
         {/* Footer Credits */}
-        <div className="mt-4 text-center text-xs text-slate-400">
-          SMART-HOSCHECK • โรงพยาบาลพังโคน จ.สกลนคร
+        <div className="mt-4 text-center text-xs text-slate-300/80 space-y-1">
+          <div className="font-semibold text-white/90">
+            SMART-HOSCHECK • โรงพยาบาลพังโคน จ.สกลนคร
+          </div>
+          <div className="text-[11.5px] text-slate-400">
+            ผู้พัฒนา: <strong className="text-white font-semibold">นายเอกพล อันคำวงค์</strong> (นักวิชาการคอมพิวเตอร์ปฏิบัติการ)
+          </div>
+          <div className="text-[11px] text-slate-400">
+            โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล
+          </div>
         </div>
       </div>
     </div>

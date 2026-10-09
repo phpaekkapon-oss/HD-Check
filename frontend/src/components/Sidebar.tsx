@@ -305,24 +305,39 @@ export const Sidebar: FC<SidebarProps> = ({
         </div>
       </div>
 
-      {/* Hospital Footer Branding (Exact Match to Screenshot) */}
+      {/* Hospital Footer Branding & Developer Credit */}
       <div
         className={cn(
-          'p-3 border-t border-slate-200 dark:border-white/[0.08] bg-slate-100/60 dark:bg-black/25 flex items-center transition-colors',
+          'p-3 border-t border-slate-200 dark:border-white/[0.08] bg-slate-100/60 dark:bg-black/25 flex items-start transition-colors',
           isCollapsedView ? 'justify-center' : 'gap-2.5'
         )}
       >
-        <Building2 className="size-5 text-slate-500 dark:text-slate-400 shrink-0" />
+        <Building2 className="size-5 text-slate-500 dark:text-slate-400 shrink-0 mt-0.5" />
         {!isCollapsedView && (
-          <div className="min-w-0 flex-1 leading-tight animate-fade-in">
-            <div className="text-[11.5px] font-bold text-slate-900 dark:text-white truncate">
-              โรงพยาบาล<span className="text-amber-600 dark:text-amber-300">พังโคน</span>
+          <div className="min-w-0 flex-1 leading-tight animate-fade-in space-y-1.5">
+            <div>
+              <div className="text-[11.5px] font-bold text-slate-900 dark:text-white truncate">
+                โรงพยาบาล<span className="text-amber-600 dark:text-amber-300">พังโคน</span>
+              </div>
+              <div className="text-[9.5px] text-slate-600 dark:text-slate-400 truncate mt-0.5">
+                กลุ่มงานการแพทย์แผนไทย (PHANG KHON)
+              </div>
             </div>
-            <div className="text-[9.5px] text-slate-600 dark:text-slate-400 truncate mt-0.5">
-              กลุ่มงานการแพทย์แผนไทย (PHANG KHON)
+
+            <div className="pt-1 border-t border-slate-200/80 dark:border-white/10 text-[9.5px] text-slate-600 dark:text-slate-300">
+              <div className="font-semibold text-slate-800 dark:text-slate-200 truncate">
+                👨‍💻 ผู้พัฒนา: นายเอกพล อันคำวงค์
+              </div>
+              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                นักวิชาการคอมพิวเตอร์ปฏิบัติการ
+              </div>
+              <div className="text-[9px] text-slate-500 dark:text-slate-400 truncate mt-0.5">
+                โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล
+              </div>
             </div>
-            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono mt-0.5">
-              v1.0.8 (2026.09.17)
+
+            <div className="text-[9px] text-slate-400 dark:text-slate-500 font-mono">
+              SMART-HOSCHECK v1.0.8 (2026)
             </div>
           </div>
         )}
