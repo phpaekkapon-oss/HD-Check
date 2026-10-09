@@ -285,7 +285,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
 
       {/* Main Shadcn Data Table (Desktop View) */}
       <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
-        <Table>
+        <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
           <TableHeader className="bg-slate-50 dark:bg-[#1d2035]">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] hover:bg-transparent">

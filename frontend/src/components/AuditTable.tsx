@@ -377,8 +377,8 @@ export const AuditTable: FC<AuditTableProps> = ({ records }) => {
         <DataTableViewOptions table={table} columnLabels={COLUMN_LABELS} />
       </div>
 
-      {/* Main Shadcn Data Table */}
-      <Table>
+      {/* Main Shadcn Data Table with sticky header and vertical scroll */}
+      <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-50 dark:bg-[#1d2035]">

@@ -3,9 +3,9 @@ import { cn } from '@/lib/utils'
 
 export const Table = React.forwardRef<
   HTMLTableElement,
-  React.HTMLAttributes<HTMLTableElement>
->(({ className, ...props }, ref) => (
-  <div className="relative w-full overflow-auto">
+  React.HTMLAttributes<HTMLTableElement> & { containerClassName?: string }
+>(({ className, containerClassName, ...props }, ref) => (
+  <div className={cn('relative w-full overflow-auto', containerClassName)}>
     <table
       ref={ref}
       className={cn('w-full caption-bottom text-xs text-left', className)}
@@ -19,7 +19,7 @@ export const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
 >(({ className, ...props }, ref) => (
-  <thead ref={ref} className={cn('[&_tr]:border-b bg-slate-100/90 dark:bg-[#1d2035] text-slate-700 dark:text-slate-200 select-none whitespace-nowrap', className)} {...props} />
+  <thead ref={ref} className={cn('[&_tr]:border-b bg-slate-100 dark:bg-[#1d2035] text-slate-700 dark:text-slate-200 select-none whitespace-nowrap sticky top-0 z-20 shadow-2xs', className)} {...props} />
 ))
 TableHeader.displayName = 'TableHeader'
 
