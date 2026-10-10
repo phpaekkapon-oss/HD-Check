@@ -13,6 +13,22 @@ const BACK_PKG = path.join(rootDir, 'backend', 'package.json')
 const CHANGELOG_JSON = path.join(rootDir, 'frontend', 'src', 'data', 'changelog.json')
 const CHANGELOG_MD = path.join(rootDir, 'CHANGELOG.md')
 
+// Load environment variables from .env if present
+const envPath = path.join(rootDir, '.env')
+if (fs.existsSync(envPath)) {
+  const envContent = fs.readFileSync(envPath, 'utf8')
+  for (const line of envContent.split('\n')) {
+    const trimmed = line.trim()
+    if (!trimmed || trimmed.startsWith('#')) continue
+    const eqIdx = trimmed.indexOf('=')
+    if (eqIdx > 0) {
+      const key = trimmed.slice(0, eqIdx).trim()
+      const val = trimmed.slice(eqIdx + 1).trim().replace(/^['"]|['"]$/g, '')
+      if (!process.env[key]) process.env[key] = val
+    }
+  }
+}
+
 function run(cmd, cwd = rootDir) {
   console.log(`\n> ${cmd}`)
   try {
@@ -71,9 +87,7 @@ function getTodayISO() {
 }
 
 /**
- * Intelligent Git & Workspace Analyzer
- * Automatically inspects modified files and commit logs to build
- * professional, human-readable release notes without manual typing.
+ * Built-in Code Rule Analyzer
  */
 function analyzeGitChanges() {
   const detectedHighlights = []
@@ -125,8 +139,8 @@ function analyzeGitChanges() {
     } else {
       detectedTitle = 'ปรับปรุงประสิทธิภาพและความเสถียรของระบบ'
     }
-  } catch (err) {
-    // fallback if git command fails
+  } catch {
+    // fallback
   }
 
   return {
@@ -136,6 +150,104 @@ function analyzeGitChanges() {
         ? Array.from(new Set(detectedHighlights))
         : ['ปรับปรุงประสิทธิภาพการทำงานและความเสถียรของระบบ', 'อัปเดตข้อมูลและส่วนติดต่อผู้ใช้งาน'],
   }
+}
+
+/**
+ * Multi-Engine AI Changelog Generator
+ * Uses Gemini API -> Local Ollama -> Built-in Smart Code Analyzer
+ */
+async function generateChangelogWithAI() {
+  console.log('\n🤖 [AI Assistant] กำลังวิเคราะห์โค้ดและสร้าง Release Notes อัตโนมัติ...')
+
+  let diffSummary = ''
+  try {
+    const stat = execSync('git diff --stat HEAD~1 HEAD', { cwd: rootDir, encoding: 'utf8' }).trim()
+    const log = execSync('git log -n 5 --oneline', { cwd: rootDir, encoding: 'utf8' }).trim()
+    diffSummary = `Files Changed:\n${stat}\n\nRecent Commits:\n${log}`
+  } catch {
+    diffSummary = 'General code updates and performance improvements'
+  }
+
+  // 1. Google Gemini API (if GEMINI_API_KEY is configured)
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (geminiKey) {
+    try {
+      console.log('  -> กำลังส่งโค้ดให้ Google Gemini AI วิเคราะห์...')
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 8000)
+      const prompt = `คุณคือ AI ผู้ช่วยสารสนเทศโรงพยาบาล จงวิเคราะห์โค้ดที่เปลี่ยนแปลงและเขียน Release Notes ภาษาไทย:
+- สรุปหัวข้อสั้นๆ 1 บรรทัด (title)
+- ไฮไลท์การเปลี่ยนแปลง 3-5 ข้อที่อ่านง่ายสำหรับผู้ใช้ระบบ (highlights)
+ตอบเป็น JSON เท่านั้น: {"title": "...", "highlights": ["...", "..."]}
+
+ข้อมูลโค้ด:
+${diffSummary}`
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      })
+      clearTimeout(timer)
+      if (res.ok) {
+        const json = await res.json()
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+        if (text) {
+          const parsed = JSON.parse(text)
+          if (parsed.title && Array.isArray(parsed.highlights)) {
+            console.log('  [+] Google Gemini AI สรุป Release Notes เรียบร้อย!')
+            return { title: parsed.title, highlights: parsed.highlights, aiModel: 'Google Gemini AI' }
+          }
+        }
+      }
+    } catch {
+      // fallback
+    }
+  }
+
+  // 2. Local Ollama LLM (if running on localhost:11434)
+  try {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 3000)
+    const res = await fetch('http://localhost:11434/api/tags', { signal: controller.signal })
+    clearTimeout(timer)
+    if (res.ok) {
+      console.log('  -> กำลังส่งโค้ดให้ Local Ollama AI ในเครื่องวิเคราะห์...')
+      const genCtrl = new AbortController()
+      const genTimer = setTimeout(() => genCtrl.abort(), 6000)
+      const genRes = await fetch('http://localhost:11434/api/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: genCtrl.signal,
+        body: JSON.stringify({
+          model: 'qwen2.5-coder:3b',
+          prompt: `คุณคือ AI สรุป Release Notes ภาษาไทย ตอบเป็น JSON {"title":"...","highlights":["..."]}: ${diffSummary}`,
+          format: 'json',
+          stream: false,
+        }),
+      })
+      clearTimeout(genTimer)
+      if (genRes.ok) {
+        const genData = await genRes.json()
+        const parsed = JSON.parse(genData.response)
+        if (parsed.title && Array.isArray(parsed.highlights)) {
+          console.log('  [+] Local Ollama AI สรุป Release Notes เรียบร้อย!')
+          return { title: parsed.title, highlights: parsed.highlights, aiModel: 'Local Ollama AI' }
+        }
+      }
+    }
+  } catch {
+    // fallback
+  }
+
+  // 3. Smart Code Rule Analyzer
+  console.log('  -> ประมวลผลผ่าน Smart Code Diff Analyzer (AI Rule-Engine)...')
+  const fallback = analyzeGitChanges()
+  return { ...fallback, aiModel: 'Smart Code Analyzer' }
 }
 
 async function main() {
@@ -165,9 +277,9 @@ async function main() {
     else if (arg.startsWith('--highlights=')) highlightsInput = arg.split('=')[1]
   }
 
-  // Automatic Change Analysis from Git
-  const gitAnalysis = analyzeGitChanges()
-  if (!releaseTitle) releaseTitle = gitAnalysis.title
+  // Run AI / Code Analyzer
+  const aiResult = await generateChangelogWithAI()
+  if (!releaseTitle) releaseTitle = aiResult.title
 
   if (!newVersion) {
     if (isAuto) {
@@ -187,13 +299,6 @@ async function main() {
 
   console.log(`\n[+] เวอร์ชันใหม่ที่จะสร้าง: v${newVersion} (${bumpType})`)
 
-  if (!releaseTitle && !isAuto) {
-    releaseTitle = await ask(
-      'ระบุหัวข้อ/คำอธิบายการอัปเดตเวอร์ชันนี้ (Title)',
-      gitAnalysis.title
-    )
-  }
-
   let highlights = []
   if (highlightsInput) {
     highlights = highlightsInput
@@ -201,11 +306,11 @@ async function main() {
       .map((s) => s.trim())
       .filter(Boolean)
   } else if (isAuto) {
-    highlights = gitAnalysis.highlights
+    highlights = aiResult.highlights
   } else {
     const input = await ask(
-      'ระบุรายการไฮไลท์การอัปเดต (คั่นด้วย ; หรือกด Enter ใช้ค่าวิเคราะห์อัตโนมัติ)',
-      gitAnalysis.highlights.join('; ')
+      'ระบุรายการไฮไลท์การอัปเดต (คั่นด้วย ; หรือกด Enter ใช้ผลวิเคราะห์ AI)',
+      aiResult.highlights.join('; ')
     )
     highlights = input
       .split(';')
@@ -213,7 +318,7 @@ async function main() {
       .filter(Boolean)
   }
 
-  console.log('\n[*] สรุปข้อมูล Release Notes (สร้างให้อัตโนมัติ):')
+  console.log(`\n[*] สรุป Release Notes (สร้างโดย ${aiResult.aiModel}):`)
   console.log(`  - เวอร์ชัน: v${newVersion}`)
   console.log(`  - วันที่: ${getTodayThai()}`)
   console.log(`  - หัวข้อ: ${releaseTitle}`)
@@ -278,7 +383,7 @@ async function main() {
   // 3. Update CHANGELOG.md
   console.log('\n[3/6] กำลังอัปเดตไฟล์ CHANGELOG.md...')
   const mdHeader = `# บันทึกการเปลี่ยนแปลง\n\nเวอร์ชันของแอปยึดจาก \`package.json\` ที่โฟลเดอร์หลัก และแสดงเลขเดียวกันในหน้าระบบทุกตำแหน่ง\n\n`
-  const mdEntry = `## v${newVersion} — ${getTodayThai()}\n\n${releaseTitle}\n\n### ไฮไลท์การเปลี่ยนแปลง\n\n${highlights.map((h) => `- ${h}`).join('\n')}\n\n`
+  const mdEntry = `## v${newVersion} — ${getTodayThai()}\n\n${releaseTitle}\n\n### ไฮไลท์การเปลี่ยนแปลง (สร้างโดย ${aiResult.aiModel})\n\n${highlights.map((h) => `- ${h}`).join('\n')}\n\n`
 
   let existingMd = ''
   if (fs.existsSync(CHANGELOG_MD)) {
@@ -343,6 +448,7 @@ async function main() {
   console.log('\n====================================================================')
   console.log(`  [SUCCESS] Release v${newVersion} ดำเนินการเสร็จสมบูรณ์ 100%!`)
   console.log(`  - เวอร์ชันใหม่  : v${newVersion}`)
+  console.log(`  - ผู้ช่วย AI    : ${aiResult.aiModel}`)
   console.log(`  - เว็บไซต์     : http://pkhospital.moph.go.th/hd-check/`)
   console.log(`  - GitHub Tag  : https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${newVersion}`)
   console.log('====================================================================\n')
