@@ -231,6 +231,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       .slice(0, 4)
   }, [records])
 
+  const maxDeptCount = useMemo(() => {
+    if (topDepartments.length === 0) return 1
+    return Math.max(...topDepartments.map((d) => d.count)) || 1
+  }, [topDepartments])
+
   // SVG Chart Geometry Constants
   const chartHeight = 180
   const chartWidth = 740
@@ -258,15 +263,23 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 รพ.พังโคน
               </span>
             </h1>
-            <p className="text-xs text-slate-500 dark:text-slate-400">
-              ตัวชี้วัดคุณภาพและความสอดคล้องรหัสโรค ICD-10
-              {status?.latestVisitDate ? ` · วันที่ข้อมูล HOSxP: ${toThaiDate(status.latestVisitDate)}` : ''}
-              {drugs.length > 0 ? ` · ยาสมุนไพรในระบบ ${drugs.length} ชนิด` : ''}
+            <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
+              <span>ตัวชี้วัดคุณภาพและความสอดคล้องรหัสโรค ICD-10 (เป้าหมาย ≥ 50%)</span>
+              {drugs.length > 0 && (
+                <span className="text-slate-400 dark:text-slate-500">
+                  • บัญชียาสมุนไพร {drugs.length} ชนิด
+                </span>
+              )}
+              {status?.latestVisitDate && (
+                <span className="text-slate-400 dark:text-slate-500">
+                  • ข้อมูล HOSxP ล่าสุด {toThaiDate(status.latestVisitDate)}
+                </span>
+              )}
             </p>
           </div>
         </div>
 
-        {/* Date presets & Sync */}
+        {/* Date presets & Subtle Refresh */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
             {/* กลุ่ม 1: ปีงบประมาณ (เรียงตามลำดับเวลา: ปีงบ 69 -> ปีงบ 70) */}
@@ -334,18 +347,18 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <span className="px-2 py-0.5 text-[11px] font-mono text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-md border border-teal-500/20 ml-0.5">
               {toThaiDate(range.startDate)} - {toThaiDate(range.endDate)}
             </span>
-          </div>
 
-          <button
-            type="button"
-            disabled={isSyncing}
-            onClick={onSync}
-            className="px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-teal-600 hover:bg-teal-500 disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5 shadow-xs"
-            title="ดึงข้อมูลล่าสุดจาก HOSxP"
-          >
-            <RefreshCw className={cn('size-3.5', isSyncing && 'animate-spin')} />
-            <span className="hidden sm:inline">{isSyncing ? 'กำลังซิงค์…' : 'ซิงค์ HOSxP'}</span>
-          </button>
+            {/* Subtle Refresh button (ไม่แย่งสายตากับปุ่มหลักบน Navbar) */}
+            <button
+              type="button"
+              disabled={isSyncing}
+              onClick={onSync}
+              className="p-1 rounded-lg text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 hover:bg-slate-200/60 dark:hover:bg-white/10 disabled:opacity-50 transition cursor-pointer ml-0.5"
+              title="ดึงข้อมูลล่าสุดจาก HOSxP"
+            >
+              <RefreshCw className={cn('size-3.5', isSyncing && 'animate-spin')} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -621,18 +634,18 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       {/* Left Y Axis Label (Volume) */}
                       <text
                         x={padLeft - 6}
-                        y={y + 3}
+                        y={y + 3.5}
                         textAnchor="end"
-                        className="text-[9px] fill-slate-400 font-mono"
+                        className="text-[10px] fill-slate-400 dark:fill-slate-400 font-mono font-medium"
                       >
                         {Math.round(maxDailyVolume * pct)}
                       </text>
                       {/* Right Y Axis Label (Pass Rate %) */}
                       <text
                         x={padLeft + plotWidth + 6}
-                        y={y + 3}
+                        y={y + 3.5}
                         textAnchor="start"
-                        className="text-[9px] fill-teal-500 font-mono font-medium"
+                        className="text-[10px] fill-teal-500 dark:fill-teal-400 font-mono font-semibold"
                       >
                         {Math.round(pct * 100)}%
                       </text>
@@ -774,13 +787,13 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       {(dailyTrends.length <= 16 || idx % 2 === 0) && (
                         <text
                           x={cx + (is3DMode ? isoDx / 2 : 0)}
-                          y={padTop + plotHeight + 14}
+                          y={padTop + plotHeight + 15}
                           textAnchor="middle"
                           className={cn(
-                            'text-[9px] font-mono',
+                            'text-[10px] font-mono',
                             isHovered
                               ? 'fill-teal-500 font-bold'
-                              : 'fill-slate-400 dark:fill-slate-500'
+                              : 'fill-slate-500 dark:fill-slate-400 font-medium'
                           )}
                         >
                           {d.dayNum}
@@ -932,6 +945,8 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               ) : (
                 topHerbs.map((d, index) => {
                   const drugPassPct = d.count > 0 ? (d.pass / d.count) * 100 : 0
+                  const isPass = drugPassPct >= 50
+                  const isWarning = drugPassPct >= 40 && drugPassPct < 50
                   return (
                     <div
                       key={d.icode}
@@ -946,7 +961,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         >
                           {index + 1}
                         </span>
-                        <span className="font-semibold text-xs text-slate-900 dark:text-white truncate">
+                        <span className="font-semibold text-xs text-slate-900 dark:text-white truncate" title={d.name}>
                           {d.name}
                         </span>
                       </div>
@@ -957,11 +972,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         </span>
                         <span
                           className={cn(
-                            'text-[10px] font-bold px-1.5 py-0.5 rounded font-mono',
-                            drugPassPct >= 60
-                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20'
+                            'text-[10px] font-bold px-1.5 py-0.5 rounded font-mono border',
+                            isPass
+                              ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                              : isWarning
+                                ? 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30'
+                                : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30'
                           )}
+                          title={`ผ่านเกณฑ์ ${d.pass}/${d.count} ใบ (${drugPassPct.toFixed(1)}%) - เป้าหมาย สธ. ≥ 50%`}
                         >
                           {drugPassPct.toFixed(0)}%
                         </span>
@@ -982,23 +1000,37 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   แผนกที่มีการสั่งจ่ายยาสูงสุด
                 </h3>
               </div>
-              <span className="text-[10.5px] text-slate-400">สัดส่วนในรอบเดือน</span>
+              <span className="text-[10.5px] text-slate-400">สัดส่วนในรอบที่เลือก</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
-              {topDepartments.map((dept) => (
-                <div
-                  key={dept.name}
-                  className="p-2 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 flex items-center justify-between gap-1"
-                >
-                  <span className="truncate text-slate-600 dark:text-slate-300 text-[11px] font-medium" title={dept.name}>
-                    {dept.name}
-                  </span>
-                  <span className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0 text-[11px]">
-                    {fmtNum(dept.count)}
-                  </span>
-                </div>
-              ))}
+              {topDepartments.map((dept) => {
+                const pctOfTotal = records.length > 0 ? Math.round((dept.count / records.length) * 100) : 0
+                const barWidthPct = Math.round((dept.count / maxDeptCount) * 100)
+                return (
+                  <div
+                    key={dept.name}
+                    className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 flex flex-col justify-between gap-1.5 hover:border-teal-500/30 transition group"
+                  >
+                    <div className="flex items-center justify-between gap-1">
+                      <span className="truncate text-slate-700 dark:text-slate-300 text-[11px] font-medium" title={dept.name}>
+                        {dept.name}
+                      </span>
+                      <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]">
+                        <strong className="text-teal-600 dark:text-teal-400 font-bold">{fmtNum(dept.count)}</strong>
+                        <span className="text-[10px] text-slate-400 font-normal">({pctOfTotal}%)</span>
+                      </div>
+                    </div>
+                    {/* Visual Proportion Bar */}
+                    <div className="h-1.5 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 transition-all duration-500"
+                        style={{ width: `${Math.max(barWidthPct, 4)}%` }}
+                      />
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
