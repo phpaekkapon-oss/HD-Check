@@ -3,7 +3,7 @@ import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE } from './config.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED } from './config.mjs'
 import { syncHerbalData, fetchDrugSummary } from './sync.mjs'
 import {
   initAuthTables,
@@ -61,6 +61,36 @@ const makePool = (base, database) => {
 }
 const dwPool = makePool(DW_DB_BASE, DW_DB)
 const hosPool = makePool(HOS_DB_BASE, HOS_DB)
+
+let activeHerbCache = []
+let activeHerbCacheAt = 0
+let latestHerbVisitCache = null
+let latestHerbVisitCacheAt = 0
+async function getActiveHerbalDrugs() {
+  if (Date.now() - activeHerbCacheAt < 30_000) return activeHerbCache
+  const [rows] = await hosPool.query(
+    `SELECT d.icode, d.name FROM drugitems d WHERE ${HERB_DRUG_FILTER} ORDER BY d.name, d.icode`
+  )
+  activeHerbCache = rows.map((row) => ({ icode: String(row.icode), drug_name: row.name ?? String(row.icode) }))
+  activeHerbCacheAt = Date.now()
+  return activeHerbCache
+}
+
+async function getLatestActiveHerbVisitDate(activeCodes) {
+  if (activeCodes.length === 0) {
+    latestHerbVisitCache = null
+    latestHerbVisitCacheAt = Date.now()
+    return null
+  }
+  if (Date.now() - latestHerbVisitCacheAt < 30_000) return latestHerbVisitCache
+  const [[row]] = await hosPool.query(
+    "SELECT DATE_FORMAT(MAX(op.vstdate), '%Y-%m-%d') AS latest_visit_date FROM opitemrece op WHERE op.icode IN (?)",
+    [activeCodes]
+  )
+  latestHerbVisitCache = row?.latest_visit_date ?? null
+  latestHerbVisitCacheAt = Date.now()
+  return latestHerbVisitCache
+}
 
 const app = express()
 const SESSION_COOKIE = 'hd_check_session'
@@ -188,18 +218,22 @@ async function loadDxMap() {
   return map
 }
 
+// ICD codes may be stored with or without the decimal separator (for example K30 / K30.0).
+// Strip separators on both sides so the configured rule and HOSxP value use the same form.
+const normalizeIcdCode = (value) => String(value ?? '').trim().toUpperCase().replace(/\./g, '')
+
 function evaluate(row, dxMap) {
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
-    .map((v) => String(v ?? '').trim().toUpperCase())
+    .map(normalizeIcdCode)
     .filter(Boolean)
   const unique = [...new Set(dxList)]
   if (unique.length === 0) {
     return { audit_result: 'NO_DX', matched_dx: [], allowed_dx: [], audit_reason: 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)' }
   }
   const allowed = dxMap.get(row.drug_icode) ?? []
-  const matched = unique.filter((dx) => dx.startsWith('U') || allowed.some((p) => dx.startsWith(p)))
+  const matched = unique.filter((dx) => allowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
   if (matched.length > 0) {
-    return { audit_result: 'PASS', matched_dx: matched, allowed_dx: allowed, audit_reason: 'รหัสวินิจฉัยสอดคล้องกับข้อบ่งใช้ยา' }
+    return { audit_result: 'PASS', matched_dx: matched, allowed_dx: allowed, audit_reason: 'พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (เป็นผลตรวจของระบบ)' }
   }
   if (allowed.length === 0) {
     return { audit_result: 'NO_MAP', matched_dx: [], allowed_dx: [], audit_reason: 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้' }
@@ -208,7 +242,7 @@ function evaluate(row, dxMap) {
     audit_result: 'FAIL',
     matched_dx: [],
     allowed_dx: allowed,
-    audit_reason: `DX ไม่ตรงข้อบ่งใช้ (ต้องเป็น ${allowed.join(', ')} หรือ U-code)`,
+    audit_reason: `ไม่พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (พบ ${unique.join(', ')}; เกณฑ์ ${allowed.join(', ')})`,
   }
 }
 
@@ -231,8 +265,22 @@ async function runSync(startDate, endDate, trigger) {
 /* ---------------- Routes ---------------- */
 app.get('/api/status', requireSession, async (_req, res) => {
   try {
-    const [[p]] = await dwPool.query('SELECT COUNT(*) AS total FROM dw_hd_check_prescriptions')
-    const [[d]] = await dwPool.query('SELECT COUNT(*) AS total FROM dw_hd_check_drugs')
+    const activeHerbs = await getActiveHerbalDrugs()
+    const activeCodes = activeHerbs.map((drug) => drug.icode)
+    let prescriptionTotal = 0
+    let latestVisitDate = null
+    if (activeCodes.length > 0) {
+      const [[p]] = await dwPool.query(
+        'SELECT COUNT(*) AS total FROM dw_hd_check_prescriptions WHERE drug_icode IN (?)',
+        [activeCodes]
+      )
+      prescriptionTotal = Number(p.total)
+      const [[warehouseLatest]] = await dwPool.query(
+        "SELECT DATE_FORMAT(MAX(visit_date), '%Y-%m-%d') AS latest_visit_date FROM dw_hd_check_prescriptions WHERE drug_icode IN (?)",
+        [activeCodes]
+      )
+      latestVisitDate = warehouseLatest?.latest_visit_date ?? await getLatestActiveHerbVisitDate(activeCodes)
+    }
     const [[last]] = await dwPool.query(
       `SELECT DATE_FORMAT(created_at, '%Y-%m-%dT%H:%i:%s') AS at, status, message, trigger_type,
               DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date, DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date
@@ -242,10 +290,12 @@ app.get('/api/status', requireSession, async (_req, res) => {
       status: 'online',
       host: `${DW_DB_BASE.host}:${DW_DB_BASE.port}`,
       database: DW_DB,
-      totalPrescriptions: Number(p.total),
-      totalDrugs: Number(d.total),
+      totalPrescriptions: prescriptionTotal,
+      totalDrugs: activeHerbs.length,
+      latestVisitDate,
       lastSync: last ?? null,
       isSyncing: Boolean(syncInFlight),
+      syncEnabled: SYNC_ENABLED,
       autoSyncMinutes: AUTO_SYNC_MINUTES,
     })
   } catch (err) {
@@ -271,11 +321,17 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
 
     let sql = `
       SELECT id, vn, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time,
-             hn, patient_name, pttype_name, drug_icode, drug_name, drug_qty, department_name,
+             hn, patient_name, pttype_name, drug_icode, drug_name, drug_qty, COALESCE(drug_units, '') AS drug_units, department_name,
              main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5, doctor_code, doctor_name
       FROM dw_hd_check_prescriptions
       WHERE visit_date BETWEEN ? AND ?`
     const params = [startDate, endDate]
+    const activeHerbs = await getActiveHerbalDrugs()
+    if (activeHerbs.length === 0) {
+      return res.json({ success: true, data: [], kpi: { total: 0, pass: 0, fail: 0, noDx: 0, noMap: 0, passRate: 0, totalQty: 0, uniquePatients: 0 }, meta: { total: 0, startDate, endDate } })
+    }
+    sql += ' AND drug_icode IN (?)'
+    params.push(activeHerbs.map((drug) => drug.icode))
     if (hn) {
       sql += ' AND hn LIKE ?'
       params.push(`%${hn}%`)
@@ -320,8 +376,40 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
 app.get('/api/drugs', requireSession, async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
+    const activeHerbs = await getActiveHerbalDrugs()
+    const activeCodes = activeHerbs.map((drug) => drug.icode)
+
+    // The backup HOSxP can lag behind the primary source. Prefer a successful
+    // non-empty snapshot for this exact date range when one is already stored.
+    // The drug summary table is a latest-sync snapshot, so only use it when the
+    // sync log confirms that it was populated for the requested range.
+    if (activeCodes.length > 0) {
+      const [[snapshot]] = await dwPool.query(
+        `SELECT id FROM dw_hd_check_sync_log
+         WHERE status = 'SUCCESS' AND total_prescriptions > 0
+           AND start_date = ? AND end_date = ?
+         ORDER BY id DESC LIMIT 1`,
+        [startDate, endDate]
+      )
+      if (snapshot) {
+        const [warehouseData] = await dwPool.query(
+          `SELECT icode, name, COALESCE(units, '') AS units, opd_qty, ipd_qty, unitcost, total_qty, total_cost, nhso_adp_code
+           FROM dw_hd_check_drugs WHERE icode IN (?)
+           ORDER BY total_qty DESC, name ASC`,
+          [activeCodes]
+        )
+        if (warehouseData.some((row) => Number(row.total_qty) > 0)) {
+          return res.json({
+            success: true,
+            data: warehouseData,
+            meta: { total: warehouseData.length, startDate, endDate, source: 'warehouse_snapshot' },
+          })
+        }
+      }
+    }
+
     const data = await fetchDrugSummary(hosPool, startDate, endDate)
-    res.json({ success: true, data, meta: { total: data.length, startDate, endDate } })
+    res.json({ success: true, data, meta: { total: data.length, startDate, endDate, source: 'hosxp' } })
   } catch (err) {
     fail(res, err)
   }
@@ -329,13 +417,27 @@ app.get('/api/drugs', requireSession, async (req, res) => {
 
 app.get('/api/dx-map', requireSession, async (_req, res) => {
   try {
-    const [rows] = await dwPool.query(
-      `SELECT m.icode, COALESCE(d.name, m.drug_name, m.icode) AS drug_name, m.dx_prefixes, m.indication,
-              DATE_FORMAT(m.updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at
-       FROM dw_hd_check_drug_dx_map m
-       LEFT JOIN dw_hd_check_drugs d ON d.icode = m.icode
-       ORDER BY drug_name`
+    const activeHerbs = await getActiveHerbalDrugs()
+    if (activeHerbs.length === 0) return res.json({ success: true, data: [] })
+    const activeCodes = activeHerbs.map((drug) => drug.icode)
+    const [mappedRows] = await dwPool.query(
+      `SELECT icode, COALESCE(dx_prefixes, '') AS dx_prefixes,
+              COALESCE(indication, '') AS indication,
+              COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s'), '') AS updated_at
+       FROM dw_hd_check_drug_dx_map WHERE icode IN (?)`,
+      [activeCodes]
     )
+    const mapByCode = new Map(mappedRows.map((row) => [String(row.icode), row]))
+    const rows = activeHerbs.map((drug) => {
+      const mapped = mapByCode.get(drug.icode)
+      return {
+        icode: drug.icode,
+        drug_name: drug.drug_name,
+        dx_prefixes: mapped?.dx_prefixes ?? '',
+        indication: mapped?.indication ?? '',
+        updated_at: mapped?.updated_at ?? '',
+      }
+    })
     res.json({ success: true, data: rows })
   } catch (err) {
     fail(res, err)
@@ -351,6 +453,8 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
       .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
     const periodDays = Number(req.body?.periodDays ?? 90)
     if (!icode) return res.status(400).json({ success: false, error: 'ไม่พบรหัสยา' })
+    const activeHerbs = await getActiveHerbalDrugs()
+    if (!activeHerbs.some((drug) => drug.icode === icode)) return res.status(404).json({ success: false, error: 'ไม่พบยาสมุนไพรที่เปิดใช้งานใน HOSxP' })
     if (![30, 90, 365, 0].includes(periodDays)) {
       return res.status(400).json({ success: false, error: 'ช่วงเวลาทดลองไม่ถูกต้อง' })
     }
@@ -376,7 +480,7 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
       else totals.noMap += 1
 
       const uniqueDx = [...new Set([row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
-        .map((value) => String(value ?? '').trim().toUpperCase())
+      .map(normalizeIcdCode)
         .filter(Boolean))]
       for (const code of uniqueDx) {
         codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1)
@@ -387,7 +491,7 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
       .map(([code, count]) => ({
         code,
         count,
-        matches: code.startsWith('U') || prefixes.some((prefix) => code.startsWith(prefix)),
+        matches: prefixes.some((prefix) => code.startsWith(normalizeIcdCode(prefix))),
       }))
       .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
       .slice(0, 12)
@@ -401,6 +505,8 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
 app.put('/api/dx-map/:icode', requireAdmin, async (req, res) => {
   try {
     const { icode } = req.params
+    const activeHerbs = await getActiveHerbalDrugs()
+    if (!activeHerbs.some((drug) => drug.icode === String(icode))) return res.status(404).json({ success: false, error: 'ไม่พบยาสมุนไพรที่เปิดใช้งานใน HOSxP' })
     const prefixes = String(req.body?.dx_prefixes ?? '')
       .split(/[,\s]+/)
       .map((s) => s.trim().toUpperCase().replace('.', ''))
@@ -884,7 +990,7 @@ app.listen(API_PORT, '0.0.0.0', () => {
   console.log(`HerbDx API → http://0.0.0.0:${API_PORT}  (HOSxP ${HOS_DB_BASE.host}/${HOS_DB} → ${DW_DB})`)
 })
 
-if (AUTO_SYNC_MINUTES > 0) {
+if (SYNC_ENABLED && AUTO_SYNC_MINUTES > 0) {
   let isAutoSyncing = false
   const autoSync = async () => {
     if (isAutoSyncing) return
@@ -892,7 +998,13 @@ if (AUTO_SYNC_MINUTES > 0) {
     const { startDate, endDate } = currentMonthRange()
     try {
       const r = await syncHerbalData(startDate, endDate, 'AUTO')
-      console.log(`[auto-sync] ${startDate}..${endDate}: ${r.totalPrescriptions} rows, ${r.totalDrugs} drugs (${r.durationMs} ms)`)
+      if (r.preservedExisting) {
+        console.warn(`[auto-sync] ${startDate}..${endDate}: source returned 0 rows; preserved existing warehouse data`)
+      } else if (r.skipped) {
+        console.info(`[auto-sync] ${startDate}..${endDate}: skipped because another application instance is syncing`)
+      } else {
+        console.log(`[auto-sync] ${startDate}..${endDate}: ${r.totalPrescriptions} rows, ${r.totalDrugs} drugs (${r.durationMs} ms)`)
+      }
     } catch (err) {
       console.error('[auto-sync] failed:', err.message)
     } finally {

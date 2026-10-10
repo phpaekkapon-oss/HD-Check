@@ -1,4 +1,4 @@
-import { useState, useMemo, type FC } from 'react'
+import { useEffect, useState, useMemo, type FC } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,8 +9,9 @@ import {
   type VisibilityState,
   flexRender,
 } from '@tanstack/react-table'
-import { CheckCircle2, AlertCircle, FileQuestion, HelpCircle } from 'lucide-react'
+import { CheckCircle2, AlertCircle, FileQuestion, HelpCircle, Maximize2, Minimize2, Settings2 } from 'lucide-react'
 import type { AuditRecord } from '@/types/herbdx.types'
+import { cleanDrugUnit } from '@/types/herbdx.types'
 import {
   Table,
   TableBody,
@@ -28,10 +29,11 @@ import { toThaiDate } from '@/lib/format'
 interface AuditTableProps {
   readonly records: readonly AuditRecord[]
   readonly embedded?: boolean
+  readonly onConfigureDrug?: (record: AuditRecord) => void
 }
 
 function DxCodeCell({ code, record }: { readonly code: string; readonly record: AuditRecord }) {
-  const normalizedCode = code.trim().toUpperCase()
+  const normalizedCode = code.trim().toUpperCase().replace(/\./g, '')
   if (!normalizedCode) {
     return (
       <span
@@ -43,7 +45,7 @@ function DxCodeCell({ code, record }: { readonly code: string; readonly record: 
     )
   }
 
-  const isMatched = record.matched_dx.some((dx) => dx.toUpperCase() === normalizedCode)
+  const isMatched = record.matched_dx.some((dx) => dx.toUpperCase().replace(/\./g, '') === normalizedCode)
   const colorClass = isMatched
     ? 'border-emerald-300 bg-emerald-100 text-emerald-800 dark:border-emerald-500/40 dark:bg-emerald-500/15 dark:text-emerald-300'
     : record.audit_result === 'FAIL'
@@ -89,7 +91,7 @@ const COLUMN_LABELS: Record<string, string> = {
   audit_result: 'สถานะผลตรวจ',
 }
 
-export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) => {
+export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onConfigureDrug }) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({
     dx2: true,
@@ -98,6 +100,16 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
     dx5: false,
     doctor_code: true,
   })
+  const [expanded, setExpanded] = useState(false)
+
+  useEffect(() => {
+    if (!expanded) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setExpanded(false)
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [expanded])
 
   // Define Shadcn Data Table columns with strict types
   const columns = useMemo<ColumnDef<AuditRecord>[]>(
@@ -181,14 +193,21 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
           const isProblem = row.original.audit_result === 'FAIL' || row.original.audit_result === 'NO_DX'
           const isPass = row.original.audit_result === 'PASS'
           return (
-            <span className={cn(
-              'font-semibold whitespace-nowrap',
-              isProblem ? 'text-rose-950 dark:text-rose-300 font-bold' :
-                isPass ? 'text-emerald-800 dark:text-emerald-300 font-bold' :
-                  'text-slate-800 dark:text-slate-100'
-            )}>
-              {row.original.drug_name}
-            </span>
+            <div className="flex flex-col py-0.5">
+              <span className={cn(
+                'font-semibold whitespace-nowrap',
+                isProblem ? 'text-rose-950 dark:text-rose-300 font-bold' :
+                  isPass ? 'text-emerald-800 dark:text-emerald-300 font-bold' :
+                    'text-slate-800 dark:text-slate-100'
+              )}>
+                {row.original.drug_name}
+              </span>
+              {row.original.drug_units ? (
+                <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                  ขนาดบรรจุ: {row.original.drug_units}
+                </span>
+              ) : null}
+            </div>
           )
         },
       },
@@ -197,11 +216,21 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="จำนวน" className="justify-center" />
         ),
-        cell: ({ row }) => (
-          <div className="text-center font-mono font-bold text-slate-800 dark:text-slate-100">
-            {row.original.drug_qty}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const shortUnit = cleanDrugUnit(row.original.drug_units)
+          return (
+            <div className="flex items-center justify-center gap-1.5 font-mono whitespace-nowrap">
+              <span className="text-sm font-bold text-slate-850 dark:text-slate-100">
+                {row.original.drug_qty}
+              </span>
+              {shortUnit ? (
+                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium font-sans bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
+                  {shortUnit}
+                </span>
+              ) : null}
+            </div>
+          )
+        },
       },
       {
         accessorKey: 'department_name',
@@ -225,8 +254,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
           return (
             <span
               className={cn(
-                'px-1.5 py-0.5 rounded text-[11px] font-mono font-bold',
-                val.startsWith('U') ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300' : 'text-slate-800 dark:text-slate-100'
+                'px-1.5 py-0.5 rounded text-[11px] font-mono font-bold text-slate-800 dark:text-slate-100',
               )}
             >
               {val}
@@ -327,7 +355,16 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
               </span>
             )
           }
-          return (
+          return onConfigureDrug ? (
+            <button
+              type="button"
+              onClick={() => onConfigureDrug(r)}
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+              title="เปิดหน้าตั้งค่าเกณฑ์ ICD-10 สำหรับยานี้"
+            >
+              <Settings2 className="size-3" /> ตั้งค่า
+            </button>
+          ) : (
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 whitespace-nowrap"
               title={r.audit_reason}
@@ -338,7 +375,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
         },
       },
     ],
-    []
+    [onConfigureDrug]
   )
 
   const table = useReactTable({
@@ -364,26 +401,32 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false }) =
     <div
       className={cn(
         'space-y-0 transition-colors overflow-hidden',
+        expanded && 'fixed inset-2 z-[70] flex flex-col rounded-2xl border border-slate-200 bg-themed-card shadow-2xl dark:border-[#292440] sm:inset-4',
         !embedded && 'rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm'
       )}
     >
       {/* Table Toolbar Header with Column Toggle */}
-      <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50/80 dark:bg-[#1d2035]/80 border-b border-slate-200 dark:border-[#292440]">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/80 dark:bg-[#1d2035]/80 border-b border-slate-200 dark:border-[#292440]">
         <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
           <span className="font-semibold text-slate-900 dark:text-white">Shadcn Data Table</span>
           <span className="text-slate-400 dark:text-slate-500">•</span>
           <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
             {records.length.toLocaleString('th-TH')} รายการ
           </span>
+          {!embedded && <button type="button" onClick={() => setExpanded((value) => !value)} className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-themed px-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:text-slate-200 dark:hover:bg-white/5" aria-label={expanded ? 'ย่อมุมมองตาราง' : 'ขยายตารางเต็มหน้าจอ'} title={expanded ? 'ย่อมุมมอง (Esc)' : 'ขยายตารางเต็มหน้าจอ'}>
+            {expanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            <span className="hidden sm:inline">{expanded ? 'ย่อมุมมอง' : 'ขยายตาราง'}</span>
+          </button>}
           <DataTableViewOptions table={table} columnLabels={COLUMN_LABELS} />
         </div>
       </div>
 
       {/* Main Shadcn Data Table with sticky header and vertical scroll */}
-      <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
+      {expanded && <div className="border-b border-themed px-4 py-1.5 text-[11px] text-slate-500 dark:text-slate-400">มุมมองเต็มหน้าจอ · เลื่อนแนวนอนเพื่อดูคอลัมน์ที่เหลือ · กด Esc เพื่อย่อ</div>}
+      <Table className={expanded ? 'min-w-max' : undefined} containerClassName={expanded ? 'min-h-0 flex-1 overflow-auto' : 'max-h-[68vh] min-h-[420px] overflow-auto'}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
             <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-50 dark:bg-[#1d2035]">

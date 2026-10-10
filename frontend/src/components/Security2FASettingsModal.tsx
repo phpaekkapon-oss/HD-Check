@@ -464,12 +464,12 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div className="fixed inset-0" onClick={onClose} />
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-3xl max-h-[90vh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
+      <div className="relative w-full max-w-3xl max-h-[94dvh] sm:max-h-[90dvh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-800/80 bg-slate-950/80 shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-slate-800/80 bg-slate-950/80 shrink-0">
           <div className="flex items-center gap-3.5">
             <div className="grid place-items-center size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 shadow-sm shrink-0">
               <ShieldCheck className="size-5.5 stroke-[2.2]" />
@@ -494,7 +494,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         </div>
 
         {/* Modern Segmented Tab Bar */}
-        <div className="px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
+        <div className="px-3 sm:px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
           <div className="flex p-1 rounded-xl bg-slate-950 border border-slate-800/80 gap-1 overflow-x-auto">
             {/* Tab: Profile */}
             <button
@@ -577,7 +577,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         </div>
 
         {/* Modal Body */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5">
+        <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-6 space-y-5">
           {/* ========================================================= */}
           {/* TAB: PROFILE PHOTO                                        */}
           {/* ========================================================= */}

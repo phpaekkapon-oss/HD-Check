@@ -1,16 +1,18 @@
 import { useState, useMemo, type FC } from 'react'
-import { AlertCircle, CheckCircle2, FileQuestion, HelpCircle, User, Clock, Pill, Stethoscope, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileQuestion, HelpCircle, Settings2, User, Clock, Pill, Stethoscope, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import type { AuditRecord } from '@/types/herbdx.types'
+import { cleanDrugUnit } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 import { toThaiDate, fmtNum } from '@/lib/format'
 
 interface AuditCardListProps {
   readonly records: readonly AuditRecord[]
+  readonly onConfigureDrug?: (record: AuditRecord) => void
 }
 
 const PAGE_SIZE = 15
 
-export const AuditCardList: FC<AuditCardListProps> = ({ records }) => {
+export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug }) => {
   const [currentPage, setCurrentPage] = useState(1)
 
   const totalPages = Math.ceil(records.length / PAGE_SIZE) || 1
@@ -83,9 +85,19 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records }) => {
                   </span>
                 )}
                 {isNoMap && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300">
-                    <HelpCircle className="size-3 text-amber-600 dark:text-amber-400" /> รอตั้งค่า
-                  </span>
+                  onConfigureDrug ? (
+                    <button
+                      type="button"
+                      onClick={() => onConfigureDrug(rec)}
+                      className="inline-flex min-h-9 items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+                    >
+                      <Settings2 className="size-3" /> ตั้งค่า
+                    </button>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300">
+                      <HelpCircle className="size-3 text-amber-600 dark:text-amber-400" /> รอตั้งค่า
+                    </span>
+                  )
                 )}
               </div>
             </div>
@@ -103,16 +115,23 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records }) => {
             <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-100 dark:border-[#292440] flex items-center justify-between gap-2">
               <div className="flex items-center gap-2 min-w-0">
                 <Pill className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <span className={cn('text-xs font-semibold truncate', isFail || isNoDx ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-slate-800 dark:text-slate-200')}>
-                  {rec.drug_name}
-                </span>
+                <div className="flex flex-col min-w-0">
+                  <span className={cn('text-xs font-semibold truncate', isFail || isNoDx ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-slate-800 dark:text-slate-200')}>
+                    {rec.drug_name}
+                  </span>
+                  {rec.drug_units && (
+                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                      {rec.drug_units}
+                    </span>
+                  )}
+                </div>
               </div>
-              <span className="text-xs font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] shrink-0">
-                x {rec.drug_qty}
+              <span className="text-xs font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] shrink-0 whitespace-nowrap">
+                x {rec.drug_qty} {cleanDrugUnit(rec.drug_units)}
               </span>
             </div>
 
-            {/* Diagnoses with U-Code highlight */}
+            {/* Diagnoses are displayed without implying that a code is valid by its prefix alone */}
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">PDX:</span>
@@ -128,7 +147,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records }) => {
                       key={`${dx}-${idx}`}
                       className={cn(
                         'font-mono text-[11px] px-1.5 py-0.5 rounded',
-                        dx.startsWith('U') ? 'bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 font-bold' : 'bg-slate-100 dark:bg-[#101326] text-slate-600 dark:text-slate-300'
+                        'bg-slate-100 dark:bg-[#101326] text-slate-600 dark:text-slate-300'
                       )}
                     >
                       {dx}

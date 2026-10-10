@@ -31,7 +31,16 @@ export function useDrugSummaries(range: DateRange) {
   return useQuery({
     queryKey: herbDxKeys.drugs(range),
     queryFn: () => herbDxApi.drugs(range),
-    select: (r) => r.data,
+    // MySQL DECIMAL fields may arrive as strings from the warehouse snapshot.
+    // Normalize here so table formatting and Excel export always receive numbers.
+    select: (r) => r.data.map((drug) => ({
+      ...drug,
+      opd_qty: Number(drug.opd_qty ?? 0),
+      ipd_qty: Number(drug.ipd_qty ?? 0),
+      unitcost: Number(drug.unitcost ?? 0),
+      total_qty: Number(drug.total_qty ?? 0),
+      total_cost: Number(drug.total_cost ?? 0),
+    })),
     placeholderData: keepPreviousData,
     refetchInterval: 15_000, // Auto-fetch drug summaries every 15s
   })

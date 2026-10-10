@@ -163,7 +163,7 @@ export const LoginPage: FC = () => {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 sm:p-6 bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 relative overflow-hidden select-none">
+    <div className="min-h-dvh w-full flex items-center justify-center p-3 sm:p-6 bg-gradient-to-br from-slate-900 via-slate-850 to-slate-900 relative overflow-x-clip select-none">
       {/* Dynamic Background Atmosphere Glow */}
       <div
         className="absolute -top-40 left-1/2 -translate-x-1/2 w-[850px] h-[700px] rounded-full blur-[140px] pointer-events-none opacity-40"
@@ -207,7 +207,7 @@ export const LoginPage: FC = () => {
         </div>
 
         {/* Form Container Card */}
-        <div className="rounded-2xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 p-6 sm:p-8 shadow-2xl relative ring-1 ring-white/10">
+        <div className="rounded-2xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 p-4 sm:p-8 shadow-2xl relative ring-1 ring-white/10">
           {/* STEP 1: HOSxP LOGIN FORM */}
           {step === 'login' && (
             <form onSubmit={handleLoginSubmit} className="space-y-4">

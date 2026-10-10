@@ -28,11 +28,35 @@ const PinLockContext = createContext<PinLockContextType | null>(null)
 
 const STORAGE_LOCK_KEY = 'smarthoscheck_pin_locked'
 
+const readStoredLock = () => {
+  try {
+    return sessionStorage.getItem(STORAGE_LOCK_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+export const clearStoredPinLock = () => {
+  try {
+    sessionStorage.removeItem(STORAGE_LOCK_KEY)
+  } catch {
+    // The lock state still updates in memory when browser storage is unavailable.
+  }
+}
+
+const storePinLock = () => {
+  try {
+    sessionStorage.setItem(STORAGE_LOCK_KEY, 'true')
+  } catch {
+    // Keep the lock active for this app session even if storage is unavailable.
+  }
+}
+
 export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { user, updateUser, isAuthenticated } = useAuth()
 
   const [isLocked, setIsLocked] = useState<boolean>(() => {
-    return sessionStorage.getItem(STORAGE_LOCK_KEY) === 'true'
+    return readStoredLock()
   })
 
   // User PIN configs from user object
@@ -49,7 +73,7 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const lockNow = useCallback(() => {
     if (!isAuthenticated || !hasPin) return
     setIsLocked(true)
-    sessionStorage.setItem(STORAGE_LOCK_KEY, 'true')
+    storePinLock()
   }, [isAuthenticated, hasPin])
 
   // Unlock with PIN
@@ -70,7 +94,7 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
         updateUser(data.user)
       }
       setIsLocked(false)
-      sessionStorage.removeItem(STORAGE_LOCK_KEY)
+      clearStoredPinLock()
       lastActivityRef.current = Date.now()
       return { success: true }
     } catch (err) {
@@ -120,7 +144,7 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
 
       setIsLocked(false)
-      sessionStorage.removeItem(STORAGE_LOCK_KEY)
+      clearStoredPinLock()
       updateUser({
         ...user,
         has_pin: false,
@@ -165,6 +189,13 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
   }
 
   // Activity Detector & Inactivity Auto-Lock Loop
+  useEffect(() => {
+    if (!isAuthenticated || !pinEnabled) {
+      setIsLocked(false)
+      clearStoredPinLock()
+    }
+  }, [isAuthenticated, pinEnabled])
+
   useEffect(() => {
     if (!isAuthenticated || !pinEnabled || autoLockMinutes <= 0) return
 

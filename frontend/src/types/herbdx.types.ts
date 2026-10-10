@@ -13,6 +13,15 @@ export interface DateRange {
   readonly endDate: string
 }
 
+/** คลีนหน่วยนับยาให้สั้นกระชับ ไม่รกสายตา เช่น "ขวด (120 ml.)" -> "ขวด", "เม็ด (SP.)" -> "เม็ด" */
+export function cleanDrugUnit(unit?: string): string {
+  if (!unit) return ''
+  const trimmed = unit.trim()
+  const clean = trimmed.replace(/\s*\(.*?\)\s*/g, '').trim()
+  if (clean === 'แค็บซูล') return 'แคปซูล'
+  return clean || trimmed
+}
+
 export interface AuditFilterParams extends DateRange {
   readonly hn: string
   readonly search: string
@@ -30,6 +39,7 @@ export interface AuditRecord {
   readonly drug_icode: string
   readonly drug_name: string
   readonly drug_qty: number
+  readonly drug_units?: string
   readonly department_name: string
   readonly main_pdx: string
   readonly pdx: string
@@ -68,6 +78,7 @@ export interface PrescriptionResponse {
 export interface DrugSummaryRecord {
   readonly icode: string
   readonly name: string
+  readonly units?: string
   readonly opd_qty: number
   readonly ipd_qty: number
   readonly unitcost: number
@@ -123,13 +134,19 @@ export interface DbStatus {
   readonly database: string
   readonly totalPrescriptions: number
   readonly totalDrugs: number
+  readonly latestVisitDate: string | null
   readonly lastSync: SyncLogEntry | null
   readonly isSyncing: boolean
+  readonly syncEnabled: boolean
   readonly autoSyncMinutes: number
 }
 
 export interface SyncResult extends DateRange {
   readonly success: true
+  readonly skipped?: boolean
+  readonly preservedExisting?: boolean
+  readonly warning?: string
+  readonly reason?: string
   readonly trigger: 'MANUAL' | 'AUTO'
   readonly totalPrescriptions: number
   readonly totalDrugs: number
@@ -137,4 +154,4 @@ export interface SyncResult extends DateRange {
   readonly timestamp: string
 }
 
-export type ActivePage = 'audit' | 'drugs' | 'dxmap' | 'sql'
+export type ActivePage = 'audit' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'

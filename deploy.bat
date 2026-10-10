@@ -3,7 +3,7 @@ title SMART-HOSCHECK Auto Deploy to 192.168.1.241
 color 0B
 
 echo ====================================================================
-echo   SMART-HOSCHECK - Auto Build & Deploy to Server [192.168.1.241]
+echo   SMART-HOSCHECK - Auto Build ^& Deploy to Server [192.168.1.241]
 echo ====================================================================
 echo.
 
@@ -14,33 +14,33 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 1. สั่ง Build โค้ดล่าสุดเป็น Production Bundle
-echo [*] ขั้นตอนที่ 1: กำลังสร้างไฟล์บิลด์ล่าสุด (HD-Check.zip)...
+:: 1. Build latest code
+echo [*] Step 1: Building latest production bundle (HD-Check.zip)...
 echo.
 call build.bat --no-pause
 
 if not exist "HD-Check.zip" (
     echo.
-    echo [ERROR] ไม่พบไฟล์ HD-Check.zip กรุณาตรวจสอบข้อผิดพลาดในการ build ด้านบน
+    echo [ERROR] HD-Check.zip not found. Please check build errors above.
     pause
     exit /b 1
 )
 
-:: 2. อัปโหลดขึ้น Server และสั่งเปิดใช้งาน
+:: 2. Upload and deploy to Server
 echo.
-echo [*] ขั้นตอนที่ 2: กำลังส่งไฟล์และสั่งเปิดใช้งานบน Server 192.168.1.241...
+echo [*] Step 2: Uploading and deploying to Server 192.168.1.241...
 echo.
 node backend\deploy.mjs
 
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] การ Deploy ขัดข้อง กรุณาตรวจสอบ Error ด้านบน
+    echo [ERROR] Deployment failed. Please check errors above.
     pause
     exit /b 1
 )
 
 echo.
 echo ====================================================================
-echo   กดปุ่มใดก็ได้เพื่อปิดหน้าต่างนี้...
+echo   Deployment finished! Press any key to close...
 echo ====================================================================
 pause >nul

@@ -28,6 +28,7 @@ if (HOS_DB.toLowerCase() === DW_DB.toLowerCase()) {
 // Use a dedicated SELECT-only account for HOSxP whenever one is configured.
 export const HOS_DB_BASE = {
   ...DB_BASE,
+  host: process.env.HOS_DB_HOST ?? DB_BASE.host,
   user: process.env.HOS_DB_USER ?? DB_BASE.user,
   password: process.env.HOS_DB_PASSWORD ?? DB_BASE.password,
 }
@@ -40,6 +41,8 @@ export const DW_DB_BASE = {
   password: process.env.DW_DB_PASSWORD ?? DB_BASE.password,
 }
 export const API_PORT = Number(process.env.API_PORT ?? 3002)
+// Data sync writes snapshots into the DW; require an explicit opt-in per environment.
+export const SYNC_ENABLED = process.env.SYNC_ENABLED === 'true'
 export const AUTO_SYNC_MINUTES = Number(process.env.AUTO_SYNC_MINUTES ?? 1)
 
 /** Herbal drug filter (same criteria as SQL Query 2) */
@@ -60,3 +63,6 @@ export const HERB_DRUG_FILTER = `
 `
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
+
+/** Filter for Thai Traditional Medicine Department (แผนกแพทย์แผนไทย) */
+export const THAI_MED_FILTER = `(sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')`

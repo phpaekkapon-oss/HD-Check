@@ -62,14 +62,23 @@ function runRemoteCommand(command) {
 
 conn.on('ready', () => {
   console.log('[+] SSH connection established successfully!')
-  console.log(`[*] Ensuring remote directory exists: ${CONFIG.remoteDir}...`)
+  console.log(`[*] Ensuring remote directory exists & fixing permissions: ${CONFIG.remoteDir}...`)
 
-  runRemoteCommand(`mkdir -p "${CONFIG.remoteDir}"`)
+  // Ensure directory exists and give ownership to the deployment user
+  const prepareDirScript = `
+    if [ ! -d "${CONFIG.remoteDir}" ]; then
+      echo "${CONFIG.password}" | sudo -S mkdir -p "${CONFIG.remoteDir}" 2>/dev/null || mkdir -p "${CONFIG.remoteDir}"
+    fi
+    echo "${CONFIG.password}" | sudo -S chown -R ${CONFIG.username}:${CONFIG.username} "${CONFIG.remoteDir}" 2>/dev/null || true
+    echo "${CONFIG.password}" | sudo -S chmod -R 775 "${CONFIG.remoteDir}" 2>/dev/null || true
+  `
+
+  runRemoteCommand(prepareDirScript)
     .then(() => {
       console.log(`[*] Uploading HD-Check.zip via SFTP...`)
       return new Promise((resolve, reject) => {
         conn.sftp((err, sftp) => {
-          if (err) return reject(err)
+          if (err) return reject(new Error(`SFTP initialization failed: ${err.message}`))
           const remoteZip = `${CONFIG.remoteDir}/HD-Check.zip`
           const readStream = fs.createReadStream(zipPath)
           const writeStream = sftp.createWriteStream(remoteZip)
@@ -86,7 +95,11 @@ conn.on('ready', () => {
             resolve()
           })
 
-          writeStream.on('error', reject)
+          writeStream.on('error', (err) => {
+            console.error('\n[ERROR] SFTP write stream error:', err.message)
+            reject(err)
+          })
+
           readStream.pipe(writeStream)
         })
       })
@@ -95,13 +108,22 @@ conn.on('ready', () => {
       console.log(`[*] Extracting files and restarting application on remote server...`)
       const remoteScript = `
         set -e
+        # Load NVM or Node paths if present
+        if [ -s "$HOME/.nvm/nvm.sh" ]; then
+          . "$HOME/.nvm/nvm.sh"
+        elif [ -s "/etc/profile.d/nvm.sh" ]; then
+          . "/etc/profile.d/nvm.sh"
+        fi
+        export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
+
         cd "${CONFIG.remoteDir}"
         echo "[1/4] Extracting HD-Check.zip..."
-        python3 -c "
+        if command -v python3 >/dev/null 2>&1; then
+          python3 -c "
 import zipfile, os
 with zipfile.ZipFile('HD-Check.zip', 'r') as z:
     for f in z.infolist():
-        target = f.filename.replace('\\\\', '/')
+        target = f.filename.replace(chr(92), '/')
         if target.endswith('/'):
             os.makedirs(target, exist_ok=True)
         else:
@@ -109,17 +131,21 @@ with zipfile.ZipFile('HD-Check.zip', 'r') as z:
             if p: os.makedirs(p, exist_ok=True)
             with open(target, 'wb') as out:
                 out.write(z.read(f))
-" 2>/dev/null || (unzip -o -q HD-Check.zip || true)
+"
+        elif command -v unzip >/dev/null 2>&1; then
+          unzip -o -q HD-Check.zip || [ $? -le 1 ]
+        elif command -v tar >/dev/null 2>&1; then
+          tar -xf HD-Check.zip
+        fi
 
         echo "[2/4] Installing backend production dependencies..."
-        cd backend
+        cd "${CONFIG.remoteDir}/backend"
         npm install --omit=dev
 
         echo "[3/4] Checking and restarting with PM2..."
         cd "${CONFIG.remoteDir}"
         if command -v pm2 >/dev/null 2>&1; then
-          pm2 delete ${CONFIG.appName} 2>/dev/null || true
-          pm2 start backend/index.mjs --name ${CONFIG.appName}
+          pm2 restart ${CONFIG.appName} 2>/dev/null || pm2 start backend/index.mjs --name ${CONFIG.appName}
           pm2 save || true
         else
           echo "[NOTICE] PM2 not installed. Starting with Node.js in background..."

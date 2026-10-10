@@ -62,6 +62,7 @@ export async function initDatabaseAndTables() {
       drug_icode VARCHAR(20) NULL,
       drug_name VARCHAR(255) NOT NULL,
       drug_qty INT NOT NULL DEFAULT 1,
+      drug_units VARCHAR(50) NULL DEFAULT '',
       department_name VARCHAR(150) NULL,
       main_pdx VARCHAR(20) NULL,
       pdx VARCHAR(20) NULL,
@@ -77,11 +78,15 @@ export async function initDatabaseAndTables() {
     ) ENGINE=InnoDB DEFAULT CHARSET=tis620
   `)
 
+  // Migration for existing tables
+  await conn.query("ALTER TABLE dw_hd_check_prescriptions ADD COLUMN IF NOT EXISTS drug_units VARCHAR(50) NULL DEFAULT '' AFTER drug_qty").catch(() => {})
+
   // 2) Drug dispensing summary snapshot (SQL Query 2)
   await conn.query(`
     CREATE TABLE IF NOT EXISTS dw_hd_check_drugs (
       icode VARCHAR(20) PRIMARY KEY,
       name VARCHAR(255) NOT NULL,
+      units VARCHAR(50) NULL DEFAULT '',
       opd_qty DECIMAL(12,2) DEFAULT 0,
       ipd_qty DECIMAL(12,2) DEFAULT 0,
       unitcost DECIMAL(10,2) DEFAULT 0,
@@ -91,6 +96,8 @@ export async function initDatabaseAndTables() {
       last_sync TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=tis620
   `)
+
+  await conn.query("ALTER TABLE dw_hd_check_drugs ADD COLUMN IF NOT EXISTS units VARCHAR(50) NULL DEFAULT '' AFTER name").catch(() => {})
 
   // 3) Drug <-> allowed ICD prefixes (audit rule)
   await conn.query(`

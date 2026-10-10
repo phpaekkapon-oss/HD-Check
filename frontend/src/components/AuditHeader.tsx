@@ -35,7 +35,6 @@ import { AnimatedNumber } from '@/components/AnimatedNumber'
 
 interface AuditHeaderProps {
   readonly page: ActivePage
-  readonly onPageChange: (page: ActivePage) => void
   readonly status: DbStatus | undefined
   readonly statusError: string | null
   readonly onSync: () => void
@@ -54,7 +53,6 @@ interface BeforeInstallPromptEvent extends Event {
 
 export const AuditHeader: FC<AuditHeaderProps> = ({
   page,
-  onPageChange,
   status,
   statusError,
   onSync,
@@ -232,9 +230,18 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     สะสมในระบบ <strong className="text-slate-800 dark:text-slate-100 font-bold"><AnimatedNumber value={status?.totalPrescriptions ?? 0} /></strong> รายการ
                   </span>
                   <span className="text-slate-300 dark:text-slate-600 select-none hidden md:inline">•</span>
-                  <span className="text-emerald-600 dark:text-emerald-400 font-medium hidden md:inline">
-                    Auto-Sync
+                  <span className={`font-medium hidden md:inline ${status?.syncEnabled === false || !status?.autoSyncMinutes ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
+                    {status?.syncEnabled === false
+                      ? 'โหมดดูข้อมูล · ปิดซิงก์'
+                      : status?.autoSyncMinutes
+                        ? `Auto-Sync ทุก ${status.autoSyncMinutes} นาที`
+                        : 'ปิด Auto-Sync · ซิงค์เอง'}
                   </span>
+                  {last.message?.startsWith('Preserved ') && (
+                    <span className="text-amber-600 dark:text-amber-400 font-medium" title={last.message}>
+                      · คงข้อมูลเดิมไว้ (ต้นทางส่งกลับ 0 รายการ)
+                    </span>
+                  )}
                 </div>
               ) : (
                 <span>กำลังเชื่อมต่อฐานข้อมูล…</span>
@@ -330,9 +337,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             id="btn-sync-hosxp"
             type="button"
             onClick={onSync}
-            disabled={isSyncing || Boolean(status?.isSyncing)}
+            disabled={isSyncing || Boolean(status?.isSyncing) || status?.syncEnabled === false}
             className="btn-pill-action size-9 sm:w-auto sm:px-3.5 grid place-items-center sm:flex sm:items-center sm:gap-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs shrink-0"
-            title={isSyncing || status?.isSyncing ? 'กำลังดึงข้อมูล HOSxP…' : 'ดึงข้อมูล HOSxP'}
+            title={status?.syncEnabled === false ? 'ปิดการซิงก์ในโหมดดูข้อมูล เพื่อป้องกันเขียนทับคลังกลาง' : isSyncing || status?.isSyncing ? 'กำลังดึงข้อมูล HOSxP…' : 'ดึงข้อมูล HOSxP'}
           >
             {isSyncing || status?.isSyncing ? (
               <Loader2 className="size-4 animate-spin shrink-0" />
@@ -584,28 +591,6 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
         </div>
       )}
 
-      {/* Responsive 4-Column navigation bar on mobile / tablet */}
-      <nav className="lg:hidden px-2.5 sm:px-3.5 pb-2 border-t border-slate-200 dark:border-white/10 pt-1.5 bg-themed-header">
-        <div className="grid grid-cols-4 gap-1 sm:gap-1.5">
-          {NAV_ITEMS.map(({ id, label, shortLabel, icon: Icon }: NavItem) => (
-            <button
-              key={id}
-              type="button"
-              onClick={() => onPageChange(id)}
-              className={cn(
-                'inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-lg px-1.5 sm:px-2.5 py-1.5 text-[11px] sm:text-xs font-medium cursor-pointer transition text-center truncate',
-                page === id
-                  ? 'bg-accent text-white font-bold shadow-xs'
-                  : 'bg-white dark:bg-white/5 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 border border-slate-200 dark:border-white/5'
-              )}
-              title={label}
-            >
-              <Icon className="size-3.5 shrink-0" />
-              <span className="truncate">{shortLabel ?? label}</span>
-            </button>
-          ))}
-        </div>
-      </nav>
     </header>
   )
 }

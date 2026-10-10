@@ -1,6 +1,8 @@
 import { useState, type FC, type ReactNode } from 'react'
 import { Sidebar, NAV_ITEMS } from '@/components/Sidebar'
 import { AuditHeader } from '@/components/AuditHeader'
+import { VersionChangelogModal } from '@/components/VersionChangelogModal'
+import { VersionUpdateNotice } from '@/components/VersionUpdateNotice'
 import type { ActivePage, DbStatus, SyncResult } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 
@@ -30,6 +32,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
   children,
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [changelogOpen, setChangelogOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar_collapsed') === 'true'
@@ -46,7 +49,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
   }
 
   return (
-    <div className="min-h-screen bg-themed-app text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-violet-500 selection:text-white antialiased transition-colors duration-300">
+    <div className="min-h-dvh bg-themed-app text-slate-900 dark:text-slate-100 flex flex-col font-sans selection:bg-violet-500 selection:text-white antialiased transition-colors duration-300">
       <div className="flex-1 flex min-w-0">
         {/* Left Sidebar: Desktop Collapsible + Mobile Slide-over Drawer */}
         <Sidebar
@@ -58,6 +61,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           onToggleCollapse={handleToggleCollapse}
           mobileOpen={mobileMenuOpen}
           onMobileClose={() => setMobileMenuOpen(false)}
+          onOpenChangelog={() => setChangelogOpen(true)}
         />
 
         {/* Main Application Viewport */}
@@ -65,7 +69,6 @@ export const AppLayout: FC<AppLayoutProps> = ({
           {/* Top Sticky Header matching Hospital Theme */}
           <AuditHeader
             page={activePage}
-            onPageChange={onPageChange}
             status={status}
             statusError={statusError}
             onSync={onSync}
@@ -78,7 +81,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           />
 
           {/* Main Content Area (Adaptive Padding: Mobile, Tablet, Desktop) */}
-          <main className="flex-1 p-3.5 sm:p-4.5 md:p-5 lg:p-6 pb-24 lg:pb-6 space-y-4 max-w-[1600px] w-full mx-auto safe-bottom">
+          <main className={cn('flex-1 p-3.5 sm:p-4.5 md:p-5 lg:p-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-6 space-y-4 w-full mx-auto', collapsed ? 'max-w-none' : 'max-w-[1600px]')}>
             {children}
           </main>
         </div>
@@ -91,6 +94,8 @@ export const AppLayout: FC<AppLayoutProps> = ({
           const shortLabel =
             id === 'audit' ? 'ตรวจสอบยา' :
             id === 'drugs' ? 'สรุปจ่ายยา' :
+            id === 'mapping' ? 'ตรวจรหัส' :
+            id === 'dxwriteback' ? 'ทบทวน DX' :
             id === 'dxmap' ? 'เกณฑ์ ICD' : 'SQL'
 
           return (
@@ -139,10 +144,28 @@ export const AppLayout: FC<AppLayoutProps> = ({
             <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
             Online
           </span>
-          <span className="text-slate-300 dark:text-white/20">|</span>
-          <span>SMART-HOSCHECK • HerbDx v1.0</span>
+          <button
+            type="button"
+            onClick={() => setChangelogOpen(true)}
+            className="inline-flex items-center gap-1.5 hover:text-teal-600 dark:hover:text-teal-400 transition-colors cursor-pointer group"
+            title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
+          >
+            <span>SMART-HOSCHECK • HerbDx v{__APP_VERSION__}</span>
+            <span className="size-1.5 rounded-full bg-teal-500 group-hover:scale-125 transition-transform" />
+          </button>
         </div>
       </footer>
+
+      {/* Version Changelog & Release Notes Modal */}
+      <VersionChangelogModal
+        isOpen={changelogOpen}
+        onClose={() => setChangelogOpen(false)}
+      />
+
+      {/* Floating toast notification for new release */}
+      <VersionUpdateNotice
+        onOpenChangelog={() => setChangelogOpen(true)}
+      />
     </div>
   )
 }

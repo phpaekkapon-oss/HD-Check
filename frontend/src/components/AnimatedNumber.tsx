@@ -31,7 +31,7 @@ export const AnimatedNumber: FC<AnimatedNumberProps> = ({
 }) => {
   const [displayValue, setDisplayValue] = useState<number>(0)
   const [hasChanged, setHasChanged] = useState<boolean>(false)
-  const prevValueRef = useRef<number>(0)
+  const displayValueRef = useRef<number>(0)
   const animFrameRef = useRef<number | null>(null)
   const isFirstMountRef = useRef<boolean>(true)
 
@@ -43,23 +43,23 @@ export const AnimatedNumber: FC<AnimatedNumberProps> = ({
 
     if (prefersReducedMotion) {
       setDisplayValue(value)
-      prevValueRef.current = value
+      displayValueRef.current = value
+      isFirstMountRef.current = false
       return
     }
 
-    const startVal = prevValueRef.current
+    const startVal = displayValueRef.current
     const targetVal = value
-
-    // If first mount or value changed, animate
     const startTime = performance.now()
     const diff = targetVal - startVal
-
-    if (diff !== 0 && !isFirstMountRef.current) {
-      setHasChanged(true)
-      const t = setTimeout(() => setHasChanged(false), 800)
-      return () => clearTimeout(t)
-    }
+    const isInitialValue = isFirstMountRef.current
     isFirstMountRef.current = false
+    let changeTimeout: ReturnType<typeof setTimeout> | undefined
+
+    if (diff !== 0 && !isInitialValue) {
+      setHasChanged(true)
+      changeTimeout = setTimeout(() => setHasChanged(false), 800)
+    }
 
     const animate = (currentTime: number) => {
       const elapsed = currentTime - startTime
@@ -67,13 +67,14 @@ export const AnimatedNumber: FC<AnimatedNumberProps> = ({
       const eased = easeOutCubic(progress)
       const current = startVal + diff * eased
 
+      displayValueRef.current = current
       setDisplayValue(current)
 
       if (progress < 1) {
         animFrameRef.current = requestAnimationFrame(animate)
       } else {
+        displayValueRef.current = targetVal
         setDisplayValue(targetVal)
-        prevValueRef.current = targetVal
       }
     }
 
@@ -87,7 +88,7 @@ export const AnimatedNumber: FC<AnimatedNumberProps> = ({
       if (animFrameRef.current) {
         cancelAnimationFrame(animFrameRef.current)
       }
-      prevValueRef.current = targetVal
+      if (changeTimeout) clearTimeout(changeTimeout)
     }
   }, [value, duration])
 

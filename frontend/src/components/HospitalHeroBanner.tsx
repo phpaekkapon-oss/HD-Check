@@ -15,6 +15,14 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
   const todayIso = new Date().toISOString().slice(0, 10)
   const todayThai = toThaiDateLong(todayIso)
   const isOnline = Boolean(status)
+  const autoSyncEnabled = Boolean(status?.syncEnabled && status.autoSyncMinutes > 0)
+  const syncModeLabel = !status
+    ? 'กำลังตรวจสอบรอบซิงค์'
+    : !status.syncEnabled
+      ? 'ปิดการซิงค์'
+      : autoSyncEnabled
+        ? `Auto-Sync ทุก ${status.autoSyncMinutes} นาที`
+        : 'ซิงค์ด้วยตนเอง'
 
   return (
     <div
@@ -54,9 +62,9 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
 
       {/* Right Controls: Quick Status Badges */}
       <div className="flex items-center gap-2.5 shrink-0 flex-wrap">
-        <div className="hidden sm:inline-flex h-9 items-center gap-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-xs font-mono font-medium text-emerald-700 dark:text-emerald-300">
-          <span className="size-2 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-          <span>Auto-Sync Real-Time</span>
+        <div className={`hidden sm:inline-flex h-9 items-center gap-1.5 px-3 rounded-xl border text-xs font-mono font-medium ${autoSyncEnabled ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-700 dark:text-emerald-300' : 'bg-amber-500/10 border-amber-500/25 text-amber-700 dark:text-amber-300'}`}>
+          <span className={`size-2 rounded-full shrink-0 ${autoSyncEnabled ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
+          <span>{syncModeLabel}</span>
         </div>
 
         <div className="h-9 inline-flex items-center px-3 rounded-xl bg-slate-100 dark:bg-white/10 border border-slate-200 dark:border-white/15 text-xs font-mono font-medium text-slate-700 dark:text-white">
@@ -66,11 +74,11 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
         <button
           type="button"
           onClick={onSync}
-          disabled={isSyncing}
+          disabled={isSyncing || status?.syncEnabled === false}
           className="btn-pill-action h-9 inline-flex items-center gap-2 px-4 text-xs font-bold text-white active:scale-95 transition cursor-pointer disabled:opacity-50"
         >
           <RefreshCw className={`size-4 ${isSyncing ? 'animate-spin' : ''}`} />
-          <span>{isSyncing ? 'กำลังดึงข้อมูล…' : 'ดึงข้อมูล HOSxP ทันที'}</span>
+          <span>{isSyncing ? 'กำลังดึงข้อมูล…' : status?.syncEnabled === false ? 'ปิดการซิงก์ (โหมดดูข้อมูล)' : 'ดึงข้อมูล HOSxP ทันที'}</span>
         </button>
 
         {status?.lastSync?.at && (

@@ -1,5 +1,7 @@
 # 🌿 SMART-HOSCHECK (HerbDx Audit System)
 
+เลขเวอร์ชันในแอปอ่านจาก `package.json` ที่โฟลเดอร์หลัก ดูรายการปรับปรุงแต่ละรุ่นได้ที่ [CHANGELOG.md](./CHANGELOG.md)
+
 ระบบตรวจสอบการสั่งใช้ยาสมุนไพรตามเงื่อนไขข้อบ่งใช้ ICD-10 / ICD-10-TM สำหรับโรงพยาบาลที่ใช้ระบบ HOSxP
 
 ---
@@ -9,7 +11,7 @@
 ```text
 HD-Check/
 ├── 📂 backend/               # [หลังบ้าน] Node.js Express API & MySQL Data Sync
-│   ├── .env                  # การตั้งค่าเชื่อมต่อ HOSxP MySQL (192.168.1.253)
+│   ├── .env                  # การตั้งค่าเชื่อมต่อ HOSxP และ Data Warehouse
 │   ├── package.json          # Dependency เฉพาะฝั่งหลังบ้าน (Express, mysql2, cors, dotenv)
 │   ├── index.mjs             # Express REST API Server (Port 3002) & Auto-Sync Cron
 │   ├── config.mjs            # การตั้งค่า DB / Indication Criteria
@@ -73,5 +75,8 @@ HOS_DB_PASSWORD=<บัญชีนี้ควรมีสิทธิ์ SELEC
 HOS_DB=hos
 DW_DB=dw_hd-check
 API_PORT=3002
+SYNC_ENABLED=true
 AUTO_SYNC_MINUTES=10
 ```
+
+> โปรไฟล์ `dev.bat` ชี้ทั้ง HOSxP และคลัง snapshot ไปที่ `192.168.1.253` และเปิดซิงก์ทุก 1 นาที ตรวจสอบสิทธิ์บัญชีและช่วงข้อมูลก่อนใช้งานจริง

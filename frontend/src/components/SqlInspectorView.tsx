@@ -27,26 +27,40 @@ LEFT JOIN pttype ps ON o.pttype = ps.pttype
 LEFT JOIN spclty sp ON o.spclty = sp.spclty
 LEFT JOIN doctor doc ON o.doctor = doc.code
 WHERE o.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
-  AND (d.name LIKE '%สมุนไพร%' OR d.drugcategory LIKE '%สมุนไพร%' OR sp.name LIKE '%แพทย์แผนไทย%')
+  AND (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')
+  AND (d.drugcategory LIKE '%สมุนไพร%' OR d.name LIKE '%มะแว้ง%' OR d.name LIKE '%มะขามแขก%' OR d.name LIKE '%เถาวัลย์เปรียง%' OR d.icode IN ('1550003', '1540013', '1560028', '1560031'))
 ORDER BY o.vstdate DESC, o.vsttime DESC;`
 
 const QUERY_2 = `SELECT 
     d.icode AS \`รหัสยา\`,
     d.name AS \`รายการยา\`,
-    -- จ่ายผู้ป่วยนอก (OPD)
-    SUM(CASE WHEN (op.an IS NULL OR op.an = '') AND op.vstdate BETWEEN '2026-10-01' AND '2026-10-31' THEN op.qty ELSE 0 END) AS \`จ่ายผู้ป่วยนอก\`,
-    -- จ่ายผู้ป่วยใน (IPD)
-    SUM(CASE WHEN (op.an IS NOT NULL AND op.an <> '') AND op.vstdate BETWEEN '2026-10-01' AND '2026-10-31' THEN op.qty ELSE 0 END) AS \`จ่ายผู้ป่วยใน\`,
+    -- จ่ายผู้ป่วยนอก (OPD) แผนกแพทย์แผนไทย
+    SUM(CASE WHEN (op.an IS NULL OR op.an = '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS \`จ่ายผู้ป่วยนอก\`,
+    -- จ่ายผู้ป่วยใน (IPD) ทุกหอผู้ป่วย
+    SUM(CASE WHEN (op.an IS NOT NULL AND op.an <> '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS \`จ่ายผู้ป่วยใน\`,
     -- ราคาต้นทุน
     ROUND(IFNULL(d.unitcost, 0), 2) AS \`ราคาต้นทุน\`,
     -- รวมจำนวนที่จ่ายทั้งหมด
-    SUM(CASE WHEN op.vstdate BETWEEN '2026-10-01' AND '2026-10-31' THEN op.qty ELSE 0 END) AS \`จำนวน\`,
+    SUM(IFNULL(op.qty, 0)) AS \`จำนวน\`,
     -- รวมต้นทุนยา
-    ROUND(SUM(CASE WHEN op.vstdate BETWEEN '2026-10-01' AND '2026-10-31' THEN op.qty ELSE 0 END) * IFNULL(d.unitcost, 0), 2) AS \`รวมต้นทุนยา\`,
+    ROUND(SUM(IFNULL(op.qty, 0)) * IFNULL(d.unitcost, 0), 2) AS \`รวมต้นทุนยา\`,
     -- รหัสมาตรฐาน 24 หลัก
     IFNULL(d.did, d.nhso_adp_code) AS \`รหัสยา 24 หลัก\`
 FROM drugitems d
-LEFT JOIN opitemrece op ON d.icode = op.icode
+LEFT JOIN (
+  SELECT op.icode, op.qty, op.an
+  FROM opitemrece op
+  LEFT JOIN ovst o ON op.vn = o.vn
+  LEFT JOIN spclty sp ON o.spclty = sp.spclty
+  WHERE op.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+    AND (
+      -- ผู้ป่วยนอก: เฉพาะแผนกแพทย์แผนไทย
+      ((op.an IS NULL OR op.an = '') AND (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16'))
+      OR
+      -- ผู้ป่วยใน: ทุกหอผู้ป่วยที่มีการสั่งใช้ยาสมุนไพร
+      (op.an IS NOT NULL AND op.an <> '')
+    )
+) op ON d.icode = op.icode
 WHERE d.istatus = 'Y' -- กรองเฉพาะยาที่มีสถานะเปิดใช้งาน (Y)
   AND (
       d.drugcategory LIKE '%สมุนไพร%'

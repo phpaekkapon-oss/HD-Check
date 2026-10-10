@@ -8,7 +8,7 @@ import {
   LogOut,
   Leaf,
 } from 'lucide-react'
-import { usePinLock } from '@/context/PinLockContext'
+import { clearStoredPinLock, usePinLock } from '@/context/PinLockContext'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import { cn } from '@/lib/utils'
@@ -127,7 +127,7 @@ export const LockScreenOverlay: FC = () => {
       setShowPasswordModal(false)
       setHosPassword('')
       // clear lock
-      sessionStorage.removeItem('smarthoscheck_pin_locked')
+      clearStoredPinLock()
       window.location.reload()
     } else {
       setPassError(res.error || 'รหัสผ่าน HOSxP ไม่ถูกต้อง')
@@ -139,7 +139,7 @@ export const LockScreenOverlay: FC = () => {
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'backspace']
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/80 backdrop-blur-2xl p-4 select-none animate-in fade-in duration-300">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-y-auto bg-slate-950/80 backdrop-blur-2xl p-3 sm:p-4 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] select-none animate-in fade-in duration-300">
       {/* Background radial gradient glow */}
       <div
         className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] rounded-full blur-[140px] opacity-25 pointer-events-none"
@@ -148,7 +148,7 @@ export const LockScreenOverlay: FC = () => {
 
       <div
         className={cn(
-          'relative w-full max-w-sm rounded-3xl bg-slate-900/90 border border-white/10 p-6 md:p-8 shadow-2xl backdrop-blur-xl flex flex-col items-center text-center transition-transform',
+          'relative my-auto w-full max-w-sm max-h-full overflow-y-auto rounded-3xl bg-slate-900/90 border border-white/10 p-4 sm:p-6 md:p-8 shadow-2xl backdrop-blur-xl flex flex-col items-center text-center transition-transform',
           isShaking && 'animate-shake'
         )}
       >
@@ -225,7 +225,7 @@ export const LockScreenOverlay: FC = () => {
               <button
                 type="button"
                 onClick={() => {
-                  sessionStorage.removeItem('smarthoscheck_pin_locked')
+                  clearStoredPinLock()
                   logout()
                 }}
                 className="mt-1 px-3 py-1 text-xs rounded-xl bg-rose-500/20 hover:bg-rose-500/30 text-rose-300 border border-rose-500/30 font-semibold transition-all cursor-pointer flex items-center gap-1.5 shadow-sm"
@@ -238,7 +238,7 @@ export const LockScreenOverlay: FC = () => {
         )}
 
         {/* PIN Keypad Grid */}
-        <div className="grid grid-cols-3 gap-2.5 w-full max-w-[260px] mb-6">
+        <div className="grid grid-cols-3 gap-2.5 w-full max-w-[260px] mb-4 sm:mb-6">
           {keys.map((k) => {
             if (k === 'clear') {
               return (
@@ -247,7 +247,7 @@ export const LockScreenOverlay: FC = () => {
                   type="button"
                   onClick={() => handleKeyClick('clear')}
                   disabled={isSubmitting || pin.length === 0}
-                  className="h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-xs font-bold text-slate-300 transition-all flex items-center justify-center cursor-pointer"
+                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-xs font-bold text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   ล้าง (C)
                 </button>
@@ -260,7 +260,7 @@ export const LockScreenOverlay: FC = () => {
                   type="button"
                   onClick={() => handleKeyClick('backspace')}
                   disabled={isSubmitting || pin.length === 0}
-                  className="h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-slate-300 transition-all flex items-center justify-center cursor-pointer"
+                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   <Delete className="size-5" />
                 </button>
@@ -272,7 +272,7 @@ export const LockScreenOverlay: FC = () => {
                 type="button"
                 onClick={() => handleKeyClick(k)}
                 disabled={isSubmitting}
-                className="h-12 rounded-2xl bg-white/5 hover:bg-white/15 active:scale-95 text-lg font-bold text-white transition-all flex items-center justify-center border border-white/5 hover:border-white/20 shadow-sm cursor-pointer"
+                className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/15 active:scale-95 text-lg font-bold text-white transition-all flex items-center justify-center border border-white/5 hover:border-white/20 shadow-sm cursor-pointer touch-manipulation"
               >
                 {k}
               </button>
@@ -301,7 +301,10 @@ export const LockScreenOverlay: FC = () => {
 
           <button
             type="button"
-            onClick={logout}
+            onClick={() => {
+              clearStoredPinLock()
+              logout()
+            }}
             className="text-rose-400 hover:text-rose-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
           >
             <LogOut className="size-3.5" />

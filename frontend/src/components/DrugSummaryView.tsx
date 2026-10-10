@@ -11,6 +11,7 @@ import {
 } from '@tanstack/react-table'
 import { Download, Search, DollarSign, Pill } from 'lucide-react'
 import type { DateRange, DrugSummaryRecord } from '@/types/herbdx.types'
+import { cleanDrugUnit } from '@/types/herbdx.types'
 import {
   Table,
   TableBody,
@@ -23,13 +24,15 @@ import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { DataTableViewOptions } from '@/components/DataTableViewOptions'
 import { DateRangeFields } from '@/components/AuditFilterBar'
-import { downloadExcel, fmtNum } from '@/lib/format'
+import { downloadExcel, fmtNum, toThaiDateShort } from '@/lib/format'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { cn } from '@/lib/utils'
 
 interface DrugSummaryViewProps {
   readonly drugs: readonly DrugSummaryRecord[]
   readonly range: DateRange
   readonly onRangeChange: (r: DateRange) => void
+  readonly latestVisitDate?: string | null
 }
 
 const DRUG_COLUMN_LABELS: Record<string, string> = {
@@ -44,23 +47,30 @@ const DRUG_COLUMN_LABELS: Record<string, string> = {
   nhso_adp_code: 'รหัส 24 หลัก',
 }
 
-export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRangeChange }) => {
+export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRangeChange, latestVisitDate }) => {
   const [search, setSearch] = useState('')
+  const [filterType, setFilterType] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
   const [sorting, setSorting] = useState<SortingState>([
     { id: 'total_qty', desc: true }, // Default sort by highest total quantity
   ])
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>({})
 
   const filteredData = useMemo(() => {
-    if (!search.trim()) return drugs
+    let list = drugs
+    if (filterType === 'OPD') {
+      list = list.filter((d) => d.opd_qty > 0)
+    } else if (filterType === 'IPD') {
+      list = list.filter((d) => d.ipd_qty > 0)
+    }
+    if (!search.trim()) return list
     const q = search.toLowerCase()
-    return drugs.filter(
+    return list.filter(
       (d) =>
         d.icode.includes(q) ||
         d.name.toLowerCase().includes(q) ||
         d.nhso_adp_code.includes(q)
     )
-  }, [drugs, search])
+  }, [drugs, search, filterType])
 
   const columns = useMemo<ColumnDef<DrugSummaryRecord>[]>(
     () => [
@@ -96,9 +106,16 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <DataTableColumnHeader column={column} title="รายการยา" />
         ),
         cell: ({ row }) => (
-          <span className="font-semibold text-slate-900 dark:text-slate-100">
-            {row.original.name}
-          </span>
+          <div className="flex flex-col py-0.5">
+            <span className="font-semibold text-slate-900 dark:text-slate-100">
+              {row.original.name}
+            </span>
+            {row.original.units ? (
+              <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+                ขนาดบรรจุ: {row.original.units}
+              </span>
+            ) : null}
+          </div>
         ),
       },
       {
@@ -137,13 +154,21 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
       {
         accessorKey: 'total_qty',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="จำนวน" className="justify-end" />
+          <DataTableColumnHeader column={column} title="จำนวนรวม" className="justify-end" />
         ),
-        cell: ({ row }) => (
-          <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50/60 dark:bg-[#1d2035] px-2 py-0.5 rounded">
-            {fmtNum(row.original.total_qty)}
-          </div>
-        ),
+        cell: ({ row }) => {
+          const shortUnit = cleanDrugUnit(row.original.units)
+          return (
+            <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50/60 dark:bg-[#1d2035] px-2 py-0.5 rounded whitespace-nowrap">
+              <span>{fmtNum(row.original.total_qty)}</span>
+              {shortUnit ? (
+                <span className="text-xs font-normal font-sans text-slate-500 dark:text-slate-400 ml-1.5">
+                  {shortUnit}
+                </span>
+              ) : null}
+            </div>
+          )
+        },
       },
       {
         accessorKey: 'total_cost',
@@ -190,10 +215,24 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
     getPaginationRowModel: getPaginationRowModel(),
   })
 
-  const grandTotalQty = filteredData.reduce((s, d) => s + d.total_qty, 0)
-  const grandTotalCost = filteredData.reduce((s, d) => s + d.total_cost, 0)
-  const totalOpd = filteredData.reduce((s, d) => s + d.opd_qty, 0)
-  const totalIpd = filteredData.reduce((s, d) => s + d.ipd_qty, 0)
+  const grandTotalQty = useMemo(() => drugs.reduce((s, d) => s + d.total_qty, 0), [drugs])
+  const grandTotalCost = useMemo(() => drugs.reduce((s, d) => s + d.total_cost, 0), [drugs])
+  const totalOpd = useMemo(() => drugs.reduce((s, d) => s + d.opd_qty, 0), [drugs])
+  const totalIpd = useMemo(() => drugs.reduce((s, d) => s + d.ipd_qty, 0), [drugs])
+  const hasNoDispensingInRange = drugs.length > 0 && drugs.every((drug) => drug.total_qty === 0)
+
+  const goToLatestDispensingMonth = () => {
+    if (!latestVisitDate) return
+    const [yearText, monthText] = latestVisitDate.split('-')
+    const year = Number(yearText)
+    const month = Number(monthText)
+    if (!year || !month) return
+    const lastDay = new Date(year, month, 0).getDate()
+    onRangeChange({
+      startDate: `${yearText}-${monthText}-01`,
+      endDate: `${yearText}-${monthText}-${String(lastDay).padStart(2, '0')}`,
+    })
+  }
 
   const handleExport = () => {
     const headers = [
@@ -223,31 +262,70 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
 
   return (
     <div className="space-y-4">
-      {/* Metric summary banner with smooth gradients */}
+      {/* Metric summary banner with interactive filtering */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <div className="rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยนอก (OPD)</div>
+        <button
+          type="button"
+          onClick={() => setFilterType((prev) => (prev === 'OPD' ? 'ALL' : 'OPD'))}
+          className={cn(
+            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
+            filterType === 'OPD' && 'ring-2 ring-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/15 border-cyan-500/50'
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยนอก (OPD)</div>
+            {filterType === 'OPD' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500 text-white font-bold">กำลังกรอง</span>
+            )}
+          </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400 mt-1 tracking-tight">
             <AnimatedNumber value={totalOpd} suffix=" หน่วย" />
           </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการผู้ป่วยนอก</div>
-        </div>
-        <div className="rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยใน (IPD)</div>
+          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการผู้ป่วยนอก (คลิกเพื่อกรอง)</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterType((prev) => (prev === 'IPD' ? 'ALL' : 'IPD'))}
+          className={cn(
+            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
+            filterType === 'IPD' && 'ring-2 ring-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/15 border-indigo-500/50'
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยใน (IPD)</div>
+            {filterType === 'IPD' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">กำลังกรอง</span>
+            )}
+          </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-1 tracking-tight">
             <AnimatedNumber value={totalIpd} suffix=" หน่วย" />
           </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการหอผู้ป่วยใน</div>
-        </div>
-        <div className="rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-            <Pill className="size-3.5 text-accent" /> รวมจำนวนที่จ่ายทั้งหมด
+          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการหอผู้ป่วยใน (คลิกเพื่อกรอง)</div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterType('ALL')}
+          className={cn(
+            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
+            filterType === 'ALL' && 'ring-2 ring-accent/60 bg-accent/5'
+          )}
+        >
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
+              <Pill className="size-3.5 text-accent" /> รวมจำนวนที่จ่ายทั้งหมด
+            </div>
+            {filterType === 'ALL' && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-white font-bold">แสดงทั้งหมด</span>
+            )}
           </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-accent mt-1 tracking-tight">
             <AnimatedNumber value={grandTotalQty} suffix=" หน่วย" />
           </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">รวมทุกขนานยา</div>
-        </div>
+          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">รวมทุกขนานยา (คลิกดูทั้งหมด)</div>
+        </button>
+
         <div className="rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs">
           <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
             <DollarSign className="size-3.5 text-amber-600 dark:text-amber-400" /> รวมต้นทุนยาสมุนไพร
@@ -258,6 +336,38 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">คำนวณจากราคาต้นทุน</div>
         </div>
       </div>
+
+      {filterType !== 'ALL' && (
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-xs">
+          <div className="flex items-center gap-2">
+            <span className="font-semibold text-slate-700 dark:text-slate-300">
+              กำลังกรองตาราง: {filterType === 'OPD' ? '💊 เฉพาะยาที่มีการจ่ายผู้ป่วยนอก (OPD)' : '🏥 เฉพาะยาที่มีการจ่ายผู้ป่วยใน (IPD)'}
+            </span>
+            <span className="text-slate-400">({filteredData.length} รายการ)</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFilterType('ALL')}
+            className="text-xs font-semibold text-accent hover:underline cursor-pointer"
+          >
+            ล้างตัวกรอง (แสดงทั้งหมด)
+          </button>
+        </div>
+      )}
+
+      {hasNoDispensingInRange && (
+        <div role="status" className="flex flex-col gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            พบรายการยาสมุนไพรที่เปิดใช้งาน {drugs.length} รายการ แต่ไม่มีการจ่ายในช่วง {toThaiDateShort(range.startDate)} ถึง {toThaiDateShort(range.endDate)}
+            {latestVisitDate ? ` · พบการจ่ายล่าสุด ${toThaiDateShort(latestVisitDate)}` : ''}
+          </span>
+          {latestVisitDate && (
+            <button type="button" onClick={goToLatestDispensingMonth} className="shrink-0 rounded-lg border border-amber-200/30 px-3 py-1.5 font-semibold hover:bg-amber-100/10">
+              ไปยังเดือนที่มีจ่ายล่าสุด
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Main Shadcn Data Table (Desktop View - Unified Card) */}
       <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">

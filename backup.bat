@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 title SMART-HOSCHECK Database Backup
 color 0B
 

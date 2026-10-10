@@ -1,4 +1,5 @@
 @echo off
+chcp 65001 >nul
 title SMART-HOSCHECK (Backend + Frontend)
 color 0A
 
@@ -47,8 +48,15 @@ if %errorlevel% equ 0 (
     exit /b 1
 )
 
-:: Override backend/.env for this launcher, keeping this app separate from HRMS
+:: Use the production HOSxP and DW hosts for this launch profile.
+set DB_HOST=192.168.1.253
+set HOS_DB_HOST=192.168.1.253
+set HOS_DB=hos
+set DW_DB=dw_hd-check
 set API_PORT=3002
+:: Keep syncing manual so operators can verify source and date range first.
+set SYNC_ENABLED=true
+set AUTO_SYNC_MINUTES=0
 
 echo.
 echo ====================================================================
@@ -56,12 +64,13 @@ echo   Starting SMART-HOSCHECK System...
 echo   * Local URL    : http://localhost:5174
 echo   * Network IP   : http://%LAN_IP%:5174
 echo   * Backend API  : http://%LAN_IP%:3002
-echo   * HOSxP MySQL  : 192.168.1.253 [dw_hd-check]
+echo   * HOSxP MySQL  : 192.168.1.253 [hos] (production source)
+echo   * Data Warehouse: 192.168.1.253 [dw_hd-check] (production snapshot)
 echo ====================================================================
 echo.
 
-:: 4. Start Backend API in background
-start /B "" node backend\index.mjs
+:: 4. Start Backend API in background and reload it when backend source changes
+start /B "" node --watch backend\index.mjs
 
 :: Wait 2 seconds for backend initialization
 timeout /t 2 /nobreak >nul

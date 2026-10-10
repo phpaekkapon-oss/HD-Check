@@ -9,6 +9,8 @@ import {
   X,
   PanelLeftClose,
   ShieldCheck,
+  ScanSearch,
+  Send,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
@@ -28,6 +30,8 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'audit', label: 'ตรวจสอบการจ่ายยาสมุนไพร', shortLabel: 'ตรวจสอบยา', hint: 'ยา + DX ตรงข้อบ่งใช้', icon: ClipboardCheck },
   { id: 'drugs', label: 'รายการจ่ายยาสมุนไพร', shortLabel: 'รายการจ่ายยา', hint: 'OPD / IPD / ต้นทุน', icon: Pill },
+  { id: 'mapping', label: 'ตรวจรหัสยาและ ICD-10', shortLabel: 'ตรวจรหัส', hint: 'รหัสว่าง / เกณฑ์ไม่ครบ', icon: ScanSearch },
+  { id: 'dxwriteback', label: 'ทบทวน DX รายครั้งรับบริการ', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },
   { id: 'dxmap', label: 'ตั้งค่ายา ↔ ICD-10', shortLabel: 'เกณฑ์ ICD-10', hint: 'เกณฑ์การตรวจสอบ', icon: Settings2 },
   { id: 'sql', label: 'SQL Query', shortLabel: 'SQL Query', hint: 'คำสั่งต้นฉบับ', icon: TerminalSquare },
 ]
@@ -41,6 +45,7 @@ interface SidebarProps {
   readonly onToggleCollapse: () => void
   readonly mobileOpen?: boolean
   readonly onMobileClose?: () => void
+  readonly onOpenChangelog?: () => void
 }
 
 export const Sidebar: FC<SidebarProps> = ({
@@ -52,6 +57,7 @@ export const Sidebar: FC<SidebarProps> = ({
   onToggleCollapse,
   mobileOpen = false,
   onMobileClose,
+  onOpenChangelog,
 }) => {
   const { accent, mode } = useTheme()
   const { user } = useAuth()
@@ -289,9 +295,17 @@ export const Sidebar: FC<SidebarProps> = ({
                 <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
                   โรงพยาบาลพังโคน
                 </span>
-                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 shrink-0">
-                  v1.0.8
-                </span>
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onOpenChangelog?.()
+                  }}
+                  className="text-[10px] font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 px-1.5 py-0.5 rounded transition cursor-pointer shrink-0"
+                  title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
+                >
+                  v{__APP_VERSION__}
+                </button>
               </div>
               <div className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center justify-between">
                 <span>แพทย์แผนไทย</span>
@@ -325,7 +339,7 @@ export const Sidebar: FC<SidebarProps> = ({
             className="fixed inset-0 bg-slate-950/70 backdrop-blur-xs transition-opacity animate-fade-in"
             onClick={onMobileClose}
           />
-          <div className="relative w-72 max-w-[80vw] h-full shadow-2xl z-10 animate-slide-right">
+          <div className="relative w-72 max-w-[80vw] h-dvh shadow-2xl z-10 animate-slide-right">
             {content(true, false)}
           </div>
         </div>
@@ -368,7 +382,18 @@ export const Sidebar: FC<SidebarProps> = ({
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1">
                 <div className="font-semibold text-slate-900 dark:text-white flex items-center justify-between">
                   <span>SMART-HOSCHECK</span>
-                  <span className="font-mono text-[11px] text-teal-600 dark:text-teal-400 font-bold">v1.0.8 (2026)</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAboutModalOpen(false)
+                      onOpenChangelog?.()
+                    }}
+                    className="font-mono text-[11px] text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer flex items-center gap-1"
+                    title="คลิกเพื่อดูบันทึกการอัปเดต"
+                  >
+                    <span>v{__APP_VERSION__}</span>
+                    <span className="text-[10px] text-teal-500 font-sans font-normal">(ดูอัปเดต)</span>
+                  </button>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
                   ระบบตรวจสอบเวชระเบียนการสั่งใช้ยาสมุนไพรตามเงื่อนไขข้อบ่งใช้ ICD-10 / ICD-10-TM

@@ -1,4 +1,4 @@
-import { Fragment, useState, useMemo, type FC } from 'react'
+import { Fragment, useEffect, useRef, useState, useMemo, type FC } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -24,6 +24,10 @@ import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { cn } from '@/lib/utils'
 
+interface DxMapSettingsModalProps {
+  readonly initialIcode?: string
+}
+
 function PreviewStat({ label, value, tone }: { readonly label: string; readonly value: number; readonly tone: 'neutral' | 'green' | 'red' | 'amber' }) {
   const toneClass = {
     neutral: 'text-slate-800 dark:text-slate-100',
@@ -39,20 +43,35 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
   )
 }
 
-export const DxMapSettingsModal: FC = () => {
+export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
   const { data: dxMap = [], isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
   const [prefixes, setPrefixes] = useState('')
   const [indication, setIndication] = useState('')
-  const [search, setSearch] = useState('')
+  const [search, setSearch] = useState(initialIcode ?? '')
+  const initializedIcode = useRef<string | undefined>(undefined)
   const [sorting, setSorting] = useState<SortingState>([])
   const [preview, setPreview] = useState<DxMapPreview | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [periodDays, setPeriodDays] = useState(90)
   const broadPrefixes = prefixes.split(/[ ,\s]+/).map((prefix) => prefix.trim()).filter((prefix) => prefix.length === 1)
+
+  useEffect(() => {
+    if (!initialIcode || isLoading || initializedIcode.current === initialIcode) return
+    initializedIcode.current = initialIcode
+    const item = dxMap.find((entry) => entry.icode === initialIcode)
+    if (!item) return
+
+    setSearch(initialIcode)
+    setEditingIcode(item.icode)
+    setPrefixes(item.dx_prefixes)
+    setIndication(item.indication)
+    setPreview(null)
+    setPreviewError(null)
+  }, [dxMap, initialIcode, isLoading])
 
   const handleStartEdit = (item: DxMapRecord) => {
     setEditingIcode(item.icode)
@@ -75,14 +94,6 @@ export const DxMapSettingsModal: FC = () => {
     }
   }
 
-  const handleTryObservedCode = (icode: string, code: string) => {
-    const current = prefixes.split(/[ ,\s]+/).map((value) => value.trim().toUpperCase()).filter(Boolean)
-    if (current.includes(code.toUpperCase())) return
-    const candidate = [...current, code.toUpperCase()].join(', ')
-    setPrefixes(candidate)
-    void handlePreview(icode, candidate)
-  }
-
   const handleSave = () => {
     if (!editingIcode) return
     updateMap(
@@ -93,13 +104,13 @@ export const DxMapSettingsModal: FC = () => {
 
   const filtered = useMemo(() => {
     if (!search.trim()) return dxMap
-    const q = search.toLowerCase()
+    const q = search.trim().normalize('NFC').toLocaleLowerCase()
     return dxMap.filter(
       (item) =>
-        item.icode.includes(q) ||
-        item.drug_name.toLowerCase().includes(q) ||
-        item.dx_prefixes.toLowerCase().includes(q) ||
-        item.indication.toLowerCase().includes(q)
+        item.icode.normalize('NFC').toLocaleLowerCase().includes(q) ||
+        item.drug_name.normalize('NFC').toLocaleLowerCase().includes(q) ||
+        item.dx_prefixes.normalize('NFC').toLocaleLowerCase().includes(q) ||
+        item.indication.normalize('NFC').toLocaleLowerCase().includes(q)
     )
   }, [dxMap, search])
 
@@ -297,8 +308,8 @@ export const DxMapSettingsModal: FC = () => {
       </div>
 
       {/* Search Header */}
-      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 flex items-center justify-between gap-3 shadow-xs dark:shadow-sm">
-        <div className="relative flex-1 max-w-md">
+      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-xs dark:shadow-sm">
+        <div className="relative w-full sm:flex-1 sm:max-w-md">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
@@ -307,13 +318,13 @@ export const DxMapSettingsModal: FC = () => {
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
+        <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
           ตั้งค่าทั้งหมด {dxMap.length} รายการ
         </div>
       </div>
 
       {/* Settings Grid with Shadcn Data Table */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden space-y-0 transition-colors">
+      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden space-y-0 transition-colors">
         {/* Table Toolbar Header with Shadcn title */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
           <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
@@ -413,22 +424,12 @@ export const DxMapSettingsModal: FC = () => {
                                 </div>
                                 <div>
                                   <p className="mb-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">รหัสวินิจฉัยที่พบในประวัติ (สูงสุด 12 รหัส)</p>
+                                  <p className="mb-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
                                   {preview.frequentDx.length ? (
                                     <div className="flex flex-wrap gap-1.5">
                                       {preview.frequentDx.map(({ code, count, matches }) => (
                                         <span key={code} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] ${matches ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-300'}`}>
                                           {code} · {count} ครั้ง · {matches ? 'ตรงกับเกณฑ์ทดลอง' : 'ไม่ตรง'}
-                                          {!matches && (
-                                            <button
-                                              type="button"
-                                              disabled={previewLoading}
-                                              onClick={() => handleTryObservedCode(item.icode, code)}
-                                              className="ml-1 rounded bg-white/80 px-1.5 py-0.5 font-sans font-semibold text-violet-700 hover:bg-white disabled:opacity-50 dark:bg-black/20 dark:text-violet-300 cursor-pointer"
-                                              title={`นำ ${code} ไปทดลองเป็นรหัสที่อนุญาต`}
-                                            >
-                                              ทดลองรหัสนี้
-                                            </button>
-                                          )}
                                         </span>
                                       ))}
                                     </div>
@@ -451,6 +452,89 @@ export const DxMapSettingsModal: FC = () => {
 
         {/* Shadcn Data Table Pagination */}
         <DataTablePagination table={table} pageSizeOptions={[10, 15, 25, 50, 100]} />
+      </div>
+
+      <div className="md:hidden space-y-3">
+        {isLoading ? (
+          <div className="rounded-2xl border border-themed bg-themed-card p-6 text-center text-sm text-slate-500 dark:text-slate-400">กำลังโหลดข้อมูลการตั้งค่า…</div>
+        ) : table.getRowModel().rows.length === 0 ? (
+          <div className="rounded-2xl border border-themed bg-themed-card p-6 text-center text-sm text-slate-500 dark:text-slate-400">ไม่พบรายการยาที่ค้นหา</div>
+        ) : table.getRowModel().rows.map((row) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          return (
+            <article key={item.icode} className="rounded-2xl border border-themed bg-themed-card p-4 shadow-xs space-y-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold leading-snug text-slate-900 dark:text-white break-words">{item.drug_name}</h3>
+                  <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">รหัสยา {item.icode}</p>
+                </div>
+                {!isEditing && (
+                  <button type="button" onClick={() => handleStartEdit(item)} className="min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 touch-manipulation">
+                    <Edit3 className="size-3.5" /> แก้ไข
+                  </button>
+                )}
+              </div>
+
+              {isEditing ? (
+                <div className="space-y-3 border-t border-slate-100 dark:border-white/10 pt-3">
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">รหัส ICD-10 ที่อนุญาต</span>
+                    <input type="text" value={prefixes} onChange={(e) => { setPrefixes(e.target.value); setPreview(null) }} placeholder="เช่น M, S หรือ K30, R14" className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 font-mono text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2" />
+                  </label>
+                  <label className="block space-y-1.5">
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">ข้อบ่งใช้ / สรรพคุณ</span>
+                    <input type="text" value={indication} onChange={(e) => setIndication(e.target.value)} placeholder="ระบุข้อบ่งใช้ของยา" className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2" />
+                  </label>
+                  <div className="flex gap-2">
+                    <button type="button" disabled={isPending} onClick={handleSave} className="btn-pill-action min-h-11 flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold disabled:opacity-50 touch-manipulation"><Check className="size-4" /> บันทึก</button>
+                    <button type="button" onClick={() => { setEditingIcode(null); setPreview(null); setPreviewError(null) }} className="min-h-11 rounded-xl border border-slate-200 dark:border-white/10 px-4 text-sm font-semibold text-slate-600 dark:text-slate-300 touch-manipulation">ยกเลิก</button>
+                  </div>
+                  <div className="rounded-xl border border-violet-200 dark:border-violet-500/20 bg-violet-50/50 dark:bg-violet-950/15 p-3 space-y-2.5">
+                    <p className="text-xs font-bold text-slate-800 dark:text-slate-100">ทดลองเกณฑ์กับประวัติย้อนหลัง</p>
+                    <div className="flex gap-2">
+                      <select value={periodDays} onChange={(e) => { setPeriodDays(Number(e.target.value)); setPreview(null) }} className="min-h-11 min-w-0 flex-1 rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 text-sm text-slate-800 dark:text-slate-100">
+                        <option value={30}>30 วันล่าสุด</option><option value={90}>90 วันล่าสุด</option><option value={365}>365 วันล่าสุด</option><option value={0}>ข้อมูลทั้งหมด</option>
+                      </select>
+                      <button type="button" onClick={() => void handlePreview(item.icode)} disabled={previewLoading} className="min-h-11 shrink-0 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white disabled:opacity-50 touch-manipulation"><FlaskConical className="mr-1 inline size-3.5" />{previewLoading ? 'กำลังทดลอง…' : 'ทดลอง'}</button>
+                    </div>
+                    {broadPrefixes.length > 0 && <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัส {broadPrefixes.join(', ')} ครอบคลุมกว้าง ควรตรวจผลทดลองก่อนบันทึก</p>}
+                    {previewError && <p className="text-xs text-rose-600 dark:text-rose-300">{previewError}</p>}
+                    {preview?.icode === item.icode && (
+                      <div className="grid grid-cols-2 gap-2">
+                        <p className="col-span-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
+                        <PreviewStat label={`รายการใน ${preview.periodDays || 'ทุก'} วัน`} value={preview.total} tone="neutral" />
+                        <PreviewStat label="ผ่าน" value={preview.pass} tone="green" />
+                        <PreviewStat label="ไม่ผ่าน" value={preview.fail} tone="red" />
+                        <PreviewStat label="ไม่มี DX" value={preview.noDx} tone="amber" />
+                        <PreviewStat label="ยังไม่มีเกณฑ์" value={preview.noMap} tone="amber" />
+                        {preview.frequentDx.map(({ code, count, matches }) => (
+                          <div key={code} className="col-span-2 flex items-center justify-between gap-2 rounded-lg bg-white/70 dark:bg-black/20 px-2.5 py-2 text-xs">
+                            <span className="min-w-0 font-mono text-slate-700 dark:text-slate-200">{code} · {count} ครั้ง · {matches ? 'ตรงเกณฑ์' : 'ไม่ตรง'}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-3 border-t border-slate-100 dark:border-white/10 pt-3">
+                  <div>
+                    <p className="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">รหัส ICD-10 ที่อนุญาต</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {item.dx_prefixes ? item.dx_prefixes.split(',').map((prefix) => <span key={prefix} className="rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 font-mono text-xs font-semibold text-emerald-800 dark:text-emerald-300">{prefix.trim()}</span>) : <span className="text-xs italic text-rose-500">ยังไม่กำหนดรหัส</span>}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">ข้อบ่งใช้ / สรรพคุณ</p>
+                    <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300 break-words">{item.indication || '-'}</p>
+                  </div>
+                </div>
+              )}
+            </article>
+          )
+        })}
+        <DataTablePagination table={table} pageSizeOptions={[10, 15, 25, 50]} />
       </div>
     </div>
   )
