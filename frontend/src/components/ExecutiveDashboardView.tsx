@@ -1,7 +1,6 @@
-import { useState, useMemo, type FC } from 'react'
+import { useMemo, type FC } from 'react'
 import {
   Sparkles,
-  Database,
   Building2,
   RefreshCw,
   TrendingUp,
