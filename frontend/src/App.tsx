@@ -10,6 +10,7 @@ import { CodeReviewQueue } from '@/components/CodeReviewQueue'
 import { DxWritebackView } from '@/components/DxWritebackView'
 import { SqlInspectorView } from '@/components/SqlInspectorView'
 import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
+import { ExecutiveDashboardView } from '@/components/ExecutiveDashboardView'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
 import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useSyncHerbDx } from '@/hooks/useHerbDx'
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange } from '@/types/herbdx.types'
@@ -22,7 +23,7 @@ import { LockScreenOverlay } from '@/components/LockScreenOverlay'
 
 const DashboardView: FC = () => {
   const { user } = useAuth()
-  const [activePage, setActivePage] = useState<ActivePage>('audit')
+  const [activePage, setActivePage] = useState<ActivePage>('dashboard')
   const [configureIcode, setConfigureIcode] = useState<string | undefined>()
 
   const [range, setRange] = useState<DateRange>(currentMonthRange)
@@ -181,6 +182,22 @@ const DashboardView: FC = () => {
       syncResult={syncResult}
       syncError={syncErr instanceof Error ? syncErr.message : null}
     >
+      {/* Page 0: ภาพรวมระบบ (Executive Dashboard) */}
+      {activePage === 'dashboard' && (
+        <ExecutiveDashboardView
+          kpi={dynamicKpi}
+          records={filteredAuditData}
+          drugs={drugSummaries}
+          status={status}
+          range={range}
+          onRangeChange={handleRangeChange}
+          onNavigate={handlePageChange}
+          onSync={handleManualSync}
+          isSyncing={isSyncing}
+          onConfigureDrug={handleConfigureDrug}
+        />
+      )}
+
       {/* Page 1: ตรวจสอบการจ่ายยาสมุนไพร (Main Audit Screen) */}
       {activePage === 'audit' && (
         <>

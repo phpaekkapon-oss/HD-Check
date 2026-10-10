@@ -154,4 +154,4 @@ export interface SyncResult extends DateRange {
   readonly timestamp: string
 }
 
-export type ActivePage = 'audit' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
+export type ActivePage = 'dashboard' | 'audit' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'

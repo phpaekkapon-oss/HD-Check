@@ -92,6 +92,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
         {NAV_ITEMS.map(({ id, icon: Icon }) => {
           const isActive = activePage === id
           const shortLabel =
+            id === 'dashboard' ? 'หน้าแรก' :
             id === 'audit' ? 'ตรวจสอบยา' :
             id === 'drugs' ? 'สรุปจ่ายยา' :
             id === 'mapping' ? 'ตรวจรหัส' :
