@@ -14,6 +14,7 @@ import {
   Activity,
   Layers,
   Calendar,
+  Box,
 } from 'lucide-react'
 import type {
   ActivePage,
@@ -65,6 +66,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 }) => {
   // Chart filter mode
   const [chartScope, setChartScope] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
+  const [is3DMode, setIs3DMode] = useState<boolean>(true)
   const [hoveredDay, setHoveredDay] = useState<DailyTrendItem | null>(null)
 
   // Quick range presets
@@ -380,44 +382,63 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               </p>
             </div>
 
-            {/* Scope switcher (All / OPD / IPD) */}
-            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11px] self-start sm:self-auto">
+            {/* Controls: 3D toggle & Scope switcher */}
+            <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+              {/* 3D Mode Toggle */}
               <button
                 type="button"
-                onClick={() => setChartScope('ALL')}
+                onClick={() => setIs3DMode(!is3DMode)}
                 className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold transition cursor-pointer',
-                  chartScope === 'ALL'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  'px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 border',
+                  is3DMode
+                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-400/40 shadow-xs'
+                    : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200/80 dark:border-white/5 hover:text-slate-800 dark:hover:text-white'
                 )}
+                title="สลับการแสดงผลแบบ 3D Isometric มีมิติแสงเงา"
               >
-                ทั้งหมด
+                <Box className="size-3" />
+                <span>{is3DMode ? 'กราฟ 3D' : 'กราฟ 2D'}</span>
               </button>
-              <button
-                type="button"
-                onClick={() => setChartScope('OPD')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold transition cursor-pointer',
-                  chartScope === 'OPD'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                )}
-              >
-                OPD
-              </button>
-              <button
-                type="button"
-                onClick={() => setChartScope('IPD')}
-                className={cn(
-                  'px-2.5 py-1 rounded-md font-semibold transition cursor-pointer',
-                  chartScope === 'IPD'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
-                    : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-                )}
-              >
-                IPD
-              </button>
+
+              {/* Scope switcher (All / OPD / IPD) */}
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => setChartScope('ALL')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
+                    chartScope === 'ALL'
+                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  )}
+                >
+                  ทั้งหมด
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartScope('OPD')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
+                    chartScope === 'OPD'
+                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  )}
+                >
+                  OPD
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setChartScope('IPD')}
+                  className={cn(
+                    'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
+                    chartScope === 'IPD'
+                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                  )}
+                >
+                  IPD
+                </button>
+              </div>
             </div>
           </div>
 
@@ -436,16 +457,29 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   {/* Gradients */}
                   <linearGradient id="barPassGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#10b981" />
-                    <stop offset="100%" stopColor="#059669" />
+                    <stop offset="100%" stopColor="#047857" />
                   </linearGradient>
                   <linearGradient id="barFailGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f43f5e" />
-                    <stop offset="100%" stopColor="#e11d48" />
+                    <stop offset="100%" stopColor="#be123c" />
                   </linearGradient>
                   <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
-                    <stop offset="0%" stopColor="#06b6d4" />
-                    <stop offset="100%" stopColor="#3b82f6" />
+                    <stop offset="0%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#06b6d4" />
                   </linearGradient>
+                  <radialGradient id="sphereGrad" cx="30%" cy="30%" r="70%">
+                    <stop offset="0%" stopColor="#ffffff" />
+                    <stop offset="40%" stopColor="#38bdf8" />
+                    <stop offset="100%" stopColor="#0284c7" />
+                  </radialGradient>
+                  <linearGradient id="areaGlow3d" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#06b6d4" stopOpacity="0.35" />
+                    <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.0" />
+                  </linearGradient>
+                  <filter id="glow3d" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="2" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
                 </defs>
 
                 {/* Horizontal Grid lines */}
@@ -496,10 +530,10 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   strokeDasharray="4 3"
                 />
 
-                {/* Stacked Bars */}
+                {/* 3D Stacked Columns */}
                 {dailyTrends.map((d, idx) => {
                   const slotWidth = plotWidth / dailyTrends.length
-                  const barWidth = Math.min(18, Math.max(6, slotWidth * 0.65))
+                  const barWidth = Math.min(18, Math.max(7, slotWidth * 0.65))
                   const cx = padLeft + idx * slotWidth + slotWidth / 2
                   const x = cx - barWidth / 2
 
@@ -511,11 +545,17 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   const failY = passY - failH
 
                   const isHovered = hoveredDay?.date === d.date
+                  const isoDx = is3DMode ? 5 : 0
+                  const isoDy = is3DMode ? -4 : 0
 
                   return (
                     <g
                       key={d.date}
-                      className="cursor-pointer transition-opacity"
+                      className="cursor-pointer transition-transform"
+                      style={{
+                        transform: isHovered && is3DMode ? 'translateY(-3px)' : 'none',
+                        transition: 'transform 0.15s ease-out',
+                      }}
                       onMouseEnter={() => setHoveredDay(d)}
                       onMouseLeave={() => setHoveredDay(null)}
                     >
@@ -523,44 +563,96 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       {isHovered && (
                         <rect
                           x={cx - slotWidth / 2}
-                          y={padTop}
+                          y={padTop - 8}
                           width={slotWidth}
-                          height={plotHeight}
+                          height={plotHeight + 16}
                           fill="currentColor"
                           className="text-teal-500/10"
                         />
                       )}
 
-                      {/* Pass Bar (Emerald) */}
-                      {passH > 0 && (
-                        <rect
-                          x={x}
-                          y={passY}
-                          width={barWidth}
-                          height={passH}
-                          rx={failH === 0 ? 3 : 0}
-                          fill="url(#barPassGrad)"
-                          opacity={isHovered ? 1 : 0.9}
+                      {/* 3D Floor Shadow */}
+                      {is3DMode && totalH > 0 && (
+                        <ellipse
+                          cx={cx + isoDx / 2}
+                          cy={padTop + plotHeight + 2}
+                          rx={barWidth * 0.75}
+                          ry={2.5}
+                          fill="#000000"
+                          opacity={isHovered ? 0.6 : 0.4}
                         />
                       )}
 
-                      {/* Non-compliant Bar (Rose) */}
+                      {/* 1. Pass Segment (Green) */}
+                      {passH > 0 && (
+                        <g>
+                          {/* Front Face */}
+                          <rect
+                            x={x}
+                            y={passY}
+                            width={barWidth}
+                            height={passH}
+                            rx={!is3DMode && failH === 0 ? 3 : 0}
+                            fill="url(#barPassGrad)"
+                            opacity={isHovered ? 1 : 0.92}
+                          />
+
+                          {/* 3D Right Side Facet */}
+                          {is3DMode && (
+                            <polygon
+                              points={`${x + barWidth},${passY} ${x + barWidth + isoDx},${passY + isoDy} ${x + barWidth + isoDx},${passY + passH + isoDy} ${x + barWidth},${passY + passH}`}
+                              fill="#047857"
+                              opacity={0.95}
+                            />
+                          )}
+
+                          {/* 3D Top Cap (only if no fail segment on top) */}
+                          {is3DMode && failH === 0 && (
+                            <polygon
+                              points={`${x},${passY} ${x + isoDx},${passY + isoDy} ${x + barWidth + isoDx},${passY + isoDy} ${x + barWidth},${passY}`}
+                              fill="#6ee7b7"
+                            />
+                          )}
+                        </g>
+                      )}
+
+                      {/* 2. Fail Segment (Red/Coral) */}
                       {failH > 0 && (
-                        <rect
-                          x={x}
-                          y={failY}
-                          width={barWidth}
-                          height={failH}
-                          rx={3}
-                          fill="url(#barFailGrad)"
-                          opacity={isHovered ? 1 : 0.85}
-                        />
+                        <g>
+                          {/* Front Face */}
+                          <rect
+                            x={x}
+                            y={failY}
+                            width={barWidth}
+                            height={failH}
+                            rx={!is3DMode ? 3 : 0}
+                            fill="url(#barFailGrad)"
+                            opacity={isHovered ? 1 : 0.9}
+                          />
+
+                          {/* 3D Right Side Facet */}
+                          {is3DMode && (
+                            <polygon
+                              points={`${x + barWidth},${failY} ${x + barWidth + isoDx},${failY + isoDy} ${x + barWidth + isoDx},${failY + failH + isoDy} ${x + barWidth},${failY + failH}`}
+                              fill="#9f1239"
+                              opacity={0.95}
+                            />
+                          )}
+
+                          {/* 3D Top Diamond Cap */}
+                          {is3DMode && (
+                            <polygon
+                              points={`${x},${failY} ${x + isoDx},${failY + isoDy} ${x + barWidth + isoDx},${failY + isoDy} ${x + barWidth},${failY}`}
+                              fill="#fda4af"
+                            />
+                          )}
+                        </g>
                       )}
 
                       {/* X-axis date tick */}
                       {(dailyTrends.length <= 16 || idx % 2 === 0) && (
                         <text
-                          x={cx}
+                          x={cx + (is3DMode ? isoDx / 2 : 0)}
                           y={padTop + plotHeight + 14}
                           textAnchor="middle"
                           className={cn(
@@ -577,6 +669,21 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   )
                 })}
 
+                {/* 3D Trend Area Glow (Only in 3D Mode) */}
+                {is3DMode && dailyTrends.length > 1 && (
+                  <path
+                    d={`${dailyTrends
+                      .map((d, idx) => {
+                        const slotWidth = plotWidth / dailyTrends.length
+                        const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
+                        const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
+                        return `${idx === 0 ? 'M' : 'L'} ${cx} ${cy}`
+                      })
+                      .join(' ')} L ${padLeft + (dailyTrends.length - 1) * (plotWidth / dailyTrends.length) + (plotWidth / dailyTrends.length) / 2 + 2.5} ${padTop + plotHeight} L ${padLeft + (plotWidth / dailyTrends.length) / 2 + 2.5} ${padTop + plotHeight} Z`}
+                    fill="url(#areaGlow3d)"
+                  />
+                )}
+
                 {/* Trend Line: Pass Rate % */}
                 {dailyTrends.length > 1 && (
                   <>
@@ -584,33 +691,34 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       d={dailyTrends
                         .map((d, idx) => {
                           const slotWidth = plotWidth / dailyTrends.length
-                          const cx = padLeft + idx * slotWidth + slotWidth / 2
-                          const cy = padTop + plotHeight * (1 - d.passRate / 100)
+                          const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
+                          const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
                           return `${idx === 0 ? 'M' : 'L'} ${cx} ${cy}`
                         })
                         .join(' ')}
                       fill="none"
                       stroke="url(#lineGrad)"
-                      strokeWidth="2.2"
+                      strokeWidth={is3DMode ? '2.8' : '2.2'}
                       strokeLinecap="round"
                       strokeLinejoin="round"
+                      filter={is3DMode ? 'url(#glow3d)' : undefined}
                     />
 
-                    {/* Points on Line */}
+                    {/* 3D Spheres or Points on Line */}
                     {dailyTrends.map((d, idx) => {
                       const slotWidth = plotWidth / dailyTrends.length
-                      const cx = padLeft + idx * slotWidth + slotWidth / 2
-                      const cy = padTop + plotHeight * (1 - d.passRate / 100)
+                      const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
+                      const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
                       const isHovered = hoveredDay?.date === d.date
                       return (
                         <circle
                           key={d.date}
                           cx={cx}
                           cy={cy}
-                          r={isHovered ? 4.5 : 2.5}
-                          fill={isHovered ? '#38bdf8' : '#06b6d4'}
+                          r={isHovered ? 5.5 : is3DMode ? 3.8 : 2.5}
+                          fill={is3DMode ? 'url(#sphereGrad)' : isHovered ? '#38bdf8' : '#06b6d4'}
                           stroke="#ffffff"
-                          strokeWidth={isHovered ? 2 : 1}
+                          strokeWidth={isHovered ? 2 : 1.2}
                           className="transition-all"
                         />
                       )
