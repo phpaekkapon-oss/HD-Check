@@ -69,8 +69,10 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const [is3DMode, setIs3DMode] = useState<boolean>(true)
   const [hoveredDay, setHoveredDay] = useState<DailyTrendItem | null>(null)
 
-  // Quick range presets
-  const handleSelectMonthPreset = (preset: 'THIS_MONTH' | 'LAST_MONTH') => {
+  // Quick range presets (Month & Fiscal Year)
+  type PresetType = 'THIS_MONTH' | 'LAST_MONTH' | 'FY_70' | 'FY_69'
+
+  const handleSelectPreset = (preset: PresetType) => {
     const now = new Date()
     const pad = (n: number) => String(n).padStart(2, '0')
     if (preset === 'THIS_MONTH') {
@@ -81,7 +83,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         startDate: `${year}-${pad(month)}-01`,
         endDate: `${year}-${pad(month)}-${pad(lastDay)}`,
       })
-    } else {
+    } else if (preset === 'LAST_MONTH') {
       const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1)
       const year = lastMonthDate.getFullYear()
       const month = lastMonthDate.getMonth() + 1
@@ -89,6 +91,18 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       onRangeChange({
         startDate: `${year}-${pad(month)}-01`,
         endDate: `${year}-${pad(month)}-${pad(lastDay)}`,
+      })
+    } else if (preset === 'FY_70') {
+      // ปีงบประมาณ 2570: 1 ต.ค. 2569 ถึง 30 ก.ย. 2570
+      onRangeChange({
+        startDate: '2026-10-01',
+        endDate: '2027-09-30',
+      })
+    } else if (preset === 'FY_69') {
+      // ปีงบประมาณ 2569: 1 ต.ค. 2568 ถึง 30 ก.ย. 2569
+      onRangeChange({
+        startDate: '2025-10-01',
+        endDate: '2026-09-30',
       })
     }
   }
@@ -223,20 +237,56 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
         {/* Date presets & Sync */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs">
+          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
             <button
               type="button"
-              onClick={() => handleSelectMonthPreset('THIS_MONTH')}
-              className="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10"
+              onClick={() => handleSelectPreset('THIS_MONTH')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
+                range.startDate === '2026-10-01' && range.endDate === '2026-10-31'
+                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              )}
             >
               เดือนนี้
             </button>
             <button
               type="button"
-              onClick={() => handleSelectMonthPreset('LAST_MONTH')}
-              className="px-2.5 py-1 rounded-lg font-medium transition cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10"
+              onClick={() => handleSelectPreset('LAST_MONTH')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
+                range.startDate === '2026-09-01' && range.endDate === '2026-09-30'
+                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              )}
             >
-              เดือนก่อน
+              เดือนก่อน (ก.ย.)
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectPreset('FY_70')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
+                range.startDate === '2026-10-01' && range.endDate === '2027-09-30'
+                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              )}
+              title="ปีงบประมาณ 2570 (1 ต.ค. 69 - 30 ก.ย. 70)"
+            >
+              ปีงบ 70
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSelectPreset('FY_69')}
+              className={cn(
+                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
+                range.startDate === '2025-10-01' && range.endDate === '2026-09-30'
+                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+              )}
+              title="ปีงบประมาณ 2569 (1 ต.ค. 68 - 30 ก.ย. 69)"
+            >
+              ปีงบ 69
             </button>
             <span className="px-2 py-0.5 text-[11px] font-mono text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-md border border-teal-500/20">
               {toThaiDate(range.startDate)} - {toThaiDate(range.endDate)}
@@ -255,6 +305,30 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Informative Banner when 0 records are present in current date range */}
+      {records.length === 0 && (
+        <div className="p-3.5 rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-900 dark:text-amber-100 text-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 animate-fade-in shadow-xs">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <AlertTriangle className="size-4 shrink-0 text-amber-500 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold">ยังไม่ได้ดึงข้อมูลช่วง {toThaiDate(range.startDate)} ถึง {toThaiDate(range.endDate)} เข้าสู่คลังข้อมูล</span>
+              <p className="text-[11px] text-amber-700 dark:text-amber-300/80 mt-0.5">
+                ในฐานข้อมูล HOSxP มีประวัติการสั่งจ่ายยาอยู่ครบถ้วน กดปุ่มเพื่อดึงข้อมูลช่วงนี้เข้ามาประมวลผลทันที
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            disabled={isSyncing}
+            onClick={onSync}
+            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs shrink-0 cursor-pointer flex items-center gap-1.5 transition shadow-sm active:scale-95"
+          >
+            <RefreshCw className={cn('size-3.5', isSyncing && 'animate-spin')} />
+            <span>{isSyncing ? 'กำลังดึงข้อมูลจาก HOSxP…' : 'ดึงข้อมูลช่วงนี้จาก HOSxP ทันที'}</span>
+          </button>
+        </div>
+      )}
 
       {/* ========================================================================= */}
       {/* 2. COMPACT 4 EXECUTIVE KPI CARDS                                          */}
