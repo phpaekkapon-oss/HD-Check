@@ -171,11 +171,20 @@ async function generateChangelogWithAI() {
   // 1. Google Gemini API (if GEMINI_API_KEY is configured)
   const geminiKey = process.env.GEMINI_API_KEY
   if (geminiKey) {
-    try {
-      console.log('  -> กำลังส่งโค้ดให้ Google Gemini AI วิเคราะห์...')
-      const controller = new AbortController()
-      const timer = setTimeout(() => controller.abort(), 8000)
-      const prompt = `คุณคือ AI ผู้ช่วยสารสนเทศโรงพยาบาล จงวิเคราะห์โค้ดที่เปลี่ยนแปลงและเขียน Release Notes ภาษาไทย:
+    const candidateModels = [
+      process.env.GEMINI_MODEL,
+      'gemini-2.5-flash',
+      'gemini-2.0-flash',
+      'gemini-flash-latest',
+      'gemini-1.5-flash',
+    ].filter(Boolean)
+
+    for (const model of candidateModels) {
+      try {
+        console.log(`  -> กำลังส่งโค้ดให้ Google Gemini AI (${model}) วิเคราะห์...`)
+        const controller = new AbortController()
+        const timer = setTimeout(() => controller.abort(), 8000)
+        const prompt = `คุณคือ AI ผู้ช่วยสารสนเทศโรงพยาบาล จงวิเคราะห์โค้ดที่เปลี่ยนแปลงและเขียน Release Notes ภาษาไทย:
 - สรุปหัวข้อสั้นๆ 1 บรรทัด (title)
 - ไฮไลท์การเปลี่ยนแปลง 3-5 ข้อที่อ่านง่ายสำหรับผู้ใช้ระบบ (highlights)
 ตอบเป็น JSON เท่านั้น: {"title": "...", "highlights": ["...", "..."]}
@@ -183,29 +192,30 @@ async function generateChangelogWithAI() {
 ข้อมูลโค้ด:
 ${diffSummary}`
 
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: 'application/json' },
-        }),
-      })
-      clearTimeout(timer)
-      if (res.ok) {
-        const json = await res.json()
-        const text = json.candidates?.[0]?.content?.parts?.[0]?.text
-        if (text) {
-          const parsed = JSON.parse(text)
-          if (parsed.title && Array.isArray(parsed.highlights)) {
-            console.log('  [+] Google Gemini AI สรุป Release Notes เรียบร้อย!')
-            return { title: parsed.title, highlights: parsed.highlights, aiModel: 'Google Gemini AI' }
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          signal: controller.signal,
+          body: JSON.stringify({
+            contents: [{ parts: [{ text: prompt }] }],
+            generationConfig: { responseMimeType: 'application/json' },
+          }),
+        })
+        clearTimeout(timer)
+        if (res.ok) {
+          const json = await res.json()
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+          if (text) {
+            const parsed = JSON.parse(text)
+            if (parsed.title && Array.isArray(parsed.highlights)) {
+              console.log(`  [+] Google Gemini AI (${model}) สรุป Release Notes เรียบร้อย!`)
+              return { title: parsed.title, highlights: parsed.highlights, aiModel: `Google Gemini (${model})` }
+            }
           }
         }
+      } catch {
+        // try next candidate model
       }
-    } catch {
-      // fallback
     }
   }
 

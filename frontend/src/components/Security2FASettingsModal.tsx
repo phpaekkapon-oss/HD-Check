@@ -136,6 +136,41 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     } catch {}
   }
 
+  // GitHub Version Check
+  const [isCheckingUpdate, setIsCheckingUpdate] = useState(false)
+  const [updateStatus, setUpdateStatus] = useState<{ isLatest: boolean; latestTag?: string; text: string } | null>(null)
+
+  const handleCheckGitHubUpdates = async () => {
+    setIsCheckingUpdate(true)
+    try {
+      const res = await fetch('https://api.github.com/repos/phpaekkapon-oss/HD-Check/releases/latest')
+      if (res.ok) {
+        const data = await res.json()
+        const latestTag = data.tag_name || ''
+        const cleanLatest = latestTag.replace(/^v/, '')
+        const current = __APP_VERSION__.replace(/^v/, '')
+
+        if (cleanLatest === current) {
+          setUpdateStatus({
+            isLatest: true,
+            latestTag,
+            text: `ระบบของคุณเป็นเวอร์ชันล่าสุดแล้ว (${latestTag})`,
+          })
+        } else {
+          setUpdateStatus({
+            isLatest: false,
+            latestTag,
+            text: `มีเวอร์ชันใหม่บน GitHub: ${latestTag} (ปัจจุบันใช้ v${current})`,
+          })
+        }
+      }
+    } catch {
+      // offline / rate limit fallback
+    } finally {
+      setIsCheckingUpdate(false)
+    }
+  }
+
   useEffect(() => {
     if (isOpen) {
       if ((initialTab === 'admin_policy' || initialTab === 'admin_system') && !isAdmin) {
@@ -144,6 +179,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         setActiveTab(initialTab)
         if (initialTab === 'admin_system') {
           fetchSysStatus()
+          handleCheckGitHubUpdates()
         }
       }
     }
@@ -1599,10 +1635,16 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         <span className="text-[11px] font-bold uppercase tracking-wider text-violet-400 bg-violet-500/15 border border-violet-500/30 px-2 py-0.5 rounded-md font-mono">
                           Production Release
                         </span>
-                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
-                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                          v{__APP_VERSION__} (Latest)
-                        </span>
+                        {updateStatus && !updateStatus.isLatest ? (
+                          <span className="text-[11px] font-bold text-amber-300 bg-amber-500/20 border border-amber-500/40 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                            🚀 {updateStatus.latestTag} มีเวอร์ชันใหม่
+                          </span>
+                        ) : (
+                          <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                            <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                            v{__APP_VERSION__} (Latest)
+                          </span>
+                        )}
                       </div>
                       <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 flex items-center gap-2">
                         SMART-HOSCHECK • HerbDx ระบบตรวจสอบยาสมุนไพร
@@ -1615,6 +1657,17 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
                   {/* Top Action Buttons */}
                   <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      disabled={isCheckingUpdate}
+                      onClick={handleCheckGitHubUpdates}
+                      className="px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                      title="ตรวจสอบเลขเวอร์ชันล่าสุดจาก GitHub"
+                    >
+                      <RefreshCw className={cn('size-3.5 text-slate-400', isCheckingUpdate && 'animate-spin')} />
+                      <span>{isCheckingUpdate ? 'กำลังตรวจ…' : 'ตรวจสอบอัปเดต'}</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={() => {
