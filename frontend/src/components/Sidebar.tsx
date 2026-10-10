@@ -12,6 +12,7 @@ import {
   ScanSearch,
   Send,
   Cpu,
+  ExternalLink,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
@@ -385,7 +386,7 @@ export const Sidebar: FC<SidebarProps> = ({
           onClick={() => setAboutModalOpen(false)}
         >
           <div
-            className="w-full max-w-sm rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 p-5 shadow-2xl space-y-4 animate-scale-in text-slate-800 dark:text-slate-100"
+            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 p-5 shadow-2xl space-y-4 animate-scale-in text-slate-800 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
@@ -405,27 +406,30 @@ export const Sidebar: FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={() => setAboutModalOpen(false)}
-                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition"
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <div className="space-y-2.5 text-xs">
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1">
-                <div className="font-semibold text-slate-900 dark:text-white flex items-center justify-between">
-                  <span>SMART-HOSCHECK</span>
+            <div className="space-y-3 text-xs">
+              {/* App Version Info Card */}
+              <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1.5">
+                <div className="font-bold text-slate-900 dark:text-white flex items-center justify-between">
+                  <span className="flex items-center gap-1.5">
+                    <span>SMART-HOSCHECK • HerbDx</span>
+                  </span>
                   <button
                     type="button"
                     onClick={() => {
                       setAboutModalOpen(false)
                       onOpenChangelog?.()
                     }}
-                    className="font-mono text-[11px] text-teal-600 dark:text-teal-400 font-bold hover:underline cursor-pointer flex items-center gap-1"
-                    title="คลิกเพื่อดูบันทึกการอัปเดต"
+                    className="font-mono text-xs text-teal-600 dark:text-teal-400 font-bold bg-teal-500/10 hover:bg-teal-500/20 px-2 py-0.5 rounded-md transition cursor-pointer flex items-center gap-1"
+                    title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
                   >
                     <span>v{__APP_VERSION__}</span>
-                    <span className="text-[10px] text-teal-500 font-sans font-normal">(ดูอัปเดต)</span>
+                    <span className="text-[10px] font-sans font-normal">(ดูอัปเดต)</span>
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -433,21 +437,89 @@ export const Sidebar: FC<SidebarProps> = ({
                 </p>
               </div>
 
-              <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 space-y-1">
-                <div className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider font-mono">
-                  ข้อมูลผู้พัฒนา & ฝ่ายเทคโนโลยี
+              {/* Developer Profile Card (พร้อมรูปถ่ายข้าราชการจริงและข้อมูลผู้พัฒนา) */}
+              <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-teal-50/50 dark:from-slate-800/80 dark:to-teal-950/20 border border-teal-500/25 dark:border-teal-500/35 space-y-3 shadow-xs">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <span className="size-1.5 rounded-full bg-teal-500 animate-pulse" />
+                    ผู้พัฒนาระบบ & ฝ่ายเทคโนโลยี
+                  </div>
+                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/25">
+                    Lead Developer
+                  </span>
                 </div>
-                <div className="font-bold text-slate-900 dark:text-white text-xs">
-                  👨‍💻 นายเอกพล อันคำวงศ์
+
+                <div className="flex items-center gap-3.5">
+                  <div className="relative shrink-0">
+                    <img
+                      src="/api/auth/avatar/aekkapon"
+                      alt="นายเอกพล อันคำวงศ์"
+                      className="size-15 rounded-2xl object-cover border-2 border-teal-500/50 shadow-md shadow-teal-500/15 ring-2 ring-teal-500/20"
+                      onError={(e) => {
+                        const target = e.currentTarget
+                        target.style.display = 'none'
+                        if (target.nextElementSibling) {
+                          (target.nextElementSibling as HTMLElement).style.display = 'flex'
+                        }
+                      }}
+                    />
+                    <div
+                      style={{ display: 'none' }}
+                      className="size-15 rounded-2xl bg-gradient-to-tr from-teal-600 to-emerald-600 items-center justify-center text-white font-bold text-sm shadow-md border-2 border-teal-400/30"
+                    >
+                      เอกพล
+                    </div>
+                    <span
+                      className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-xs grid place-items-center text-[9px] text-white"
+                      title="ผู้พัฒนาระบบตัวจริง"
+                    >
+                      ✓
+                    </span>
+                  </div>
+
+                  <div className="min-w-0 flex-1 space-y-0.5">
+                    <div className="font-bold text-slate-900 dark:text-white text-sm tracking-tight truncate">
+                      นายเอกพล อันคำวงศ์
+                    </div>
+                    <div className="text-teal-700 dark:text-teal-300 font-medium text-[11.5px] truncate">
+                      นักวิชาการคอมพิวเตอร์ปฏิบัติการ
+                    </div>
+                    <div className="text-slate-500 dark:text-slate-400 text-[11px] truncate">
+                      กลุ่มงานสุขภาพดิจิทัล • โทร. 257 IT
+                    </div>
+                  </div>
                 </div>
-                <div className="text-slate-600 dark:text-slate-300 text-[11px]">
-                  นักวิชาการคอมพิวเตอร์ปฏิบัติการ
-                </div>
-                <div className="text-slate-500 dark:text-slate-400 text-[11px]">
-                  กลุ่มงานสุขภาพดิจิทัล • โทร. 257 IT
+
+                {/* Developer Interactive Actions */}
+                <div className="pt-2 flex items-center gap-2 border-t border-slate-200/70 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAboutModalOpen(false)
+                      setSecurityInitialTab('my_profile')
+                      setSecurityModalOpen(true)
+                    }}
+                    className="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold text-teal-800 dark:text-teal-200 bg-teal-500/15 hover:bg-teal-500/25 border border-teal-500/30 transition cursor-pointer flex items-center justify-center gap-1.5 active:scale-95"
+                    title="คลิกเพื่อดูโปรไฟล์และสิทธิ์ผู้พัฒนา"
+                  >
+                    <span>คลิกดูโปรไฟล์ผู้พัฒนา</span>
+                    <ExternalLink className="size-3 text-teal-600 dark:text-teal-400" />
+                  </button>
+
+                  <a
+                    href="https://github.com/phpaekkapon-oss/HD-Check"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="py-1.5 px-3 rounded-xl text-xs font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1.5 active:scale-95"
+                    title="เปิดดู GitHub Source Code & Releases"
+                  >
+                    <span>GitHub</span>
+                    <ExternalLink className="size-3 text-slate-400" />
+                  </a>
                 </div>
               </div>
 
+              {/* HOSxP Connection Status */}
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11.5px]">
                 <span className="text-slate-500 dark:text-slate-400">การเชื่อมต่อ HOSxP</span>
                 <span className={cn('font-semibold inline-flex items-center gap-1.5', statusError ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400')}>

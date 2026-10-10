@@ -132,8 +132,14 @@ export const AppLayout: FC<AppLayoutProps> = ({
           <span>ระบบ : <strong className="text-slate-900 dark:text-white">แผนกการแพทย์แผนไทย</strong></span>
           <span className="text-slate-300 dark:text-white/20">|</span>
           <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+            <img
+              src="/api/auth/avatar/aekkapon"
+              alt="นายเอกพล อันคำวงศ์"
+              className="size-5 rounded-full object-cover border border-teal-500/50 shadow-xs inline-block"
+              onError={(e) => { e.currentTarget.style.display = 'none' }}
+            />
             <span className="font-bold text-violet-600 dark:text-violet-400">ผู้พัฒนา:</span>
-            <strong className="text-slate-900 dark:text-white">นายเอกพล อันคำวงค์</strong>
+            <strong className="text-slate-900 dark:text-white">นายเอกพล อันคำวงศ์</strong>
             <span className="text-slate-500 dark:text-slate-400">(นักวิชาการคอมพิวเตอร์ปฏิบัติการ)</span>
             <span className="text-slate-500 dark:text-slate-400 font-sans">• โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล</span>
           </span>
