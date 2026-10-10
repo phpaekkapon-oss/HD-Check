@@ -20,6 +20,15 @@ import {
   Trash2,
   User as UserIcon,
   Monitor,
+  Cpu,
+  Sparkles,
+  ExternalLink,
+  RefreshCw,
+  Database,
+  Server,
+  GitBranch,
+  Bell,
+  Layers,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
@@ -30,7 +39,8 @@ import { ProfileAvatarModal } from './ProfileAvatarModal'
 interface Security2FASettingsModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'
+  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'
+  readonly onOpenChangelog?: () => void
 }
 
 const lockIntervals = [
@@ -45,6 +55,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   isOpen,
   onClose,
   initialTab = 'my_profile',
+  onOpenChangelog,
 }) => {
   const { user, init2FASetup, confirm2FASetup, disable2FA, deleteAvatar } = useAuth()
   const isAdmin = isAdminUser(user)
@@ -59,17 +70,84 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     updatePinSettings,
   } = usePinLock()
 
-  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'>(() => {
-    if (initialTab === 'admin_policy' && !isAdmin) return 'my_profile'
+  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'>(() => {
+    if ((initialTab === 'admin_policy' || initialTab === 'admin_system') && !isAdmin) return 'my_profile'
     return initialTab
   })
 
+  // Admin System Tab States
+  const [sysStatus, setSysStatus] = useState<any>(null)
+  const [isSysStatusLoading, setIsSysStatusLoading] = useState(false)
+  const [isManualSyncing, setIsManualSyncing] = useState(false)
+  const [syncFeedback, setSyncFeedback] = useState<{ text: string; isError?: boolean } | null>(null)
+  const [notifyEnabled, setNotifyEnabled] = useState(() => {
+    try {
+      return localStorage.getItem('hd_check_notify_enabled') !== 'false'
+    } catch {
+      return true
+    }
+  })
+
+  const fetchSysStatus = async () => {
+    setIsSysStatusLoading(true)
+    try {
+      const res = await fetch('/api/status')
+      const data = await res.json()
+      setSysStatus(data)
+    } catch (err) {
+      console.error('Failed to fetch system status', err)
+    } finally {
+      setIsSysStatusLoading(false)
+    }
+  }
+
+  const handleTriggerManualSync = async () => {
+    setIsManualSyncing(true)
+    setSyncFeedback(null)
+    try {
+      const now = new Date()
+      const y = now.getFullYear()
+      const m = String(now.getMonth() + 1).padStart(2, '0')
+      const lastDay = new Date(y, Number(m), 0).getDate()
+      const startDate = `${y}-${m}-01`
+      const endDate = `${y}-${m}-${String(lastDay).padStart(2, '0')}`
+
+      const res = await fetch('/api/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate }),
+      })
+      const data = await res.json()
+      if (data.success !== false) {
+        setSyncFeedback({ text: `ซิงค์ข้อมูล HOSxP สำเร็จ: ${data.totalPrescriptions ?? 0} รายการ (${data.durationMs ?? 0} ms)` })
+        fetchSysStatus()
+      } else {
+        setSyncFeedback({ text: data.error || 'ซิงค์ข้อมูลไม่สำเร็จ', isError: true })
+      }
+    } catch (err) {
+      setSyncFeedback({ text: `เกิดข้อผิดพลาด: ${(err as Error).message}`, isError: true })
+    } finally {
+      setIsManualSyncing(false)
+    }
+  }
+
+  const handleToggleNotify = () => {
+    const next = !notifyEnabled
+    setNotifyEnabled(next)
+    try {
+      localStorage.setItem('hd_check_notify_enabled', String(next))
+    } catch {}
+  }
+
   useEffect(() => {
     if (isOpen) {
-      if (initialTab === 'admin_policy' && !isAdmin) {
+      if ((initialTab === 'admin_policy' || initialTab === 'admin_system') && !isAdmin) {
         setActiveTab('my_profile')
       } else {
         setActiveTab(initialTab)
+        if (initialTab === 'admin_system') {
+          fetchSysStatus()
+        }
       }
     }
   }, [isOpen, initialTab, isAdmin])
@@ -467,19 +545,32 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div className="fixed inset-0" onClick={onClose} />
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-3xl max-h-[94dvh] sm:max-h-[90dvh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
+      <div className="relative w-full max-w-3xl sm:max-w-4xl max-h-[94dvh] sm:max-h-[90dvh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-slate-800/80 bg-slate-950/80 shrink-0">
           <div className="flex items-center gap-3.5">
-            <div className="grid place-items-center size-10 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 shadow-sm shrink-0">
-              <ShieldCheck className="size-5.5 stroke-[2.2]" />
+            <div className={cn(
+              'grid place-items-center size-10 rounded-xl border shadow-sm shrink-0 transition-colors',
+              activeTab === 'admin_system'
+                ? 'bg-violet-500/15 border-violet-500/30 text-violet-400'
+                : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+            )}>
+              {activeTab === 'admin_system' ? (
+                <Cpu className="size-5.5 stroke-[2.2]" />
+              ) : (
+                <ShieldCheck className="size-5.5 stroke-[2.2]" />
+              )}
             </div>
             <div>
               <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
-                ศูนย์ตั้งค่าความปลอดภัย
+                {activeTab === 'admin_system'
+                  ? 'ศูนย์จัดการระบบ & ควบคุมเวอร์ชัน (Admin Hub)'
+                  : 'ศูนย์ตั้งค่าความปลอดภัย & จัดการบัญชี'}
               </h2>
               <p className="text-xs text-slate-400 font-normal mt-0.5">
-                ยืนยันตัวตน 2FA • PIN ล็อกหน้าจอ • นโยบายคุ้มครองข้อมูลผู้ป่วย
+                {activeTab === 'admin_system'
+                  ? 'บริหารเวอร์ชัน • ระบบสรุป AI อัตโนมัติ • สถานะเซิร์ฟเวอร์ & ซิงค์ HOSxP'
+                  : 'ยืนยันตัวตน 2FA • PIN ล็อกหน้าจอ • นโยบายคุ้มครองข้อมูลผู้ป่วย'}
               </p>
             </div>
           </div>
@@ -571,6 +662,29 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     บังคับใช้
                   </span>
                 )}
+              </button>
+            )}
+
+            {/* Tab 4: Admin System & Versions (Admin / IT only) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveTab('admin_system')
+                  fetchSysStatus()
+                }}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                  activeTab === 'admin_system'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                )}
+              >
+                <Cpu className={cn('size-3.5', activeTab === 'admin_system' ? 'text-violet-400' : 'text-slate-400')} />
+                <span>จัดการระบบ & เวอร์ชัน</span>
+                <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
+                  v{__APP_VERSION__}
+                </span>
               </button>
             )}
           </div>
@@ -1441,12 +1555,288 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* ========================================================= */}
+          {/* TAB 4: ADMIN SYSTEM & VERSION MANAGEMENT                  */}
+          {/* ========================================================= */}
+          {activeTab === 'admin_system' && isAdmin && (
+            <div className="space-y-5">
+              {/* Sync / Action Feedback Notice */}
+              {syncFeedback && (
+                <div
+                  className={cn(
+                    'p-3.5 rounded-xl border text-xs font-medium flex items-center justify-between gap-2 animate-in fade-in shadow-xs',
+                    syncFeedback.isError
+                      ? 'bg-rose-500/10 border-rose-500/25 text-rose-300'
+                      : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-200'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {syncFeedback.isError ? (
+                      <AlertCircle className="size-4 shrink-0 text-rose-400" />
+                    ) : (
+                      <CheckCircle2 className="size-4 shrink-0 text-emerald-400" />
+                    )}
+                    <span>{syncFeedback.text}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSyncFeedback(null)}
+                    className="p-1 hover:bg-white/10 rounded text-slate-400 hover:text-white"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              )}
+
+              {/* SECTION 1: SYSTEM & RELEASE HERO CARD */}
+              <div className="p-5 sm:p-6 rounded-2xl bg-gradient-to-br from-slate-900 via-slate-950 to-[#12122b] border border-violet-500/30 relative overflow-hidden shadow-xl">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-violet-500/10 rounded-full blur-3xl pointer-events-none" />
+                <div className="relative z-10 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+                  <div className="flex items-start gap-4">
+                    <div className="size-13 rounded-2xl bg-gradient-to-tr from-violet-600 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-violet-500/25 shrink-0 border border-violet-400/30">
+                      <Cpu className="size-7" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-[11px] font-bold uppercase tracking-wider text-violet-400 bg-violet-500/15 border border-violet-500/30 px-2 py-0.5 rounded-md font-mono">
+                          Production Release
+                        </span>
+                        <span className="text-[11px] font-bold text-emerald-400 bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5 rounded-md flex items-center gap-1 font-mono">
+                          <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          v{__APP_VERSION__} (Latest)
+                        </span>
+                      </div>
+                      <h3 className="text-base sm:text-lg font-bold text-white mt-1.5 flex items-center gap-2">
+                        SMART-HOSCHECK • HerbDx ระบบตรวจสอบยาสมุนไพร
+                      </h3>
+                      <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                        เซิร์ฟเวอร์โรงพยาบาลพังโคน • Host: 192.168.1.241:3002 • Node.js PM2 Application (ID: 38)
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Top Action Buttons */}
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose()
+                        onOpenChangelog?.()
+                      }}
+                      className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 transition cursor-pointer shadow-md shadow-violet-950/40 active:scale-95 flex items-center gap-1.5"
+                    >
+                      <Sparkles className="size-3.5 text-violet-200" />
+                      <span>ดูบันทึกการอัปเดต (Changelog)</span>
+                    </button>
+
+                    <a
+                      href="https://github.com/phpaekkapon-oss/HD-Check/releases"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-2 rounded-xl text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <ExternalLink className="size-3.5 text-slate-400" />
+                      <span>GitHub Releases</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 2: TWO COLUMNS (AI ENGINE & NOTIFICATION POLICY) */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* AI Assistant Release Engine Card */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-8 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-400 grid place-items-center">
+                        <Sparkles className="size-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">Google Gemini AI Auto-Release</h4>
+                        <span className="text-[10px] text-teal-400 font-mono">models/gemini-flash-latest</span>
+                      </div>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30 flex items-center gap-1">
+                      <span className="size-1.5 rounded-full bg-teal-400" />
+                      Connected
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    ระบบเชื่อมต่อ Google Gemini API Key เพื่อวิเคราะห์ Git commits ล่าสุด และสรุป Release Notes ภาษาไทยจัดหมวดหมู่ (Features, Fixes, Security) ให้แบบอัตโนมัติทุกครั้งที่รัน deploy
+                  </p>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80 text-[11px] text-slate-300 space-y-1.5">
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Git Repository:</span>
+                      <span className="font-mono text-white">phpaekkapon-oss/HD-Check</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>Branch ปัจจุบัน:</span>
+                      <span className="font-mono text-teal-300">main (auto-tagged)</span>
+                    </div>
+                    <div className="flex items-center justify-between text-slate-400">
+                      <span>การรักษาความปลอดภัย:</span>
+                      <span className="text-emerald-400 font-medium">.env Git-Ignored ปลอดภัย</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Hospital Notification Policy Card */}
+                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-3.5 shadow-xs">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                      <div className="size-8 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 grid place-items-center">
+                        <Bell className="size-4" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-white">การแจ้งเตือนเวอร์ชันโรงพยาบาล</h4>
+                        <span className="text-[10px] text-slate-400">Hospital Version Toast Notice</span>
+                      </div>
+                    </div>
+
+                    {/* Switch */}
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={notifyEnabled}
+                      onClick={handleToggleNotify}
+                      className={cn(
+                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden',
+                        notifyEnabled ? 'bg-indigo-500' : 'bg-slate-800'
+                      )}
+                      title={notifyEnabled ? 'คลิกเพื่อปิดแจ้งเตือน' : 'คลิกเพื่อเปิดแจ้งเตือน'}
+                    >
+                      <span
+                        className={cn(
+                          'pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
+                          notifyEnabled ? 'translate-x-5' : 'translate-x-0'
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    {notifyEnabled
+                      ? 'เปิดใช้งาน: เจ้าหน้าที่ทุกคนจะเห็น Popup แจ้งเตือนสรุปฟีเจอร์ใหม่ที่มุมขวาล่างทันทีเมื่อมีการอัปเดตเวอร์ชัน'
+                      : 'ปิดการใช้งาน: ปิดกั้น Popup แจ้งเตือนเวอร์ชันใหม่ชั่วคราว'}
+                  </p>
+
+                  <div className="pt-1 flex items-center justify-between">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          localStorage.removeItem('hd_check_last_seen_version')
+                          setSyncFeedback({ text: 'รีเซ็ตสถานะแล้ว! เมื่อโหลดหน้านี้ใหม่จะแสดง Popup แจ้งเตือนเวอร์ชัน' })
+                        } catch {}
+                      }}
+                      className="px-3 py-1.5 rounded-lg text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-750 border border-slate-700/80 transition cursor-pointer flex items-center gap-1.5"
+                    >
+                      <RefreshCw className="size-3 text-slate-400" />
+                      <span>ทดสอบแสดง Popup อีกครั้ง</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 3: DATABASE HEALTH & MANUAL SYNC TRIGGER */}
+              <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5 space-y-4 shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="size-9 rounded-xl bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 grid place-items-center shrink-0">
+                      <Database className="size-4.5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                        ฐานข้อมูลและการซิงค์เวชระเบียน HOSxP
+                        {isSysStatusLoading && <Loader2 className="size-3.5 animate-spin text-slate-400" />}
+                      </h4>
+                      <p className="text-xs text-slate-400">
+                        ดึงข้อมูลใบสั่งยา แผนกแพทย์แผนไทย เข้าสู่คลัง Data Warehouse อัตโนมัติ
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={fetchSysStatus}
+                      disabled={isSysStatusLoading}
+                      className="p-2 rounded-xl text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 transition cursor-pointer"
+                      title="รีเฟรชสถานะ"
+                    >
+                      <RefreshCw className={cn('size-4', isSysStatusLoading && 'animate-spin')} />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={isManualSyncing}
+                      onClick={handleTriggerManualSync}
+                      className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-cyan-600 hover:bg-cyan-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-60 transition cursor-pointer shadow-md shadow-cyan-950/40 active:scale-95 disabled:active:scale-100 flex items-center gap-2"
+                    >
+                      {isManualSyncing ? (
+                        <>
+                          <Loader2 className="size-3.5 animate-spin" />
+                          <span>กำลังดึงข้อมูลจาก HOSxP…</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="size-3.5" />
+                          <span>ซิงค์ข้อมูล HOSxP ตอนนี้ (Manual Sync)</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Database Metrics Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="text-[10.5px] text-slate-400 font-medium">HOSxP Database</div>
+                    <div className="text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      Connected (Source)
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">192.168.1.250:3306</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="text-[10.5px] text-slate-400 font-medium">Data Warehouse</div>
+                    <div className="text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
+                      <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      {sysStatus?.database ?? 'dw_hd-check'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">{sysStatus?.host ?? '192.168.1.241'}</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="text-[10.5px] text-slate-400 font-medium">ใบสั่งยาในระบบ</div>
+                    <div className="text-xs font-bold text-white mt-1 font-mono">
+                      {sysStatus?.totalPrescriptions ? Number(sysStatus.totalPrescriptions).toLocaleString() : '...'} รายการ
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">ยาสมุนไพร {sysStatus?.totalDrugs ?? '...'} รายการ</div>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
+                    <div className="text-[10.5px] text-slate-400 font-medium">การซิงค์ล่าสุด</div>
+                    <div className="text-xs font-bold text-teal-300 mt-1 font-mono truncate">
+                      {sysStatus?.lastSync?.at ? sysStatus.lastSync.at.replace('T', ' ') : 'ระบบอัตโนมัติ'}
+                    </div>
+                    <div className="text-[10px] text-slate-400 mt-0.5">รอบออโต้ทุก {sysStatus?.autoSyncMinutes ?? 5} นาที</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-slate-950 shrink-0 text-xs">
           <div className="text-slate-400 font-normal">
-            PIN/2FA เก็บในฐาน dw_hd-check เท่านั้น — ไม่แตะฐาน HOSxP
+            {activeTab === 'admin_system'
+              ? 'SMART-HOSCHECK • HerbDx ระบบบริหารจัดการและควบคุมส่วนกลางสำหรับ Admin'
+              : 'PIN/2FA เก็บในฐาน dw_hd-check เท่านั้น — ไม่แตะฐาน HOSxP'}
           </div>
           <button
             type="button"

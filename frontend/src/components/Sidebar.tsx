@@ -11,6 +11,7 @@ import {
   ShieldCheck,
   ScanSearch,
   Send,
+  Cpu,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
@@ -63,6 +64,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const { user } = useAuth()
   const isAdmin = isAdminUser(user)
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
+  const [securityInitialTab, setSecurityInitialTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'>('my_profile')
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
 
   const content = (isMobileView: boolean, isCollapsedView: boolean) => (
@@ -242,6 +244,7 @@ export const Sidebar: FC<SidebarProps> = ({
           <button
             type="button"
             onClick={() => {
+              setSecurityInitialTab('my_profile')
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
@@ -269,6 +272,36 @@ export const Sidebar: FC<SidebarProps> = ({
                     OFF
                   </span>
                 )}
+              </div>
+            )}
+          </button>
+        )}
+
+        {/* Admin System Management & Version Control Hub */}
+        {isAdmin && (
+          <button
+            type="button"
+            onClick={() => {
+              setSecurityInitialTab('admin_system')
+              setSecurityModalOpen(true)
+              if (isMobileView && onMobileClose) onMobileClose()
+            }}
+            title={isCollapsedView ? 'จัดการระบบ & เวอร์ชัน (เฉพาะ Admin)' : undefined}
+            className={cn(
+              'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
+              isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
+            )}
+          >
+            <div className="relative shrink-0">
+              <Cpu className="size-4.5 text-slate-500 dark:text-slate-400 group-hover:text-violet-400 transition-colors" />
+              <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-violet-400 animate-pulse" />
+            </div>
+            {!isCollapsedView && (
+              <div className="flex-1 flex items-center justify-between min-w-0">
+                <span className="text-xs font-medium truncate">จัดการระบบ & เวอร์ชัน</span>
+                <span className="text-[9px] font-mono font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1 py-0.2 rounded">
+                  ADMIN
+                </span>
               </div>
             )}
           </button>
@@ -437,10 +470,12 @@ export const Sidebar: FC<SidebarProps> = ({
         </div>
       )}
 
-      {/* 2FA Security Modal */}
+      {/* 2FA Security Modal & Admin System Hub */}
       <Security2FASettingsModal
         isOpen={securityModalOpen}
         onClose={() => setSecurityModalOpen(false)}
+        initialTab={securityInitialTab}
+        onOpenChangelog={onOpenChangelog}
       />
     </>
   )
