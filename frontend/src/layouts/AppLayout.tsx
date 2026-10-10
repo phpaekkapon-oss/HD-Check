@@ -171,6 +171,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
 
       {/* Floating toast notification for new release */}
       <VersionUpdateNotice
+        serverVersion={status?.appVersion}
         onOpenChangelog={() => setChangelogOpen(true)}
       />
     </div>

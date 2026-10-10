@@ -130,6 +130,7 @@ export interface SyncLogEntry {
 
 export interface DbStatus {
   readonly status: 'online'
+  readonly appVersion?: string
   readonly host: string
   readonly database: string
   readonly totalPrescriptions: number

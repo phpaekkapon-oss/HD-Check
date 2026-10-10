@@ -1,6 +1,6 @@
 {
   "name": "hd-check-backend",
-  "version": "1.1.18",
+  "version": "1.1.19",
   "description": "HerbDx (SMART-HOSCHECK) Backend API & Data Sync Engine",
   "type": "module",
   "main": "index.mjs",

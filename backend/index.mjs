@@ -44,6 +44,17 @@ const possibleDistPaths = [
 ]
 const distPath = possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) || possibleDistPaths[0]
 
+let appVersion = '1.0.0'
+try {
+  const pkgPath = path.join(__dirname, 'package.json')
+  if (fs.existsSync(pkgPath)) {
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+    appVersion = pkg.version || '1.0.0'
+  }
+} catch {
+  // ignore
+}
+
 process.on('uncaughtException', (err) => {
   console.error('[CRITICAL] Uncaught exception:', err?.message || err)
 })
@@ -288,6 +299,7 @@ app.get('/api/status', requireSession, async (_req, res) => {
     )
     res.json({
       status: 'online',
+      appVersion,
       host: `${DW_DB_BASE.host}:${DW_DB_BASE.port}`,
       database: DW_DB,
       totalPrescriptions: prescriptionTotal,
@@ -301,6 +313,14 @@ app.get('/api/status', requireSession, async (_req, res) => {
   } catch (err) {
     fail(res, err)
   }
+})
+
+app.get('/api/version', (_req, res) => {
+  res.json({
+    success: true,
+    version: appVersion,
+    timestamp: Date.now(),
+  })
 })
 
 app.post('/api/sync', requireAdmin, async (req, res) => {
