@@ -17,8 +17,9 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | undefined
     try {
+      const notifyEnabled = localStorage.getItem('hd_check_notify_enabled') !== 'false'
       const lastSeen = localStorage.getItem('hd_check_last_seen_version')
-      if (lastSeen !== currentVersion) {
+      if (notifyEnabled && lastSeen !== currentVersion) {
         timer = setTimeout(() => setShowNotice(true), 800)
       }
     } catch {
