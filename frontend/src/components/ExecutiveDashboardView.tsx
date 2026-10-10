@@ -127,32 +127,63 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const opdCount = useMemo(() => records.filter((r) => !r.vn.startsWith('AN:')).length, [records])
   const ipdCount = useMemo(() => records.filter((r) => r.vn.startsWith('AN:')).length, [records])
 
-  // 1. Daily Trend Aggregation for SVG Chart
+  const isYearlyRange = useMemo(() => {
+    const d1 = new Date(range.startDate).getTime()
+    const d2 = new Date(range.endDate).getTime()
+    return (d2 - d1) > 35 * 24 * 60 * 60 * 1000
+  }, [range.startDate, range.endDate])
+
+  // 1. Daily/Monthly Trend Aggregation for SVG Chart
   const dailyTrends = useMemo<DailyTrendItem[]>(() => {
     if (scopedRecords.length === 0) return []
+
+    const thaiMonthShort = [
+      'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+      'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.',
+    ]
 
     const map = new Map<string, { pass: number; fail: number; noDx: number; noMap: number; total: number }>()
 
     for (const r of scopedRecords) {
       const d = r.visit_date
       if (!d) continue
-      const current = map.get(d) || { pass: 0, fail: 0, noDx: 0, noMap: 0, total: 0 }
+      // If viewing a yearly period, aggregate by YYYY-MM; otherwise by date YYYY-MM-DD
+      const key = isYearlyRange ? d.slice(0, 7) : d
+      const current = map.get(key) || { pass: 0, fail: 0, noDx: 0, noMap: 0, total: 0 }
       current.total += 1
       if (r.audit_result === 'PASS') current.pass += 1
       else if (r.audit_result === 'FAIL') current.fail += 1
       else if (r.audit_result === 'NO_DX') current.noDx += 1
       else if (r.audit_result === 'NO_MAP') current.noMap += 1
-      map.set(d, current)
+      map.set(key, current)
     }
 
-    const sortedDates = Array.from(map.keys()).sort()
-    return sortedDates.map((dateStr) => {
-      const item = map.get(dateStr)!
-      const dateObj = new Date(dateStr)
-      const dayNum = dateObj.getDate()
+    const sortedKeys = Array.from(map.keys()).sort()
+    return sortedKeys.map((keyStr, idx) => {
+      const item = map.get(keyStr)!
       const passRate = item.total > 0 ? (item.pass / item.total) * 100 : 0
+
+      if (isYearlyRange) {
+        const parts = keyStr.split('-')
+        const m = parseInt(parts[1] ?? '1', 10) || 1
+        const monthLabel = thaiMonthShort[m - 1] ?? keyStr
+        return {
+          date: `${keyStr}-01`,
+          dayNum: idx + 1,
+          label: monthLabel,
+          total: item.total,
+          pass: item.pass,
+          fail: item.fail,
+          noDx: item.noDx,
+          noMap: item.noMap,
+          passRate,
+        }
+      }
+
+      const dateObj = new Date(keyStr)
+      const dayNum = dateObj.getDate()
       return {
-        date: dateStr,
+        date: keyStr,
         dayNum,
         label: `${dayNum}`,
         total: item.total,
@@ -163,7 +194,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         passRate,
       }
     })
-  }, [scopedRecords])
+  }, [scopedRecords, isYearlyRange])
 
   // Maximum value for SVG scaling
   const maxDailyVolume = useMemo(() => {
@@ -237,58 +268,70 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
         {/* Date presets & Sync */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
-          <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('THIS_MONTH')}
-              className={cn(
-                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
-                range.startDate === '2026-10-01' && range.endDate === '2026-10-31'
-                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              )}
-            >
-              เดือนนี้
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('LAST_MONTH')}
-              className={cn(
-                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
-                range.startDate === '2026-09-01' && range.endDate === '2026-09-30'
-                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              )}
-            >
-              เดือนก่อน (ก.ย.)
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('FY_70')}
-              className={cn(
-                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
-                range.startDate === '2026-10-01' && range.endDate === '2027-09-30'
-                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              )}
-              title="ปีงบประมาณ 2570 (1 ต.ค. 69 - 30 ก.ย. 70)"
-            >
-              ปีงบ 70
-            </button>
-            <button
-              type="button"
-              onClick={() => handleSelectPreset('FY_69')}
-              className={cn(
-                'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
-                range.startDate === '2025-10-01' && range.endDate === '2026-09-30'
-                  ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
-              )}
-              title="ปีงบประมาณ 2569 (1 ต.ค. 68 - 30 ก.ย. 69)"
-            >
-              ปีงบ 69
-            </button>
-            <span className="px-2 py-0.5 text-[11px] font-mono text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-md border border-teal-500/20">
+          <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
+            {/* กลุ่ม 1: ปีงบประมาณ (เรียงตามลำดับเวลา: ปีงบ 69 -> ปีงบ 70) */}
+            <div className="flex items-center gap-1 pr-1.5 border-r border-slate-300 dark:border-white/10">
+              <span className="text-[10px] text-slate-400 font-semibold px-0.5 select-none">ปีงบ:</span>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('FY_69')}
+                className={cn(
+                  'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
+                  range.startDate === '2025-10-01' && range.endDate === '2026-09-30'
+                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                )}
+                title="ปีงบประมาณ 2569 (1 ต.ค. 68 - 30 ก.ย. 69)"
+              >
+                ปีงบ 69
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('FY_70')}
+                className={cn(
+                  'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
+                  range.startDate === '2026-10-01' && range.endDate === '2027-09-30'
+                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                )}
+                title="ปีงบประมาณ 2570 (1 ต.ค. 69 - 30 ก.ย. 70)"
+              >
+                ปีงบ 70
+              </button>
+            </div>
+
+            {/* กลุ่ม 2: รายเดือน (เรียงตามลำดับเวลา: ก.ย. 69 -> ต.ค. 69) */}
+            <div className="flex items-center gap-1">
+              <span className="text-[10px] text-slate-400 font-semibold px-0.5 select-none">เดือน:</span>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('LAST_MONTH')}
+                className={cn(
+                  'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
+                  range.startDate === '2026-09-01' && range.endDate === '2026-09-30'
+                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                )}
+                title="เดือนก่อนหน้า (กันยายน 2569)"
+              >
+                ก.ย. 69
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('THIS_MONTH')}
+                className={cn(
+                  'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
+                  range.startDate === '2026-10-01' && range.endDate === '2026-10-31'
+                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                )}
+                title="เดือนปัจจุบัน (ตุลาคม 2569)"
+              >
+                ต.ค. 69 (เดือนนี้)
+              </button>
+            </div>
+
+            <span className="px-2 py-0.5 text-[11px] font-mono text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-md border border-teal-500/20 ml-0.5">
               {toThaiDate(range.startDate)} - {toThaiDate(range.endDate)}
             </span>
           </div>
@@ -448,11 +491,15 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="flex items-center gap-2">
                 <TrendingUp className="size-4 text-teal-600 dark:text-teal-400" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
-                  แนวโน้มการสั่งใช้ยาและอัตราผ่านเกณฑ์รายวัน
+                  {isYearlyRange
+                    ? 'แนวโน้มการสั่งใช้ยาและอัตราผ่านเกณฑ์รายเดือน (12 เดือนของปีงบประมาณ)'
+                    : 'แนวโน้มการสั่งใช้ยาและอัตราผ่านเกณฑ์รายวัน'}
                 </h2>
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                กราฟแท่งแสดงจำนวนใบสั่งยา (ผ่าน vs ไม่ตรงเกณฑ์) ซ้อนเส้นแนวโน้มอัตราผ่าน (%)
+                {isYearlyRange
+                  ? 'กราฟแท่ง 3D แสดงยอดจ่ายยาสมุนไพรแยกรายเดือน พร้อมเส้นแนวโน้มอัตราผ่านเกณฑ์ (%)'
+                  : 'กราฟแท่งแสดงจำนวนใบสั่งยา (ผ่าน vs ไม่ตรงเกณฑ์) ซ้อนเส้นแนวโน้มอัตราผ่าน (%)'}
               </p>
             </div>
 
@@ -807,7 +854,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="absolute top-2 right-2 bg-slate-900/90 backdrop-blur-md text-white text-[11px] p-2.5 rounded-xl border border-teal-500/30 shadow-lg pointer-events-none space-y-1">
                 <div className="font-bold text-teal-300 flex items-center gap-1.5">
                   <Calendar className="size-3" />
-                  <span>{toThaiDate(hoveredDay.date)}</span>
+                  <span>
+                    {isYearlyRange
+                      ? `เดือน ${hoveredDay.label} (รวมทั้งเดือน)`
+                      : toThaiDate(hoveredDay.date)}
+                  </span>
                 </div>
                 <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10.5px]">
                   <span className="text-slate-300">รวมทั้งหมด:</span>
