@@ -16,10 +16,6 @@ import {
   Settings2,
   Activity,
   Layers,
-  Search,
-  ExternalLink,
-  ShieldCheck,
-  FileText,
 } from 'lucide-react'
 import type {
   ActivePage,
@@ -173,6 +169,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <span className="text-slate-500">•</span>
               <span className="text-slate-400">
                 ผู้ล็อกอิน: <strong className="text-white">{user?.name || 'นายเอกพล อันคำวงศ์'}</strong>
+              </span>
+              <span className="text-slate-500">•</span>
+              <span className="text-teal-300 font-mono text-xs">
+                ยาสมุนไพรในคลัง {fmtNum(drugs.length)} รายการ
+                {status?.latestVisitDate ? ` · ข้อมูล HOSxP ล่าสุด ${toThaiDate(status.latestVisitDate)}` : ''}
               </span>
             </p>
           </div>
@@ -561,6 +562,31 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               )}
             </div>
           </div>
+
+          {/* Top Departments breakdown */}
+          {topDepartments.length > 0 && (
+            <div className="pt-3 border-t border-slate-200/60 dark:border-white/5 space-y-2">
+              <div className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Building2 className="size-3.5 text-teal-500" />
+                  <span>แผนกที่มีการสั่งจ่ายยาสูงสุด:</span>
+                </span>
+                <span className="text-[10.5px] font-normal text-slate-400">สัดส่วนในรอบเดือน</span>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-[11px]">
+                {topDepartments.map((dept) => (
+                  <div key={dept.name} className="flex items-center justify-between p-2 rounded-xl bg-slate-100/60 dark:bg-white/5">
+                    <span className="truncate text-slate-600 dark:text-slate-300 font-medium" title={dept.name}>
+                      {dept.name}
+                    </span>
+                    <span className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0 ml-1">
+                      {fmtNum(dept.count)} <span className="font-normal text-[10px] text-slate-400">ใบ</span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <div className="text-[11px] text-slate-500 dark:text-slate-400 text-right">
             สัดส่วนการใช้ยาสมุนไพรอิงตามฐานข้อมูลเวชระเบียนโรงพยาบาลพังโคน

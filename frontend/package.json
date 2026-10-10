@@ -1,7 +1,7 @@
 {
   "name": "hd-check-frontend",
   "private": true,
-  "version": "1.1.9",
+  "version": "1.1.10",
   "description": "HerbDx (SMART-HOSCHECK) Frontend Dashboard UI (React 19 + TypeScript + Tailwind CSS)",
   "type": "module",
   "scripts": {
