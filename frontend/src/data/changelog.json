@@ -1,5 +1,22 @@
 [
   {
+    "version": "1.1.1",
+    "date": "2026-10-10",
+    "title": "เพิ่มระบบแจ้งเตือนเวอร์ชันใหม่และบันทึกการอัปเดตอัตโนมัติ",
+    "type": "patch",
+    "highlights": [
+      "พัฒนาระบบแจ้งเตือนเวอร์ชันอัปเดตและหน้าต่าง Changelog Modal อัตโนมัติ",
+      "ปรับปรุงระบบ Build, Git Release และ Automated Deployment"
+    ],
+    "categories": {
+      "features": [
+        "พัฒนาระบบแจ้งเตือนเวอร์ชันอัปเดตและหน้าต่าง Changelog Modal อัตโนมัติ",
+        "ปรับปรุงระบบ Build, Git Release และ Automated Deployment"
+      ],
+      "improvements": []
+    }
+  },
+  {
     "version": "1.1.0",
     "date": "2026-10-10",
     "title": "เพิ่มระบบตรวจสอบข้อมูลผู้ป่วยใน (IPD) และจัดเลย์เอาต์ระดับ Enterprise",

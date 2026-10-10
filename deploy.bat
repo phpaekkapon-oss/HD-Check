@@ -1,9 +1,9 @@
 @echo off
-title SMART-HOSCHECK Auto Deploy to 192.168.1.241
+title SMART-HOSCHECK Automated Release, Git Push ^& Deploy to Server
 color 0B
 
 echo ====================================================================
-echo   SMART-HOSCHECK - Auto Build ^& Deploy to Server [192.168.1.241]
+echo   SMART-HOSCHECK - Automated Release, Git Push ^& Deploy
 echo ====================================================================
 echo.
 
@@ -14,33 +14,18 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: 1. Build latest code
-echo [*] Step 1: Building latest production bundle (HD-Check.zip)...
-echo.
-call build.bat --no-pause
-
-if not exist "HD-Check.zip" (
-    echo.
-    echo [ERROR] HD-Check.zip not found. Please check build errors above.
-    pause
-    exit /b 1
-)
-
-:: 2. Upload and deploy to Server
-echo.
-echo [*] Step 2: Uploading and deploying to Server 192.168.1.241...
-echo.
-node backend\deploy.mjs
+:: Run fully automated release (Zero manual input: Auto Changelog + Bump + Git Push + Deploy)
+node scripts\release.mjs --auto
 
 if %errorlevel% neq 0 (
     echo.
-    echo [ERROR] Deployment failed. Please check errors above.
+    echo [ERROR] Automated release or deploy failed. Please check errors above.
     pause
     exit /b 1
 )
 
 echo.
 echo ====================================================================
-echo   Deployment finished! Press any key to close...
+echo   Deployment and Release finished! Press any key to close...
 echo ====================================================================
 pause >nul

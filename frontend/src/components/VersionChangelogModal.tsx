@@ -154,13 +154,14 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                 </div>
 
                 <a
-                  href="https://github.com/phpaekkapon-oss/HD-Check"
+                  href={`https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${activeRelease.version}`}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#1a1e36] hover:bg-slate-200 dark:hover:bg-[#252a48] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#34304a] transition-colors self-start sm:self-auto cursor-pointer"
+                  title={`เปิดดู Release v${activeRelease.version} และ Commit History บน GitHub`}
                 >
                   <ExternalLink className="size-3.5" />
-                  <span>ดูบน GitHub</span>
+                  <span>Release v{activeRelease.version} บน GitHub</span>
                 </a>
               </div>
 

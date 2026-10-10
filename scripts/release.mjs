@@ -70,6 +70,74 @@ function getTodayISO() {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
 
+/**
+ * Intelligent Git & Workspace Analyzer
+ * Automatically inspects modified files and commit logs to build
+ * professional, human-readable release notes without manual typing.
+ */
+function analyzeGitChanges() {
+  const detectedHighlights = []
+  let detectedTitle = ''
+
+  try {
+    const statusOutput = execSync('git status --porcelain', { cwd: rootDir, encoding: 'utf8' })
+    const changedFiles = statusOutput
+      .split('\n')
+      .map((line) => line.trim().slice(3))
+      .filter(Boolean)
+
+    const categories = new Set()
+
+    for (const f of changedFiles) {
+      if (f.includes('AuditFilterBar')) {
+        detectedHighlights.push('ปรับปรุงการจัดวางและการทำงานของแถบตัวกรองการตรวจสอบ (Audit Filter Bar Layout)')
+        categories.add('FilterBar')
+      } else if (f.includes('DrugSummaryView')) {
+        detectedHighlights.push('ปรับปรุงหน้ารายการจ่ายยาสมุนไพรและกล่องตัวชี้วัด (Drug Summary & Interactive Metric Boxes)')
+        categories.add('DrugSummary')
+      } else if (f.includes('AuditTable') || f.includes('AuditCardList')) {
+        detectedHighlights.push('ปรับปรุงตารางเวชระเบียนและมุมมองรายการตรวจ (Audit Table & Cards)')
+        categories.add('AuditTable')
+      } else if (f.includes('VersionChangelog') || f.includes('VersionUpdate') || f.includes('changelog')) {
+        detectedHighlights.push('พัฒนาระบบแจ้งเตือนเวอร์ชันอัปเดตและหน้าต่าง Changelog Modal อัตโนมัติ')
+        categories.add('VersionSystem')
+      } else if (f.includes('DxMap') || f.includes('DxMismatch')) {
+        detectedHighlights.push('ปรับปรุงระบบตั้งค่าเกณฑ์การจับคู่ยาและรหัสโรค ICD-10')
+        categories.add('DxMap')
+      } else if (f.includes('Security') || f.includes('PinLock') || f.includes('auth')) {
+        detectedHighlights.push('ปรับปรุงระบบความปลอดภัย 2FA และระบบล็อกหน้าจอ PIN')
+        categories.add('Security')
+      } else if (f.includes('sync.mjs') || f.includes('backend/index.mjs')) {
+        detectedHighlights.push('ปรับปรุงคำสั่งประมวลผลข้อมูลและระบบบริการ Backend API สำหรับ OPD/IPD')
+        categories.add('Backend')
+      } else if (f.includes('deploy') || f.includes('build.bat') || f.includes('release')) {
+        detectedHighlights.push('ปรับปรุงระบบ Build, Git Release และ Automated Deployment')
+        categories.add('Deployment')
+      }
+    }
+
+    if (categories.has('FilterBar') || categories.has('DrugSummary')) {
+      detectedTitle = 'ปรับปรุงส่วนติดต่อผู้ใช้ (UI/UX) และระบบตัวกรองข้อมูล'
+    } else if (categories.has('VersionSystem')) {
+      detectedTitle = 'เพิ่มระบบแจ้งเตือนเวอร์ชันใหม่และบันทึกการอัปเดตอัตโนมัติ'
+    } else if (categories.has('Backend')) {
+      detectedTitle = 'ปรับปรุงประสิทธิภาพการดึงและประมวลผลข้อมูลคลังข้อมูล'
+    } else {
+      detectedTitle = 'ปรับปรุงประสิทธิภาพและความเสถียรของระบบ'
+    }
+  } catch (err) {
+    // fallback if git command fails
+  }
+
+  return {
+    title: detectedTitle || 'ปรับปรุงและอัปเดตระบบประจำวัน',
+    highlights:
+      detectedHighlights.length > 0
+        ? Array.from(new Set(detectedHighlights))
+        : ['ปรับปรุงประสิทธิภาพการทำงานและความเสถียรของระบบ', 'อัปเดตข้อมูลและส่วนติดต่อผู้ใช้งาน'],
+  }
+}
+
 async function main() {
   console.log('====================================================================')
   console.log('  SMART-HOSCHECK Automated Versioning, Git & Release Engine')
@@ -81,62 +149,78 @@ async function main() {
 
   // Parse arguments or prompt
   const args = process.argv.slice(2)
-  let bumpType = 'minor'
+  let bumpType = 'patch'
   let newVersion = ''
   let releaseTitle = ''
   let highlightsInput = ''
-  let autoYes = false
+  let isAuto = false
 
   for (const arg of args) {
     if (arg === '--patch') bumpType = 'patch'
     else if (arg === '--minor') bumpType = 'minor'
     else if (arg === '--major') bumpType = 'major'
-    else if (arg === '--yes' || arg === '-y') autoYes = true
+    else if (arg === '--auto' || arg === '--yes' || arg === '-y') isAuto = true
     else if (arg.startsWith('--version=')) newVersion = arg.split('=')[1]
     else if (arg.startsWith('--title=')) releaseTitle = arg.split('=')[1]
     else if (arg.startsWith('--highlights=')) highlightsInput = arg.split('=')[1]
   }
 
-  if (!newVersion) {
-    const choice = await ask(
-      `เลือกประเภทการอัปเดตเวอร์ชัน:\n  [1] Patch (${bumpVersion(currentVersion, 'patch')})\n  [2] Minor (${bumpVersion(currentVersion, 'minor')})\n  [3] Major (${bumpVersion(currentVersion, 'major')})\nกรุณาเลือก (1/2/3)`,
-      '2'
-    )
-    if (choice === '1') bumpType = 'patch'
-    else if (choice === '3') bumpType = 'major'
-    else bumpType = 'minor'
+  // Automatic Change Analysis from Git
+  const gitAnalysis = analyzeGitChanges()
+  if (!releaseTitle) releaseTitle = gitAnalysis.title
 
-    newVersion = bumpVersion(currentVersion, bumpType)
+  if (!newVersion) {
+    if (isAuto) {
+      newVersion = bumpVersion(currentVersion, bumpType)
+    } else {
+      const choice = await ask(
+        `เลือกประเภทการอัปเดตเวอร์ชัน:\n  [1] Patch (${bumpVersion(currentVersion, 'patch')})\n  [2] Minor (${bumpVersion(currentVersion, 'minor')})\n  [3] Major (${bumpVersion(currentVersion, 'major')})\nกรุณาเลือก (1/2/3)`,
+        '1'
+      )
+      if (choice === '2') bumpType = 'minor'
+      else if (choice === '3') bumpType = 'major'
+      else bumpType = 'patch'
+
+      newVersion = bumpVersion(currentVersion, bumpType)
+    }
   }
 
   console.log(`\n[+] เวอร์ชันใหม่ที่จะสร้าง: v${newVersion} (${bumpType})`)
 
-  if (!releaseTitle) {
+  if (!releaseTitle && !isAuto) {
     releaseTitle = await ask(
       'ระบุหัวข้อ/คำอธิบายการอัปเดตเวอร์ชันนี้ (Title)',
-      'ปรับปรุงระบบและเพิ่มประสิทธิภาพการทำงาน'
+      gitAnalysis.title
     )
   }
 
-  if (!highlightsInput) {
-    highlightsInput = await ask(
-      'ระบุรายการไฮไลท์การอัปเดต (คั่นแต่ละข้อด้วยเครื่องหมาย ;)',
-      'ปรับปรุงระบบให้ทันสมัย; อัปเดตข้อมูลและส่วนติดต่อผู้ใช้งาน'
+  let highlights = []
+  if (highlightsInput) {
+    highlights = highlightsInput
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
+  } else if (isAuto) {
+    highlights = gitAnalysis.highlights
+  } else {
+    const input = await ask(
+      'ระบุรายการไฮไลท์การอัปเดต (คั่นด้วย ; หรือกด Enter ใช้ค่าวิเคราะห์อัตโนมัติ)',
+      gitAnalysis.highlights.join('; ')
     )
+    highlights = input
+      .split(';')
+      .map((s) => s.trim())
+      .filter(Boolean)
   }
 
-  const highlights = highlightsInput
-    .split(';')
-    .map((s) => s.trim())
-    .filter(Boolean)
-
-  console.log('\n[*] สรุปข้อมูล Release Notes:')
+  console.log('\n[*] สรุปข้อมูล Release Notes (สร้างให้อัตโนมัติ):')
   console.log(`  - เวอร์ชัน: v${newVersion}`)
   console.log(`  - วันที่: ${getTodayThai()}`)
   console.log(`  - หัวข้อ: ${releaseTitle}`)
   console.log(`  - ไฮไลท์: ${highlights.length} รายการ`)
+  highlights.forEach((h, i) => console.log(`     ${i + 1}. ${h}`))
 
-  if (!autoYes) {
+  if (!isAuto) {
     const confirm = await ask('ยืนยันการเริ่ม Release อัตโนมัติ? (y/n)', 'y')
     if (confirm.toLowerCase() !== 'y') {
       console.log('[*] ยกเลิกการทำงาน')
@@ -258,9 +342,9 @@ async function main() {
 
   console.log('\n====================================================================')
   console.log(`  [SUCCESS] Release v${newVersion} ดำเนินการเสร็จสมบูรณ์ 100%!`)
-  console.log(`  - เวอร์ชันใหม่: v${newVersion}`)
-  console.log(`  - เว็บไซต์: http://pkhospital.moph.go.th/hd-check/`)
-  console.log(`  - GitHub: https://github.com/phpaekkapon-oss/HD-Check`)
+  console.log(`  - เวอร์ชันใหม่  : v${newVersion}`)
+  console.log(`  - เว็บไซต์     : http://pkhospital.moph.go.th/hd-check/`)
+  console.log(`  - GitHub Tag  : https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${newVersion}`)
   console.log('====================================================================\n')
 }
 
