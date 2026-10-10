@@ -25,10 +25,7 @@ import {
   ExternalLink,
   RefreshCw,
   Database,
-  Server,
-  GitBranch,
   Bell,
-  Layers,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
