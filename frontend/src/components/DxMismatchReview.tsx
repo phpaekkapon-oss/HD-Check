@@ -82,7 +82,7 @@ export const DxMismatchReview: FC<DxMismatchReviewProps> = ({ records, dxMap, ca
         const isOpen = openIcode === group.icode
         return (
           <article key={group.icode} className="overflow-hidden rounded-xl border border-themed bg-themed-card shadow-xs">
-            <button type="button" aria-expanded={isOpen} aria-controls={`dx-review-${group.icode}`} onClick={() => setOpenIcode((current) => current === group.icode ? null : group.icode)} className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-teal-500 dark:hover:bg-white/[0.025] sm:px-4">
+            <button type="button" aria-expanded={isOpen} aria-controls={`dx-review-${group.icode}`} onClick={() => setOpenIcode((current) => current === group.icode ? null : group.icode)} className="flex min-h-14 w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-slate-50/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--accent-hex)] dark:hover:bg-white/[0.025] sm:px-4">
               <span className="min-w-0 flex-1">
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5"><span className="break-words text-sm font-bold text-slate-900 dark:text-white">{group.drugName}</span><span className="font-mono text-[11px] text-slate-500 dark:text-slate-400">{group.icode}</span></span>
                 <span className="mt-0.5 block text-[11px] text-slate-500 dark:text-slate-400">พบปัญหา {fmtNum(group.visits)} ครั้ง · {group.diagnoses.length} รหัส DX ให้ตรวจ</span>
@@ -107,7 +107,7 @@ export const DxMismatchReview: FC<DxMismatchReviewProps> = ({ records, dxMap, ca
                     <input type="checkbox" checked={checked} disabled={!canEdit || alreadyAllowed || mutation.isPending} onChange={(event) => {
                       setSaved((value) => ({ ...value, [group.icode]: false }))
                       setSelected((value) => ({ ...value, [group.icode]: event.target.checked ? [...chosen, code] : chosen.filter((item) => item !== code) }))
-                    }} className="size-4 shrink-0 accent-teal-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-teal-500" />
+                    }} className="size-4 shrink-0 accent-[var(--accent-hex)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-hex)]" />
                     <span className="min-w-0 flex-1"><span className="font-mono font-bold text-slate-900 dark:text-white">{code}</span>{alreadyAllowed && <span className="ml-2 text-[11px] font-semibold text-amber-700 dark:text-amber-300">อยู่ในเกณฑ์แล้ว</span>}</span>
                     <span className="shrink-0 text-[11px] text-slate-500 dark:text-slate-400">{fmtNum(count)} ครั้ง</span>
                   </label>
@@ -116,10 +116,10 @@ export const DxMismatchReview: FC<DxMismatchReviewProps> = ({ records, dxMap, ca
             </div>
 
             <div className="border-t border-themed bg-slate-50/70 px-3 py-2.5 dark:bg-white/[0.02] sm:px-4">
-              {canEdit && chosen.length > 0 && <label className="mb-2 flex items-start gap-2 text-[11px] leading-4 text-slate-700 dark:text-slate-300"><input type="checkbox" checked={Boolean(confirmed[group.icode])} onChange={(event) => setConfirmed((value) => ({ ...value, [group.icode]: event.target.checked }))} className="mt-0.5 size-4 shrink-0 accent-teal-700" /><span>ยืนยันว่ารหัสที่เลือกตรงข้อบ่งใช้ตามแนวทางของหน่วยงาน</span></label>}
+              {canEdit && chosen.length > 0 && <label className="mb-2 flex items-start gap-2 text-[11px] leading-4 text-slate-700 dark:text-slate-300"><input type="checkbox" checked={Boolean(confirmed[group.icode])} onChange={(event) => setConfirmed((value) => ({ ...value, [group.icode]: event.target.checked }))} className="mt-0.5 size-4 shrink-0 accent-[var(--accent-hex)]" /><span>ยืนยันว่ารหัสที่เลือกตรงข้อบ่งใช้ตามแนวทางของหน่วยงาน</span></label>}
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-[11px] leading-4 text-slate-500 dark:text-slate-400">บันทึกเฉพาะเกณฑ์ในแอป ไม่แก้ DX ใน HOSxP</p>
-                {canEdit && <button type="button" disabled={!chosen.length || !confirmed[group.icode] || mutation.isPending} onClick={() => handleSave(group)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-teal-700 px-4 text-xs font-bold text-white transition hover:bg-teal-800 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-teal-500/25 disabled:cursor-not-allowed disabled:opacity-45 dark:bg-teal-500 dark:text-slate-950 dark:hover:bg-teal-400"><Check className="size-4" />{mutation.isPending ? 'กำลังบันทึก…' : 'บันทึกเกณฑ์ที่ยืนยันแล้ว'}</button>}
+                {canEdit && <button type="button" disabled={!chosen.length || !confirmed[group.icode] || mutation.isPending} onClick={() => handleSave(group)} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-accent px-4 text-xs font-bold transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[var(--accent-hex)] disabled:cursor-not-allowed disabled:opacity-45"><Check className="size-4" />{mutation.isPending ? 'กำลังบันทึก…' : 'บันทึกเกณฑ์ที่ยืนยันแล้ว'}</button>}
               </div>
               {saved[group.icode] && <p role="status" className="mt-2 text-xs font-semibold text-emerald-700 dark:text-emerald-300">บันทึกเกณฑ์แล้ว ระบบจะคำนวณผลตรวจใหม่</p>}
               {mutation.isError && <p role="alert" className="mt-2 text-xs font-medium text-rose-700 dark:text-rose-300">บันทึกไม่สำเร็จ: {mutation.error instanceof Error ? mutation.error.message : 'กรุณาลองใหม่'}</p>}

@@ -316,7 +316,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               className="hidden sm:grid size-9 md:w-auto md:px-3 place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer shrink-0"
               title="ติดตั้ง SMART-HOSCHECK เป็นแอปพลิเคชันบนเครื่อง"
             >
-              <Smartphone className="size-4 text-teal-600 dark:text-teal-400" />
+              <Smartphone className="size-4 text-accent" />
               <span className="hidden md:inline">ติดตั้งแอป</span>
             </button>
           )}
@@ -529,7 +529,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
                   >
-                    <Camera className="size-4 text-teal-600 dark:text-teal-400" />
+                    <Camera className="size-4 text-accent" />
                     <span>จัดการรูปโปรไฟล์ (Profile Photo)</span>
                   </button>
 
@@ -542,7 +542,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                       }}
                       className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
                     >
-                      <Smartphone className="size-4 text-teal-600 dark:text-teal-400" />
+                      <Smartphone className="size-4 text-accent" />
                       <span>ติดตั้งแอปบนเครื่อง</span>
                     </button>
                   )}

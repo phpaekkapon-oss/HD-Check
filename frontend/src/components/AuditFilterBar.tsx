@@ -93,8 +93,8 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
               className={cn(
                 'px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer text-xs',
                 patientType === 'OPD'
-                  ? 'bg-cyan-600 text-white shadow-xs'
-                  : 'text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-cyan-400'
+                  ? 'bg-accent shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               )}
             >
               🌿 ผู้ป่วยนอก OPD แผนไทย {counts ? `(${counts.opd})` : ''}
