@@ -97,6 +97,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   }, [currentVersion, remoteVersion])
 
   if (!showNotice) return <NoticeOffset height={0} />
+  const autoCloseMs = remoteVersion && remoteVersion !== currentVersion ? 0 : 10_000
 
   const isServerUpgradePending = Boolean(remoteVersion && remoteVersion !== currentVersion)
   const activeVersion = remoteVersion || currentVersion
@@ -111,7 +112,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   }
 
   const handleView = () => {
-    setShowNotice(false)
+    handleDismiss()
     onOpenChangelog()
   }
 
@@ -142,7 +143,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   const githubReleaseUrl = `https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${activeVersion}`
 
   return (
-    <ToastShell>
+    <ToastShell autoCloseMs={autoCloseMs} onAutoClose={() => handleDismiss()}>
       <div className={`relative p-3 lg:p-4 rounded-2xl bg-white/95 dark:bg-[#161a2f]/95 backdrop-blur-md border border-teal-500/40 dark:border-teal-500/50 shadow-2xl shadow-teal-500/20 flex ${notesOpen ? 'items-start' : 'items-center'} lg:items-start gap-3`}>
         <div className="size-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center text-white shrink-0 shadow-md shadow-teal-500/25">
           {isServerUpgradePending ? <Zap className="size-4.5" /> : <Sparkles className="size-4" />}
@@ -255,9 +256,21 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
  * Position: phones = full-width bar just above the bottom nav (thumb reach, nothing covered);
  * desktop = top-right under the header (clear of the status bar and back-to-top button).
  */
-const ToastShell: FC<{ children: React.ReactNode }> = ({ children }) => {
+const ToastShell: FC<{ children: React.ReactNode; autoCloseMs: number; onAutoClose: () => void }> = ({
+  children,
+  autoCloseMs,
+  onAutoClose,
+}) => {
   const ref = useRef<HTMLDivElement>(null)
   const [height, setHeight] = useState(0)
+  const [paused, setPaused] = useState(false)
+  const closeRef = useRef(onAutoClose)
+  closeRef.current = onAutoClose
+  useEffect(() => {
+    if (!autoCloseMs || paused) return
+    const t = window.setTimeout(() => closeRef.current(), autoCloseMs)
+    return () => window.clearTimeout(t)
+  }, [autoCloseMs, paused])
   useEffect(() => {
     const el = ref.current
     if (!el) return
@@ -270,6 +283,10 @@ const ToastShell: FC<{ children: React.ReactNode }> = ({ children }) => {
       ref={ref}
       role="status"
       aria-live="polite"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocus={() => setPaused(true)}
+      onBlur={() => setPaused(false)}
       className="fixed z-40 inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:inset-x-auto lg:bottom-auto lg:top-20 lg:right-5 lg:w-full lg:max-w-sm animate-in slide-in-from-bottom-5 lg:slide-in-from-top-5 fade-in duration-300"
     >
       <NoticeOffset height={height} />

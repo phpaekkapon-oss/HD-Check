@@ -290,6 +290,8 @@ async function main() {
   // Run AI / Code Analyzer
   const aiResult = await generateChangelogWithAI()
   if (!releaseTitle) releaseTitle = aiResult.title
+  // The AI sees the old version in package.json and writes "อัปเดตเวอร์ชัน x.y.z: ..."; the entry already carries the version
+  releaseTitle = String(releaseTitle).replace(/^\s*(อัปเดต|ปรับปรุง)?\s*(ระบบ)?\s*(เวอร์ชัน|version)?\s*v?\d+\.\d+\.\d+\s*[:：–-]\s*/i, '').trim() || releaseTitle
 
   if (!newVersion) {
     if (isAuto) {
