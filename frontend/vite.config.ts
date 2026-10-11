@@ -12,6 +12,18 @@ export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
+    {
+      // Publish release notes next to index.html so an already-open (older) page can
+      // read what the newly deployed version contains before reloading.
+      name: 'emit-changelog',
+      generateBundle() {
+        this.emitFile({
+          type: 'asset',
+          fileName: 'changelog.json',
+          source: readFileSync(new URL('./src/data/changelog.json', import.meta.url), 'utf8'),
+        })
+      },
+    },
   ],
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),

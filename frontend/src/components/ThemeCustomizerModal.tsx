@@ -38,7 +38,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
   return (
     <div
       ref={popoverRef}
-      className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-1.5rem)] sm:w-88 rounded-2xl bg-themed-card text-slate-800 dark:text-slate-100 p-4 border border-slate-200 dark:border-[#292440] shadow-2xl shadow-slate-900/15 dark:shadow-black/80 space-y-4 animate-in fade-in zoom-in-95 duration-150 select-none"
+      className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-1.5rem)] sm:w-[26rem] rounded-2xl bg-themed-card text-slate-800 dark:text-slate-100 p-4 border border-slate-200 dark:border-[#292440] shadow-2xl shadow-slate-900/15 dark:shadow-black/80 space-y-4 animate-in fade-in zoom-in-95 duration-150 select-none"
     >
       {/* 1. Mode Switcher (สว่าง / มืด) */}
       <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 dark:bg-[#09151e] border border-slate-200 dark:border-white/5 text-xs font-semibold">
@@ -95,8 +95,8 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
               >
                 <span className={cn('size-4 rounded-full mt-0.5 shrink-0 shadow-sm', preset.swatchBg)} />
                 <div className="min-w-0 flex-1 leading-tight">
-                  <div className="font-bold text-[12px] truncate">{preset.label}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 truncate mt-0.5">{preset.desc}</div>
+                  <div className="font-bold text-[12px] leading-snug">{preset.label}</div>
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5 line-clamp-2">{preset.desc}</div>
                 </div>
                 {isSelected && <Check className="size-4 text-accent shrink-0" />}
               </button>

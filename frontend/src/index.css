@@ -253,6 +253,14 @@
   border-color: var(--accent-hex) !important;
 }
 
+.bg-accent-soft {
+  background-color: color-mix(in srgb, var(--accent-hex) 14%, transparent) !important;
+}
+
+.border-accent-soft {
+  border-color: color-mix(in srgb, var(--accent-hex) 32%, transparent) !important;
+}
+
 .ring-accent {
   --tw-ring-color: var(--accent-hex) !important;
 }

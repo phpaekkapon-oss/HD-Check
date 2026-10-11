@@ -257,13 +257,13 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       {/* ========================================================================= */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-themed-card border border-themed shadow-xs">
         <div className="flex items-center gap-3">
-          <div className="size-10 rounded-xl bg-teal-500/15 border border-teal-500/30 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0">
+          <div className="size-10 rounded-xl bg-accent-soft border border-accent-soft text-accent grid place-items-center shrink-0">
             <Activity className="size-5" />
           </div>
           <div>
             <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
               <span>ภาพรวมการสั่งใช้ยาสมุนไพร</span>
-              <span className="text-xs px-2 py-0.5 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/20 font-normal">
+              <span className="text-xs px-2 py-0.5 rounded-md bg-accent-soft text-accent border border-accent-soft font-normal">
                 รพ.พังโคน
               </span>
             </h1>
@@ -295,7 +295,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 className={cn(
                   'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
                   range.startDate === '2025-10-01' && range.endDate === '2026-09-30'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    ? 'bg-white dark:bg-slate-800 text-accent font-bold shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 )}
                 title="ปีงบประมาณ 2569 (1 ต.ค. 68 - 30 ก.ย. 69)"
@@ -308,7 +308,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 className={cn(
                   'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
                   range.startDate === '2026-10-01' && range.endDate === '2027-09-30'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    ? 'bg-white dark:bg-slate-800 text-accent font-bold shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 )}
                 title="ปีงบประมาณ 2570 (1 ต.ค. 69 - 30 ก.ย. 70)"
@@ -326,7 +326,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 className={cn(
                   'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
                   range.startDate === '2026-09-01' && range.endDate === '2026-09-30'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    ? 'bg-white dark:bg-slate-800 text-accent font-bold shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 )}
                 title="เดือนก่อนหน้า (กันยายน 2569)"
@@ -339,7 +339,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 className={cn(
                   'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
                   range.startDate === '2026-10-01' && range.endDate === '2026-10-31'
-                    ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                    ? 'bg-white dark:bg-slate-800 text-accent font-bold shadow-2xs'
                     : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
                 )}
                 title="เดือนปัจจุบัน (ตุลาคม 2569)"
@@ -348,7 +348,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               </button>
             </div>
 
-            <span className="px-2 py-0.5 text-[11px] font-mono text-teal-700 dark:text-teal-300 bg-teal-500/10 rounded-md border border-teal-500/20 ml-0.5">
+            <span className="px-2 py-0.5 text-[11px] font-mono text-accent bg-accent-soft rounded-md border border-accent-soft ml-0.5">
               {toThaiDate(range.startDate)} - {toThaiDate(range.endDate)}
             </span>
 
@@ -506,7 +506,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
               <div className="flex items-center gap-2">
-                <TrendingUp className="size-4 text-teal-600 dark:text-teal-400" />
+                <TrendingUp className="size-4 text-accent" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                   {isYearlyRange
                     ? 'แนวโน้มการสั่งใช้ยาและอัตราผ่านเกณฑ์รายเดือน (12 เดือนของปีงบประมาณ)'
@@ -529,7 +529,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 className={cn(
                   'px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 border',
                   is3DMode
-                    ? 'bg-gradient-to-r from-teal-500 to-cyan-500 text-white border-teal-400/40 shadow-xs'
+                    ? 'bg-accent border-accent shadow-xs'
                     : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200/80 dark:border-white/5 hover:text-slate-800 dark:hover:text-white'
                 )}
                 title="สลับการแสดงผลแบบ 3D Isometric มีมิติแสงเงา"
@@ -546,7 +546,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   className={cn(
                     'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
                     chartScope === 'ALL'
-                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      ? 'bg-white dark:bg-slate-800 text-accent shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   )}
                 >
@@ -558,7 +558,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   className={cn(
                     'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
                     chartScope === 'OPD'
-                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      ? 'bg-white dark:bg-slate-800 text-accent shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   )}
                 >
@@ -570,7 +570,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   className={cn(
                     'px-2 py-0.5 rounded-md font-semibold transition cursor-pointer',
                     chartScope === 'IPD'
-                      ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-2xs'
+                      ? 'bg-white dark:bg-slate-800 text-accent shadow-2xs'
                       : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                   )}
                 >
@@ -914,7 +914,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <button
               type="button"
               onClick={() => onNavigate('audit')}
-              className="text-teal-600 dark:text-teal-400 font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
+              className="text-accent font-semibold hover:underline flex items-center gap-0.5 cursor-pointer"
             >
               <span>ดูตารางตรวจละเอียด</span>
               <ArrowUpRight className="size-3" />
@@ -928,7 +928,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           <div className="rounded-2xl bg-themed-card border border-themed p-4 sm:p-5 shadow-xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Pill className="size-4 text-teal-600 dark:text-teal-400" />
+                <Pill className="size-4 text-accent" />
                 <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                   5 อันดับยาสมุนไพรที่สั่งใช้สูงสุด
                 </h2>
@@ -936,7 +936,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigate('drugs')}
-                className="text-[11px] font-semibold text-teal-600 dark:text-teal-400 hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-[11px] font-semibold text-accent hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>ดูทั้งหมด</span>
                 <ArrowUpRight className="size-3" />
@@ -999,7 +999,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           <div className="rounded-2xl bg-themed-card border border-themed p-4 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Building2 className="size-4 text-teal-600 dark:text-teal-400" />
+                <Building2 className="size-4 text-accent" />
                 <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
                   แผนกที่มีการสั่งจ่ายยาสูงสุด
                 </h3>
@@ -1021,14 +1021,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         {dept.name}
                       </span>
                       <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]">
-                        <strong className="text-teal-600 dark:text-teal-400 font-bold">{fmtNum(dept.count)}</strong>
+                        <strong className="text-accent font-bold">{fmtNum(dept.count)}</strong>
                         <span className="text-[11px] text-slate-400 font-normal">({pctOfTotal}%)</span>
                       </div>
                     </div>
                     {/* Visual Proportion Bar */}
                     <div className="h-1.5 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-teal-500 to-cyan-400 transition-all duration-500"
+                        className="h-full rounded-full bg-accent transition-all duration-500"
                         style={{ width: `${Math.max(barWidthPct, 4)}%` }}
                       />
                     </div>
@@ -1046,7 +1046,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       <div>
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-            <Layers className="size-3.5 text-teal-600 dark:text-teal-400" />
+            <Layers className="size-3.5 text-accent" />
             <span>ศูนย์ปฏิบัติการทางลัด (Quick Launchpad)</span>
           </span>
           <span className="text-[11px] text-slate-400">เข้าถึงฟังก์ชันงานได้ทันที</span>

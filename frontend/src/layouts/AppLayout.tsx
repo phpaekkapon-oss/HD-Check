@@ -179,7 +179,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
         title="เลื่อนขึ้นบนสุด"
         className={cn(
           'fixed right-4 z-30 size-12 lg:size-11 grid place-items-center rounded-full text-white shadow-lg shadow-black/30 ring-1 ring-white/20 backdrop-blur-md transition-all duration-200 cursor-pointer active:scale-95',
-          'bg-violet-600/90 hover:bg-violet-600 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:bottom-14',
+          'bg-violet-600/90 hover:bg-violet-600 bottom-[calc(5rem+env(safe-area-inset-bottom,0px)+var(--update-notice-offset,0px))] lg:bottom-14',
           showScrollTop && !mobileMenuOpen && !moreOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
         )}
       >
