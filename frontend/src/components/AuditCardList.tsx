@@ -120,7 +120,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                     {rec.drug_name}
                   </span>
                   {rec.drug_units && (
-                    <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate">
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
                       {rec.drug_units}
                     </span>
                   )}
@@ -134,12 +134,12 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             {/* Diagnoses are displayed without implying that a code is valid by its prefix alone */}
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[10px] uppercase font-bold text-slate-500 dark:text-slate-400">PDX:</span>
+                <span className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400">PDX:</span>
                 <span className="font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#101326] font-bold text-slate-800 dark:text-slate-200">
                   {rec.pdx || '-'}
                 </span>
 
-                <span className="text-[10px] uppercase font-bold text-slate-400 ml-1">DX:</span>
+                <span className="text-[11px] uppercase font-bold text-slate-400 ml-1">DX:</span>
                 {[rec.dx0, rec.dx1, rec.dx2, rec.dx3, rec.dx4, rec.dx5]
                   .filter(Boolean)
                   .map((dx, idx) => (

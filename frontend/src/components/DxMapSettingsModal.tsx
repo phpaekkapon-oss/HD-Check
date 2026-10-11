@@ -37,7 +37,7 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
   }[tone]
   return (
     <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2.5 py-2">
-      <p className="text-[10px] text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-[11px] text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`text-base font-bold tabular-nums ${toneClass}`}>{value.toLocaleString('th-TH')}</p>
     </div>
   )
@@ -338,7 +338,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         </div>
 
         {/* Scrollable table container */}
-        <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
+        <Table containerClassName="max-h-[68dvh] sm:min-h-[420px] overflow-auto">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-100 dark:bg-[#1d2035]">

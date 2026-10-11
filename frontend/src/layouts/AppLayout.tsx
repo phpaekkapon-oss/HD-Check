@@ -1,10 +1,13 @@
 import { useState, type FC, type ReactNode } from 'react'
+import { MoreHorizontal } from 'lucide-react'
 import { Sidebar, NAV_ITEMS } from '@/components/Sidebar'
 import { AuditHeader } from '@/components/AuditHeader'
 import { VersionChangelogModal } from '@/components/VersionChangelogModal'
 import { VersionUpdateNotice } from '@/components/VersionUpdateNotice'
 import type { ActivePage, DbStatus, SyncResult } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
+
+const PRIMARY_NAV_IDS: readonly ActivePage[] = ['dashboard', 'audit', 'drugs', 'mapping']
 
 interface AppLayoutProps {
   readonly activePage: ActivePage
@@ -33,6 +36,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
 }) => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar_collapsed') === 'true'
@@ -77,7 +81,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
             syncError={syncError}
             collapsed={collapsed}
             onToggleCollapse={handleToggleCollapse}
-            onOpenMobileMenu={() => setMobileMenuOpen(true)}
+            onOpenMobileMenu={() => { setMoreOpen(false); setMobileMenuOpen(true) }}
           />
 
           {/* Main Content Area (Adaptive Padding: Mobile, Tablet, Desktop) */}
@@ -87,39 +91,76 @@ export const AppLayout: FC<AppLayoutProps> = ({
         </div>
       </div>
 
-      {/* Mobile & Tablet Bottom Navigation Bar (Thumb-Friendly PWA App Bar) */}
-      <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-themed-header backdrop-blur-md border-t border-slate-200 dark:border-[#30364b] py-1.5 px-3 flex items-center justify-around shadow-2xl select-none safe-bottom">
-        {NAV_ITEMS.map(({ id, icon: Icon }) => {
-          const isActive = activePage === id
-          const shortLabel =
-            id === 'dashboard' ? 'หน้าแรก' :
-            id === 'audit' ? 'ตรวจสอบยา' :
-            id === 'drugs' ? 'สรุปจ่ายยา' :
-            id === 'mapping' ? 'ตรวจรหัส' :
-            id === 'dxwriteback' ? 'ทบทวน DX' :
-            id === 'dxmap' ? 'เกณฑ์ ICD' : 'SQL'
+      {/* Mobile & Tablet Bottom Navigation Bar: 4 primary items + "more" sheet */}
+      {moreOpen && (
+        <div className="lg:hidden fixed inset-0 z-40" onClick={() => setMoreOpen(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-themed-card border-t border-themed p-3 pb-[calc(5.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300 dark:bg-white/20" />
+            <div className="grid grid-cols-3 gap-2">
+              {NAV_ITEMS.filter((n) => !PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => {
+                    onPageChange(id)
+                    setMoreOpen(false)
+                    window.scrollTo({ top: 0, behavior: 'smooth' })
+                  }}
+                  className={cn(
+                    'flex flex-col items-center justify-center gap-1.5 min-h-16 rounded-xl border border-themed text-xs cursor-pointer active:scale-95 transition',
+                    activePage === id ? 'text-accent font-bold bg-slate-100 dark:bg-white/10' : 'text-slate-600 dark:text-slate-300'
+                  )}
+                >
+                  <Icon className="size-5" />
+                  <span>{shortLabel}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
+      <nav className={cn("lg:hidden fixed bottom-0 inset-x-0 z-50 bg-themed-header backdrop-blur-md border-t border-slate-200 dark:border-[#30364b] py-1 px-2 flex items-stretch justify-around shadow-2xl select-none safe-bottom", mobileMenuOpen && "hidden")}>
+        {NAV_ITEMS.filter((n) => PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => {
+          const isActive = activePage === id
           return (
             <button
               key={id}
               type="button"
               onClick={() => {
+                setMoreOpen(false)
                 onPageChange(id)
                 window.scrollTo({ top: 0, behavior: 'smooth' })
               }}
               className={cn(
-                'flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-xl transition-all cursor-pointer relative active:scale-95',
+                'flex-1 min-h-12 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer relative active:scale-95',
                 isActive ? 'text-accent font-bold' : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
               )}
             >
               {isActive && (
-                <span className="absolute -top-1.5 size-1.5 rounded-full bg-emerald-500 dark:bg-teal-400 shadow-sm shadow-emerald-400" />
+                <span className="absolute -top-1 size-1.5 rounded-full bg-emerald-500 dark:bg-teal-400 shadow-sm shadow-emerald-400" />
               )}
               <Icon className={cn('size-5 transition-transform', isActive && 'scale-110 text-accent')} />
-              <span className="text-[10px] tracking-tight">{shortLabel}</span>
+              <span className="text-[11px] leading-tight tracking-tight truncate max-w-full px-0.5">{shortLabel}</span>
             </button>
           )
         })}
+        <button
+          type="button"
+          onClick={() => setMoreOpen((v) => !v)}
+          aria-expanded={moreOpen}
+          className={cn(
+            'flex-1 min-h-12 flex flex-col items-center justify-center gap-0.5 rounded-xl transition-all cursor-pointer active:scale-95',
+            moreOpen || !PRIMARY_NAV_IDS.includes(activePage) ? 'text-accent font-bold' : 'text-slate-500 dark:text-slate-400'
+          )}
+        >
+          <MoreHorizontal className="size-5" />
+          <span className="text-[11px] leading-tight">เพิ่มเติม</span>
+        </button>
       </nav>
 
       {/* Hospital System Desktop Bottom Status Bar */}

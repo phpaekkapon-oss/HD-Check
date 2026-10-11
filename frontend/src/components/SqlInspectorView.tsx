@@ -200,7 +200,7 @@ export const SqlInspectorView: FC = () => {
             <Info className="size-4" />
           </div>
           <span className="tracking-tight">การดึงและจัดเก็บข้อมูลเข้าตาราง dw_hd-check</span>
-          <span className="ml-auto inline-flex items-center gap-1 text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
             <Sparkles className="size-3" /> Auto ETL Sync
           </span>
         </div>
@@ -249,7 +249,7 @@ export const SqlInspectorView: FC = () => {
 
         {/* IDE-Grade Code Editor Container */}
         <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[10px] font-mono text-teal-300/70">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-teal-300/70">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500/80" />
               <span className="size-2 rounded-full bg-amber-500/80" />
@@ -304,7 +304,7 @@ export const SqlInspectorView: FC = () => {
 
         {/* IDE-Grade Code Editor Container */}
         <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[10px] font-mono text-cyan-300/70">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-cyan-300/70">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500/80" />
               <span className="size-2 rounded-full bg-amber-500/80" />

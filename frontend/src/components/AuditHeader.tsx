@@ -166,6 +166,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   // Theme controls
   const { mode, toggleMode, accent } = useTheme()
   const [themeCustomizerOpen, setThemeCustomizerOpen] = useState(false)
+  const [mobileThemeOpen, setMobileThemeOpen] = useState(false)
 
   // Auth & 2FA controls
   const { user, logout } = useAuth()
@@ -196,7 +197,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           <button
             type="button"
             onClick={onOpenMobileMenu}
-            className="lg:hidden size-9 grid place-items-center rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer shrink-0 border border-slate-200/80 dark:border-white/10"
+            className="lg:hidden size-10 grid place-items-center rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer shrink-0 border border-slate-200/80 dark:border-white/10"
             aria-label="เปิดเมนู"
           >
             <PanelLeft className="size-4.5" />
@@ -222,10 +223,10 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                 </span>
               ) : last ? (
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-slate-500 dark:text-slate-400">
+                  <span className="hidden sm:inline text-slate-500 dark:text-slate-400">
                     ซิงก์ล่าสุด: {toThaiDate(last.start_date)} – {toThaiDate(last.end_date)}
                   </span>
-                  <span className="text-slate-300 dark:text-slate-600 select-none">•</span>
+                  <span className="hidden sm:inline text-slate-300 dark:text-slate-600 select-none">•</span>
                   <span className="text-slate-600 dark:text-slate-300">
                     สะสมในระบบ <strong className="text-slate-800 dark:text-slate-100 font-bold"><AnimatedNumber value={status?.totalPrescriptions ?? 0} /></strong> รายการ
                   </span>
@@ -312,7 +313,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             <button
               type="button"
               onClick={handleInstallClick}
-              className="size-9 md:w-auto md:px-3 grid place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer shrink-0"
+              className="hidden sm:grid size-9 md:w-auto md:px-3 place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-200 text-xs font-semibold active:scale-95 transition cursor-pointer shrink-0"
               title="ติดตั้ง SMART-HOSCHECK เป็นแอปพลิเคชันบนเครื่อง"
             >
               <Smartphone className="size-4 text-teal-600 dark:text-teal-400" />
@@ -338,7 +339,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             type="button"
             onClick={onSync}
             disabled={isSyncing || Boolean(status?.isSyncing) || status?.syncEnabled === false}
-            className="btn-pill-action size-9 sm:w-auto sm:px-3.5 grid place-items-center sm:flex sm:items-center sm:gap-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs shrink-0"
+            className="btn-pill-action size-10 sm:size-9 sm:w-auto sm:px-3.5 grid place-items-center sm:flex sm:items-center sm:gap-1.5 text-xs font-bold text-white active:scale-95 transition disabled:opacity-60 disabled:cursor-wait cursor-pointer rounded-xl shadow-xs shrink-0"
             title={status?.syncEnabled === false ? 'ปิดการซิงก์ในโหมดดูข้อมูล เพื่อป้องกันเขียนทับคลังกลาง' : isSyncing || status?.isSyncing ? 'กำลังดึงข้อมูล HOSxP…' : 'ดึงข้อมูล HOSxP'}
           >
             {isSyncing || status?.isSyncing ? (
@@ -362,7 +363,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                 setSecurityModalOpen(true)
               }
             }}
-            className="size-9 md:w-auto md:px-3 grid place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-amber-500/10 active:scale-95 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-white/10 text-xs font-semibold cursor-pointer transition shrink-0"
+            className="hidden sm:grid size-9 md:w-auto md:px-3 place-items-center md:flex md:items-center md:gap-1.5 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-amber-500/10 active:scale-95 text-slate-700 dark:text-slate-300 hover:text-amber-600 dark:hover:text-amber-400 border border-slate-200 dark:border-white/10 text-xs font-semibold cursor-pointer transition shrink-0"
             title={hasPin ? 'ล็อกหน้าจอทันที (Ctrl + L)' : 'ตั้งรหัส PIN ล็อกหน้าจอ'}
           >
             <Lock className="size-4 text-slate-500 dark:text-slate-400" />
@@ -370,14 +371,14 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           </button>
 
           {/* Divider */}
-          <div className="h-5 w-px bg-slate-200 dark:bg-white/10 shrink-0" />
+          <div className="hidden sm:block h-5 w-px bg-slate-200 dark:bg-white/10 shrink-0" />
 
           {/* User Profile Pill (Strict Uniform h-9 Height with Proportional Avatar) */}
           <div className="relative shrink-0">
             <button
               type="button"
               onClick={() => setUserDropdownOpen(!userDropdownOpen)}
-              className="group flex items-center gap-2 h-9 p-0.5 xl:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              className="group flex items-center gap-2 h-10 sm:h-9 p-0.5 xl:pr-2.5 rounded-xl hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
             >
               <div
                 className="grid place-items-center size-8 sm:size-8.5 rounded-full bg-slate-100 dark:bg-white/15 border-2 shrink-0 text-slate-700 dark:text-white shadow-xs overflow-hidden ring-1 ring-black/5 dark:ring-white/10 transition-all duration-200 group-hover:ring-2"
@@ -461,7 +462,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                         >
                           {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                         </div>
-                        <div className="text-[10px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
                           @{user?.loginname} {user?.groupname && user?.position && user.position !== user.groupname ? `• สิทธิ์ ${user.groupname}` : ''}
                         </div>
                       </div>
@@ -469,7 +470,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border',
                           user?.two_factor_enabled
                             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                             : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
@@ -481,7 +482,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border',
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border',
                           hasPin && pinEnabled
                             ? 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30'
                             : 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30'
@@ -513,9 +514,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                       <span>{hasPin ? 'ล็อกหน้าจอทันที' : 'ตั้ง PIN เพื่อล็อกหน้าจอ'}</span>
                     </div>
                     {hasPin ? (
-                      <kbd className="px-1.5 py-0.5 rounded bg-white/40 dark:bg-white/10 text-[10px] font-mono text-amber-800 dark:text-amber-200">Ctrl+L</kbd>
+                      <kbd className="px-1.5 py-0.5 rounded bg-white/40 dark:bg-white/10 text-[11px] font-mono text-amber-800 dark:text-amber-200">Ctrl+L</kbd>
                     ) : (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">เริ่มตั้งค่า</span>
+                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">เริ่มตั้งค่า</span>
                     )}
                   </button>
 
@@ -530,6 +531,34 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   >
                     <Camera className="size-4 text-teal-600 dark:text-teal-400" />
                     <span>จัดการรูปโปรไฟล์ (Profile Photo)</span>
+                  </button>
+
+                  {!isInstalled && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserDropdownOpen(false)
+                        void handleInstallClick()
+                      }}
+                      className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+                    >
+                      <Smartphone className="size-4 text-teal-600 dark:text-teal-400" />
+                      <span>ติดตั้งแอปบนเครื่อง</span>
+                    </button>
+                  )}
+
+                  {/* Appearance: header utility icons are hidden below sm, so expose them here */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setUserDropdownOpen(false)
+                      setMobileThemeOpen(true)
+                    }}
+                    className="sm:hidden w-full flex items-center gap-2.5 px-3 py-2.5 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+                  >
+                    <Palette className="size-4" style={{ color: accent.hex }} />
+                    <span className="flex-1 text-left">ธีมและสี</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{mode === 'dark' ? 'โหมดมืด' : 'โหมดสว่าง'}</span>
                   </button>
 
                   <button
@@ -559,6 +588,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                 </div>
               </>
             )}
+            <div className="sm:hidden">
+              <ThemeCustomizerPopover isOpen={mobileThemeOpen} onClose={() => setMobileThemeOpen(false)} />
+            </div>
           </div>
         </div>
       </div>

@@ -231,7 +231,7 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
 
     const values = presc.map((p) => [
       p.vn ?? '', p.visit_date, p.visit_time, p.hn, p.patient_name ?? '', p.pttype_name ?? '',
-      p.drug_icode ?? '', p.drug_name ?? '', toNum(p.drug_qty) || 1, p.drug_units ?? '', p.department_name ?? '',
+      p.drug_icode ?? '', p.drug_name ?? '', toNum(p.drug_qty), p.drug_units ?? '', p.department_name ?? '',
       p.main_pdx ?? '', p.pdx ?? '', p.dx0 ?? '', p.dx1 ?? '', p.dx2 ?? '', p.dx3 ?? '', p.dx4 ?? '', p.dx5 ?? '',
       p.doctor_code ?? '', p.doctor_name ?? '', p.audit_status,
     ])

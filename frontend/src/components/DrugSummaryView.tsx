@@ -275,7 +275,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยนอก (OPD)</div>
             {filterType === 'OPD' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500 text-white font-bold">กำลังกรอง</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-500 text-white font-bold">กำลังกรอง</span>
             )}
           </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400 mt-1 tracking-tight">
@@ -295,7 +295,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <div className="flex items-center justify-between">
             <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยใน (IPD)</div>
             {filterType === 'IPD' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">กำลังกรอง</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">กำลังกรอง</span>
             )}
           </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-1 tracking-tight">
@@ -317,7 +317,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               <Pill className="size-3.5 text-accent" /> รวมจำนวนที่จ่ายทั้งหมด
             </div>
             {filterType === 'ALL' && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-accent text-white font-bold">แสดงทั้งหมด</span>
+              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-accent text-white font-bold">แสดงทั้งหมด</span>
             )}
           </div>
           <div className="text-xl sm:text-2xl font-extrabold font-mono text-accent mt-1 tracking-tight">
@@ -487,11 +487,11 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#292440] text-xs">
                   <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยนอก (OPD)</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยนอก (OPD)</span>
                     <span className="font-mono font-semibold text-cyan-700 dark:text-cyan-400">{fmtNum(d.opd_qty)} หน่วย</span>
                   </div>
                   <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
-                    <span className="text-[10px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยใน (IPD)</span>
+                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยใน (IPD)</span>
                     <span className="font-mono font-semibold text-indigo-700 dark:text-indigo-400">{fmtNum(d.ipd_qty)} หน่วย</span>
                   </div>
                 </div>

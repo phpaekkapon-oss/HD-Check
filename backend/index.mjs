@@ -404,13 +404,21 @@ app.get('/api/drugs', requireSession, async (req, res) => {
     // The drug summary table is a latest-sync snapshot, so only use it when the
     // sync log confirms that it was populated for the requested range.
     if (activeCodes.length > 0) {
-      const [[snapshot]] = await dwPool.query(
-        `SELECT id FROM dw_hd_check_sync_log
-         WHERE status = 'SUCCESS' AND total_prescriptions > 0
-           AND start_date = ? AND end_date = ?
-         ORDER BY id DESC LIMIT 1`,
-        [startDate, endDate]
+      // dw_hd_check_drugs is overwritten by every sync, so it only describes this
+      // range when the most recent successful sync was for exactly this range.
+      const [[latest]] = await dwPool.query(
+        `SELECT DATE_FORMAT(start_date, '%Y-%m-%d') AS start_date, DATE_FORMAT(end_date, '%Y-%m-%d') AS end_date,
+                total_prescriptions, message
+         FROM dw_hd_check_sync_log
+         WHERE status = 'SUCCESS'
+         ORDER BY id DESC LIMIT 1`
       )
+      const snapshot =
+        latest &&
+        latest.start_date === startDate &&
+        latest.end_date === endDate &&
+        Number(latest.total_prescriptions) > 0 &&
+        !String(latest.message ?? '').startsWith('Preserved ')
       if (snapshot) {
         const [warehouseData] = await dwPool.query(
           `SELECT icode, name, COALESCE(units, '') AS units, opd_qty, ipd_qty, unitcost, total_qty, total_cost, nhso_adp_code
@@ -999,11 +1007,17 @@ app.use((req, res, next) => {
 })
 
 /* ---------------- Boot ---------------- */
-try {
-  await initAuthTables(dwPool)
-} catch (err) {
-  console.error(`[ERROR] Authentication database is not ready: ${err.message}`)
-  process.exit(1)
+// The DB host can be briefly unreachable at startup (LAN/VPN); retry instead of exiting,
+// because `node --watch` only restarts on file changes.
+for (let attempt = 1; ; attempt++) {
+  try {
+    await initAuthTables(dwPool)
+    break
+  } catch (err) {
+    const delaySec = Math.min(5 * attempt, 30)
+    console.error(`[ERROR] Authentication database is not ready: ${err.message} (retry #${attempt} in ${delaySec}s)`)
+    await new Promise((resolve) => setTimeout(resolve, delaySec * 1000))
+  }
 }
 
 app.listen(API_PORT, '0.0.0.0', () => {

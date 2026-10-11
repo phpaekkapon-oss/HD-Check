@@ -260,7 +260,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                     {t === 'ALL' ? 'ทั้งหมด' : t}
                   </button>
                 ))}
-                <span className="ml-auto text-[10px] text-slate-400 font-mono">
+                <span className="ml-auto text-[11px] text-slate-400 font-mono">
                   {filteredReleases.length} รุ่น
                 </span>
               </div>
@@ -294,11 +294,11 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
 
                       <div className="flex items-center gap-1">
                         {isLatest && (
-                          <span className="text-[10px] px-1.5 py-0.2 rounded font-black bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
+                          <span className="text-[11px] px-1.5 py-0.2 rounded font-black bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
                             ล่าสุด
                           </span>
                         )}
-                        <span className="text-[10px] text-slate-400 font-mono">
+                        <span className="text-[11px] text-slate-400 font-mono">
                           {rel.date}
                         </span>
                       </div>

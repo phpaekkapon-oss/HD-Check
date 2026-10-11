@@ -161,7 +161,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           <span className="font-semibold text-slate-700 dark:text-slate-100">
           {toThaiDateShort(range.startDate)} – {toThaiDateShort(range.endDate)}
         </span>
-        <span className="text-[10px] font-mono font-bold bg-violet-50 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200 px-1.5 py-0.5 rounded ring-1 ring-violet-600/20">
+        <span className="text-[11px] font-mono font-bold bg-violet-50 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200 px-1.5 py-0.5 rounded ring-1 ring-violet-600/20">
           พ.ศ.
         </span>
       </button>
@@ -261,7 +261,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
                         active ? 'border-accent bg-violet-50 ring-1 ring-accent/40 dark:bg-violet-500/10' : 'border-slate-200 dark:border-[#34304a] bg-white dark:bg-[#111326]'
                       )}
                     >
-                      <span className="flex items-center justify-between gap-2 text-[10px] text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
                         <span>{edge === 'start' ? 'วันเริ่มต้น' : 'วันสิ้นสุด'}</span>
                         {active && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent">กำลังเลือก</span>}
                       </span>
@@ -360,7 +360,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
               {/* Selection Summary */}
               <div className="rounded-2xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block text-[10px]">ช่วงวันที่เลือก:</span>
+                  <span className="text-slate-500 dark:text-slate-400 block text-[11px]">ช่วงวันที่เลือก:</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200">
                     {toThaiDate(tempStart)} ถึง {toThaiDate(tempEnd)}
                   </span>

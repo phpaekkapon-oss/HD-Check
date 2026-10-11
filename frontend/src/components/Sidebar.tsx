@@ -31,7 +31,7 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { id: 'dashboard', label: 'หน้าแรก / ภาพรวมระบบ', shortLabel: 'หน้าแรก', hint: 'Executive Dashboard & KPI', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'หน้าแรก / ภาพรวมระบบ', shortLabel: 'หน้าแรก', hint: 'สรุปภาพรวมและตัวชี้วัด', icon: LayoutDashboard },
   { id: 'audit', label: 'ตรวจสอบการจ่ายยาสมุนไพร', shortLabel: 'ตรวจสอบยา', hint: 'ยา + DX ตรงข้อบ่งใช้', icon: ClipboardCheck },
   { id: 'drugs', label: 'รายการจ่ายยาสมุนไพร', shortLabel: 'รายการจ่ายยา', hint: 'OPD / IPD / ต้นทุน', icon: Pill },
   { id: 'mapping', label: 'ตรวจรหัสยาและ ICD-10', shortLabel: 'ตรวจรหัส', hint: 'รหัสว่าง / เกณฑ์ไม่ครบ', icon: ScanSearch },
@@ -105,7 +105,7 @@ export const Sidebar: FC<SidebarProps> = ({
                 HOSxP HERB-CHECK
               </div>
               <div className="font-extrabold text-slate-900 dark:text-white tracking-tight text-sm truncate">SMART-HOSCHECK</div>
-              <div className="text-[10px] text-slate-500 dark:text-slate-400 font-medium truncate">แพทย์แผนไทย • รพ.พังโคน</div>
+              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">แพทย์แผนไทย • รพ.พังโคน</div>
             </div>
           )}
         </div>
@@ -137,7 +137,7 @@ export const Sidebar: FC<SidebarProps> = ({
       {/* Navigation List */}
       <nav className="flex-1 p-2.5 space-y-1.5 overflow-y-auto scrollbar-none">
         {!isCollapsedView && (
-          <div className="px-2.5 pt-2 pb-1 text-[10px] font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+          <div className="px-2.5 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
             <span
               className="size-1 rounded-full"
               style={{ backgroundColor: mode === 'dark' ? accent.darkText : accent.hex }}
@@ -157,12 +157,12 @@ export const Sidebar: FC<SidebarProps> = ({
                 onChange(id)
                 if (isMobileView && onMobileClose) onMobileClose()
               }}
-              title={isCollapsedView ? `${label} (${hint})` : undefined}
+              title={isCollapsedView ? `${label} (${hint})` : hint}
               className={cn(
                 'group w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer relative',
                 isCollapsedView
                   ? 'justify-center p-2.5 my-1'
-                  : 'gap-3 px-3.5 py-2.5 text-left',
+                  : cn('gap-3 px-3.5 text-left', isMobileView ? 'min-h-12 py-2' : 'min-h-11 py-2'),
                 isActive
                   ? 'border shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]'
@@ -203,11 +203,8 @@ export const Sidebar: FC<SidebarProps> = ({
 
               {!isCollapsedView && (
                 <span className="min-w-0 flex-1 animate-fade-in pl-0.5">
-                  <span className={cn('block text-[13px] truncate', isActive ? 'text-slate-900 dark:text-white font-semibold' : 'font-medium')}>
+                  <span className={cn('block truncate text-sm', isActive ? 'text-slate-900 dark:text-white font-semibold' : 'font-medium')}>
                     {label}
-                  </span>
-                  <span className={cn('block text-[10.5px] truncate mt-0.5', isActive ? 'text-slate-600 dark:text-slate-300 font-normal' : 'text-slate-500 dark:text-slate-400')}>
-                    {hint}
                   </span>
                 </span>
               )}
@@ -337,7 +334,7 @@ export const Sidebar: FC<SidebarProps> = ({
                     e.stopPropagation()
                     onOpenChangelog?.()
                   }}
-                  className="text-[10px] font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 px-1.5 py-0.5 rounded transition cursor-pointer shrink-0"
+                  className="text-[11px] font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 px-1.5 py-0.5 rounded transition cursor-pointer shrink-0"
                   title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
                 >
                   v{__APP_VERSION__}
@@ -345,7 +342,7 @@ export const Sidebar: FC<SidebarProps> = ({
               </div>
               <div className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center justify-between">
                 <span>แพทย์แผนไทย</span>
-                <span className="text-[10px] text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-[11px] text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
                   เกี่ยวกับระบบ →
                 </span>
               </div>
@@ -361,7 +358,7 @@ export const Sidebar: FC<SidebarProps> = ({
       {/* Desktop Persistent Sidebar with Expand/Collapse Width */}
       <aside
         className={cn(
-          'hidden lg:flex shrink-0 flex-col select-none transition-all duration-300 ease-in-out',
+          'hidden lg:flex sticky top-0 h-dvh shrink-0 flex-col select-none transition-all duration-300 ease-in-out',
           collapsed ? 'w-18' : 'w-64'
         )}
       >
@@ -431,7 +428,7 @@ export const Sidebar: FC<SidebarProps> = ({
                     title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
                   >
                     <span>v{__APP_VERSION__}</span>
-                    <span className="text-[10px] font-sans font-normal">(ดูอัปเดต)</span>
+                    <span className="text-[11px] font-sans font-normal">(ดูอัปเดต)</span>
                   </button>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
@@ -442,7 +439,7 @@ export const Sidebar: FC<SidebarProps> = ({
               {/* Developer Profile Card (พร้อมรูปถ่ายข้าราชการจริงและข้อมูลผู้พัฒนา) */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-teal-50/50 dark:from-slate-800/80 dark:to-teal-950/20 border border-teal-500/25 dark:border-teal-500/35 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <div className="text-[10px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <div className="text-[11px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-teal-500 animate-pulse" />
                     ผู้พัฒนาระบบ & ฝ่ายเทคโนโลยี
                   </div>

@@ -133,7 +133,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
             <span className="text-xs font-black text-slate-900 dark:text-white">
               {isServerUpgradePending ? 'มีอัปเดตเวอร์ชันใหม่พร้อมใช้งาน!' : 'อัปเดตระบบเรียบร้อย!'}
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-teal-500/20 text-teal-600 dark:text-teal-400 font-mono border border-teal-500/30">
+            <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-teal-500/20 text-teal-600 dark:text-teal-400 font-mono border border-teal-500/30">
               v{activeVersion}
             </span>
           </div>

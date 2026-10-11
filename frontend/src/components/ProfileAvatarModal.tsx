@@ -263,7 +263,7 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
       />
 
       <div
-        className="relative w-full max-w-[420px] rounded-2xl bg-[#0f1424] border border-slate-800 shadow-2xl p-5 text-slate-200 z-10 animate-scale-in"
+        className="relative w-full max-w-[420px] max-h-[94dvh] overflow-y-auto rounded-2xl bg-[#0f1424] border border-slate-800 shadow-2xl p-5 text-slate-200 z-10 animate-scale-in"
         style={{
           boxShadow: '0 20px 60px -10px rgba(0, 0, 0, 0.8), 0 0 40px rgba(147, 51, 234, 0.15)',
         }}

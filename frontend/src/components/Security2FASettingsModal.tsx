@@ -575,10 +575,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div className="fixed inset-0" onClick={onClose} />
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-3xl sm:max-w-4xl max-h-[94dvh] sm:max-h-[90dvh] bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
+      <div className="relative w-full max-w-3xl sm:max-w-4xl max-sm:h-dvh max-h-dvh sm:max-h-[90dvh] bg-slate-900 border border-slate-800 max-sm:rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
         {/* Header */}
         <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-slate-800/80 bg-slate-950/80 shrink-0">
           <div className="flex items-center gap-3.5">
@@ -851,7 +851,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     <div>
                       <div className="font-semibold text-white flex items-center gap-2">
                         <span>Chrome • Windows</span>
-                        <span className="px-1.5 py-0.2 rounded text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                        <span className="px-1.5 py-0.2 rounded text-[11px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
                           เครื่องนี้
                         </span>
                       </div>
@@ -1300,11 +1300,11 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-sm font-bold text-white">บังคับใช้ 2FA ทั้งโรงพยาบาล</h3>
                           {enforcePolicy === 'Y' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                               Enforced
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
                               Optional
                             </span>
                           )}
@@ -1365,11 +1365,11 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         <div className="flex items-center gap-2 flex-wrap">
                           <h3 className="text-sm font-bold text-white">บังคับใช้ PIN Auto-Lock ทุกคน</h3>
                           {enforcePinPolicy === 'Y' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                               Enforced ({defaultHospitalMinutes}น.)
                             </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
+                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
                               Optional
                             </span>
                           )}
@@ -1469,7 +1469,79 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 </div>
 
                 {/* Table Container */}
-                <div className="rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/60 shadow-sm">
+                {/* Mobile card list (< md) */}
+                <div className="md:hidden space-y-2 max-h-[60dvh] overflow-y-auto">
+                  {usersLoading ? (
+                    <div className="py-8 text-center text-sm text-slate-400">
+                      <Loader2 className="size-5 animate-spin mx-auto mb-2 text-emerald-400" />
+                      กำลังโหลดรายชื่อผู้ใช้จาก HOSxP…
+                    </div>
+                  ) : filteredUsers.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-slate-400 font-medium">
+                      {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากร'}
+                    </div>
+                  ) : (
+                    filteredUsers.map((u) => (
+                      <div key={u.loginname} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="font-medium text-slate-100 text-sm truncate">{u.name}</div>
+                            <div className="text-xs text-slate-400 truncate">
+                              {u.position || u.entryposition || u.groupname || '-'}
+                            </div>
+                          </div>
+                          <span className="font-mono font-semibold text-emerald-400 text-xs shrink-0">{u.loginname}</span>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <span className={cn(
+                            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border',
+                            u.two_factor_enabled
+                              ? 'font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                              : 'font-medium bg-slate-900/80 text-slate-400 border-slate-800'
+                          )}>
+                            {u.two_factor_enabled && <Check className="size-3" />} 2FA: {u.two_factor_enabled ? 'เปิด' : 'ยังไม่เปิด'}
+                          </span>
+                          <span className={cn(
+                            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border',
+                            u.has_pin
+                              ? 'font-semibold bg-teal-500/10 text-teal-300 border-teal-500/25'
+                              : 'font-medium bg-slate-900/80 text-slate-400 border-slate-800'
+                          )}>
+                            {u.has_pin && <Lock className="size-3" />} PIN: {u.has_pin ? `มี (${u.auto_lock_minutes ?? 5} น.)` : 'ไม่มี'}
+                          </span>
+                        </div>
+                        {(u.two_factor_enabled || u.has_pin) && (
+                          <div className="flex flex-wrap gap-2 pt-1">
+                            {u.two_factor_enabled && (
+                              <button
+                                type="button"
+                                disabled={resettingUser === u.loginname}
+                                onClick={() => handleResetUser2FA(u.loginname)}
+                                className="min-h-11 px-3 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/25 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+                              >
+                                {resettingUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                                รีเซ็ต 2FA
+                              </button>
+                            )}
+                            {u.has_pin && (
+                              <button
+                                type="button"
+                                disabled={resettingPinUser === u.loginname}
+                                onClick={() => handleResetUserPin(u.loginname)}
+                                className="min-h-11 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+                              >
+                                {resettingPinUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+                                รีเซ็ต PIN
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/60 shadow-sm">
                   <div className="overflow-x-auto max-h-80">
                     <table className="w-full text-left text-xs border-collapse min-w-[700px]">
                       <thead className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
@@ -1510,7 +1582,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                   {u.position || u.entryposition || u.groupname || '-'}
                                 </div>
                                 {u.position && u.groupname && u.position !== u.groupname && (
-                                  <div className="text-[10px] text-slate-400 font-mono">
+                                  <div className="text-[11px] text-slate-400 font-mono">
                                     สิทธิ์: {u.groupname}
                                   </div>
                                 )}
@@ -1704,10 +1776,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-white">Google Gemini AI Auto-Release</h4>
-                        <span className="text-[10px] text-teal-400 font-mono">models/gemini-flash-latest</span>
+                        <span className="text-[11px] text-teal-400 font-mono">models/gemini-flash-latest</span>
                       </div>
                     </div>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30 flex items-center gap-1">
+                    <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/15 text-teal-300 border border-teal-500/30 flex items-center gap-1">
                       <span className="size-1.5 rounded-full bg-teal-400" />
                       Connected
                     </span>
@@ -1742,7 +1814,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-white">การแจ้งเตือนเวอร์ชันโรงพยาบาล</h4>
-                        <span className="text-[10px] text-slate-400">Hospital Version Toast Notice</span>
+                        <span className="text-[11px] text-slate-400">Hospital Version Toast Notice</span>
                       </div>
                     </div>
 
@@ -1848,7 +1920,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       Connected (Source)
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">192.168.1.250:3306</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">192.168.1.250:3306</div>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
@@ -1857,7 +1929,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                       {sysStatus?.database ?? 'dw_hd-check'}
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">{sysStatus?.host ?? '192.168.1.241'}</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">{sysStatus?.host ?? '192.168.1.241'}</div>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
@@ -1865,7 +1937,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     <div className="text-xs font-bold text-white mt-1 font-mono">
                       {sysStatus?.totalPrescriptions ? Number(sysStatus.totalPrescriptions).toLocaleString() : '...'} รายการ
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">ยาสมุนไพร {sysStatus?.totalDrugs ?? '...'} รายการ</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">ยาสมุนไพร {sysStatus?.totalDrugs ?? '...'} รายการ</div>
                   </div>
 
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
@@ -1873,7 +1945,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     <div className="text-xs font-bold text-teal-300 mt-1 font-mono truncate">
                       {sysStatus?.lastSync?.at ? sysStatus.lastSync.at.replace('T', ' ') : 'ระบบอัตโนมัติ'}
                     </div>
-                    <div className="text-[10px] text-slate-400 mt-0.5">รอบออโต้ทุก {sysStatus?.autoSyncMinutes ?? 5} นาที</div>
+                    <div className="text-[11px] text-slate-400 mt-0.5">รอบออโต้ทุก {sysStatus?.autoSyncMinutes ?? 5} นาที</div>
                   </div>
                 </div>
               </div>

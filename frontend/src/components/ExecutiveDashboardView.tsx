@@ -200,7 +200,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const maxDailyVolume = useMemo(() => {
     if (dailyTrends.length === 0) return 10
     const m = Math.max(...dailyTrends.map((d) => d.total))
-    return Math.ceil(m * 1.15) || 10
+    // Round up to a "nice" max so the 4 grid steps get round labels (e.g. 0/60/120/180/240)
+    const raw = Math.max(1, (m * 1.1) / 4)
+    const mag = 10 ** Math.floor(Math.log10(raw))
+    const step = [1, 1.5, 2, 2.5, 3, 4, 5, 6, 7, 8, 10].map((n) => n * mag).find((v) => v >= raw && Number.isInteger(v)) ?? Math.ceil(raw)
+    return step * 4
   }, [dailyTrends])
 
   // 2. Top 5 Prescribed Herbs
@@ -237,7 +241,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   }, [topDepartments])
 
   // SVG Chart Geometry Constants
-  const chartHeight = 180
+  const chartHeight = 240
   const chartWidth = 740
   const padLeft = 36
   const padRight = 40
@@ -284,7 +288,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
             {/* กลุ่ม 1: ปีงบประมาณ (เรียงตามลำดับเวลา: ปีงบ 69 -> ปีงบ 70) */}
             <div className="flex items-center gap-1 pr-1.5 border-r border-slate-300 dark:border-white/10">
-              <span className="text-[10px] text-slate-400 font-semibold px-0.5 select-none">ปีงบ:</span>
+              <span className="text-[11px] text-slate-400 font-semibold px-0.5 select-none">ปีงบ:</span>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('FY_69')}
@@ -315,7 +319,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             {/* กลุ่ม 2: รายเดือน (เรียงตามลำดับเวลา: ก.ย. 69 -> ต.ค. 69) */}
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-slate-400 font-semibold px-0.5 select-none">เดือน:</span>
+              <span className="text-[11px] text-slate-400 font-semibold px-0.5 select-none">เดือน:</span>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('LAST_MONTH')}
@@ -636,7 +640,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         x={padLeft - 6}
                         y={y + 3.5}
                         textAnchor="end"
-                        className="text-[10px] fill-slate-400 dark:fill-slate-400 font-mono font-medium"
+                        className="text-[11px] fill-slate-400 dark:fill-slate-400 font-mono font-medium"
                       >
                         {Math.round(maxDailyVolume * pct)}
                       </text>
@@ -645,7 +649,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         x={padLeft + plotWidth + 6}
                         y={y + 3.5}
                         textAnchor="start"
-                        className="text-[10px] fill-teal-500 dark:fill-teal-400 font-mono font-semibold"
+                        className="text-[11px] fill-teal-500 dark:fill-teal-400 font-mono font-semibold"
                       >
                         {Math.round(pct * 100)}%
                       </text>
@@ -790,7 +794,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                           y={padTop + plotHeight + 15}
                           textAnchor="middle"
                           className={cn(
-                            'text-[10px] font-mono',
+                            'text-[11px] font-mono',
                             isHovered
                               ? 'fill-teal-500 font-bold'
                               : 'fill-slate-500 dark:fill-slate-400 font-medium'
@@ -955,7 +959,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={cn(
-                            'size-5 rounded-md text-[10px] font-bold grid place-items-center shrink-0 font-mono text-white',
+                            'size-5 rounded-md text-[11px] font-bold grid place-items-center shrink-0 font-mono text-white',
                             index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : 'bg-slate-500'
                           )}
                         >
@@ -968,11 +972,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                          {fmtNum(d.count)} <span className="font-normal text-[10px] text-slate-400">ใบ</span>
+                          {fmtNum(d.count)} <span className="font-normal text-[11px] text-slate-400">ใบ</span>
                         </span>
                         <span
                           className={cn(
-                            'text-[10px] font-bold px-1.5 py-0.5 rounded font-mono border',
+                            'text-[11px] font-bold px-1.5 py-0.5 rounded font-mono border',
                             isPass
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                               : isWarning
@@ -1018,7 +1022,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       </span>
                       <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]">
                         <strong className="text-teal-600 dark:text-teal-400 font-bold">{fmtNum(dept.count)}</strong>
-                        <span className="text-[10px] text-slate-400 font-normal">({pctOfTotal}%)</span>
+                        <span className="text-[11px] text-slate-400 font-normal">({pctOfTotal}%)</span>
                       </div>
                     </div>
                     {/* Visual Proportion Bar */}
@@ -1061,7 +1065,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-teal-600 dark:group-hover:text-teal-400">
                 ตรวจสอบเวชระเบียน
               </div>
-              <div className="text-[10px] text-slate-400 truncate">
+              <div className="text-[11px] text-slate-400 truncate">
                 ตารางตรวจสอบรหัสโรค
               </div>
             </div>
@@ -1079,7 +1083,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400">
                 สรุปการจ่ายยา & ต้นทุน
               </div>
-              <div className="text-[10px] text-slate-400 truncate">
+              <div className="text-[11px] text-slate-400 truncate">
                 วิเคราะห์ยอดจ่าย OPD / IPD
               </div>
             </div>
@@ -1097,7 +1101,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-rose-600 dark:group-hover:text-rose-400">
                 ทบทวนเคสไม่ตรง ({fmtNum(problemCount)})
               </div>
-              <div className="text-[10px] text-slate-400 truncate">
+              <div className="text-[11px] text-slate-400 truncate">
                 คิวตรวจสอบและแก้ไขผล
               </div>
             </div>
@@ -1115,7 +1119,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-violet-600 dark:group-hover:text-violet-400">
                 ตั้งค่าเกณฑ์ ICD-10
               </div>
-              <div className="text-[10px] text-slate-400 truncate">
+              <div className="text-[11px] text-slate-400 truncate">
                 จับคู่ยาสมุนไพรกับข้อบ่งใช้
               </div>
             </div>
