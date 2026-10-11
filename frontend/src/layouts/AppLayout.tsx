@@ -1,5 +1,5 @@
-import { useState, type FC, type ReactNode } from 'react'
-import { MoreHorizontal } from 'lucide-react'
+import { useEffect, useState, type FC, type ReactNode } from 'react'
+import { ArrowUp, MoreHorizontal } from 'lucide-react'
 import { Sidebar, NAV_ITEMS } from '@/components/Sidebar'
 import { AuditHeader } from '@/components/AuditHeader'
 import { VersionChangelogModal } from '@/components/VersionChangelogModal'
@@ -37,6 +37,14 @@ export const AppLayout: FC<AppLayoutProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
+  const [showScrollTop, setShowScrollTop] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setShowScrollTop(window.scrollY > 400)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
   const [collapsed, setCollapsed] = useState(() => {
     if (typeof window !== 'undefined') {
       return localStorage.getItem('sidebar_collapsed') === 'true'
@@ -163,9 +171,24 @@ export const AppLayout: FC<AppLayoutProps> = ({
         </button>
       </nav>
 
+      {/* Back-to-top: sits above the mobile bottom nav / desktop status bar */}
+      <button
+        type="button"
+        onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+        aria-label="เลื่อนขึ้นบนสุด"
+        title="เลื่อนขึ้นบนสุด"
+        className={cn(
+          'fixed right-4 z-30 size-12 lg:size-11 grid place-items-center rounded-full text-white shadow-lg shadow-black/30 ring-1 ring-white/20 backdrop-blur-md transition-all duration-200 cursor-pointer active:scale-95',
+          'bg-violet-600/90 hover:bg-violet-600 bottom-[calc(5rem+env(safe-area-inset-bottom,0px))] lg:bottom-14',
+          showScrollTop && !mobileMenuOpen && !moreOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
+        )}
+      >
+        <ArrowUp className="size-5" />
+      </button>
+
       {/* Hospital System Desktop Bottom Status Bar */}
-      <footer className="hidden lg:flex bg-themed-card border-t border-themed py-2 px-4 text-[11px] text-slate-600 dark:text-slate-300 flex-wrap items-center justify-between gap-3 select-none">
-        <div className="flex items-center gap-3">
+      <footer className="hidden lg:flex sticky bottom-0 z-30 h-9 bg-themed-card border-t border-themed px-4 text-[11px] text-slate-600 dark:text-slate-300 items-center justify-between gap-3 whitespace-nowrap overflow-hidden select-none">
+        <div className="flex items-center gap-3 min-w-0 overflow-hidden">
           <span>
             HOSxP Database :{' '}
             <strong className="text-teal-700 dark:text-teal-300">เชื่อมต่อแล้ว (Connected)</strong>
@@ -182,12 +205,12 @@ export const AppLayout: FC<AppLayoutProps> = ({
             />
             <span className="font-bold text-violet-600 dark:text-violet-400">ผู้พัฒนา:</span>
             <strong className="text-slate-900 dark:text-white">นายเอกพล อันคำวงศ์</strong>
-            <span className="text-slate-500 dark:text-slate-400">(นักวิชาการคอมพิวเตอร์ปฏิบัติการ)</span>
-            <span className="text-slate-500 dark:text-slate-400 font-sans">• โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล</span>
+            <span className="hidden 2xl:inline text-slate-500 dark:text-slate-400">(นักวิชาการคอมพิวเตอร์ปฏิบัติการ)</span>
+            <span className="hidden xl:inline text-slate-500 dark:text-slate-400 font-sans">• โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล</span>
           </span>
         </div>
 
-        <div className="flex items-center gap-3 font-mono">
+        <div className="flex items-center gap-3 font-mono shrink-0">
           <span className="inline-flex items-center gap-1.5">
             <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
             Online

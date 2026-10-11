@@ -21,6 +21,7 @@ import {
   User as UserIcon,
   Monitor,
   Cpu,
+  Fingerprint,
   Sparkles,
   ExternalLink,
   RefreshCw,
@@ -32,11 +33,12 @@ import { usePinLock } from '@/context/PinLockContext'
 import { isAdminUser, type TotpSetupData, type User2FAAdminItem, type PinPolicy } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 import { ProfileAvatarModal } from './ProfileAvatarModal'
+import { SsoSettingsPanel } from './SsoSettingsPanel'
 
 interface Security2FASettingsModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'
+  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso'
   readonly onOpenChangelog?: () => void
 }
 
@@ -67,8 +69,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     updatePinSettings,
   } = usePinLock()
 
-  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'>(() => {
-    if ((initialTab === 'admin_policy' || initialTab === 'admin_system') && !isAdmin) return 'my_profile'
+  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso'>(() => {
+    if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso') && !isAdmin) return 'my_profile'
     return initialTab
   })
 
@@ -173,7 +175,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      if ((initialTab === 'admin_policy' || initialTab === 'admin_system') && !isAdmin) {
+      if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso') && !isAdmin) {
         setActiveTab('my_profile')
       } else {
         setActiveTab(initialTab)
@@ -695,6 +697,23 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     บังคับใช้
                   </span>
                 )}
+              </button>
+            )}
+
+            {/* Tab: ThaiD / Provider ID sign-in (Admin / IT only) */}
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setActiveTab('admin_sso')}
+                className={cn(
+                  'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
+                  activeTab === 'admin_sso'
+                    ? 'bg-slate-800 text-white shadow-xs'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
+                )}
+              >
+                <Fingerprint className={cn('size-3.5', activeTab === 'admin_sso' ? 'text-indigo-300' : 'text-slate-400')} />
+                <span>ThaiD / Provider ID</span>
               </button>
             )}
 
@@ -1664,6 +1683,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           {/* ========================================================= */}
           {/* TAB 4: ADMIN SYSTEM & VERSION MANAGEMENT                  */}
           {/* ========================================================= */}
+          {activeTab === 'admin_sso' && isAdmin && <SsoSettingsPanel />}
+
           {activeTab === 'admin_system' && isAdmin && (
             <div className="space-y-5">
               {/* Sync / Action Feedback Notice */}

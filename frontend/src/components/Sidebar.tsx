@@ -358,7 +358,7 @@ export const Sidebar: FC<SidebarProps> = ({
       {/* Desktop Persistent Sidebar with Expand/Collapse Width */}
       <aside
         className={cn(
-          'hidden lg:flex sticky top-0 h-dvh shrink-0 flex-col select-none transition-all duration-300 ease-in-out',
+          'hidden lg:flex sticky top-0 h-[calc(100dvh-2.25rem)] shrink-0 flex-col select-none transition-all duration-300 ease-in-out',
           collapsed ? 'w-18' : 'w-64'
         )}
       >

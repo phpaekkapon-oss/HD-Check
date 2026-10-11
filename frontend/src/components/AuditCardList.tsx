@@ -1,4 +1,4 @@
-import { useState, useMemo, type FC } from 'react'
+import { useState, useMemo, useRef, type FC } from 'react'
 import { AlertCircle, CheckCircle2, FileQuestion, HelpCircle, Settings2, User, Clock, Pill, Stethoscope, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from 'lucide-react'
 import type { AuditRecord } from '@/types/herbdx.types'
 import { cleanDrugUnit } from '@/types/herbdx.types'
@@ -17,6 +17,12 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
 
   const totalPages = Math.ceil(records.length / PAGE_SIZE) || 1
   const safePage = Math.min(currentPage, totalPages)
+  const listTopRef = useRef<HTMLDivElement>(null)
+  // Changing page from the bottom pager should bring the reader back to the first card
+  const goToPage = (next: number | ((p: number) => number)) => {
+    setCurrentPage(next)
+    listTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
 
   const paginatedRecords = useMemo(() => {
     const start = (safePage - 1) * PAGE_SIZE
@@ -33,7 +39,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
   }
 
   return (
-    <div className="space-y-3">
+    <div ref={listTopRef} className="space-y-3 scroll-mt-24">
       {/* Mobile Records Counter */}
       <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 px-1 font-medium">
         <span>พบ {fmtNum(records.length)} รายการ</span>
@@ -180,7 +186,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setCurrentPage(1)}
+              onClick={() => goToPage(1)}
               disabled={safePage <= 1}
               className="p-2 rounded-xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs active:scale-95 transition"
               aria-label="หน้าแรก"
@@ -189,7 +195,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             </button>
             <button
               type="button"
-              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              onClick={() => goToPage((p) => Math.max(1, p - 1))}
               disabled={safePage <= 1}
               className="px-3 py-2 rounded-xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs active:scale-95 transition"
             >
@@ -204,7 +210,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
           <div className="flex items-center gap-1">
             <button
               type="button"
-              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => goToPage((p) => Math.min(totalPages, p + 1))}
               disabled={safePage >= totalPages}
               className="px-3 py-2 rounded-xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-xs font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs active:scale-95 transition"
             >
@@ -212,7 +218,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             </button>
             <button
               type="button"
-              onClick={() => setCurrentPage(totalPages)}
+              onClick={() => goToPage(totalPages)}
               disabled={safePage >= totalPages}
               className="p-2 rounded-xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-slate-600 dark:text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed shadow-xs active:scale-95 transition"
               aria-label="หน้าสุดท้าย"

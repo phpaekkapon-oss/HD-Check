@@ -35,6 +35,24 @@ import {
   saveSession,
   getAuthenticatedUserByLoginname,
 } from './auth.mjs'
+import {
+  SSO_PROVIDERS,
+  SSO_LABEL,
+  isSsoProvider,
+  initSsoTables,
+  getSsoConfig,
+  saveSsoConfig,
+  missingFields,
+  callbackUrl,
+  isLive,
+  buildAuthorizeUrl,
+  takeState,
+  exchangeCode,
+  findLoginByCid,
+  touchIdentity,
+  listIdentities,
+  linkManual,
+} from './sso.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const possibleDistPaths = [
@@ -551,6 +569,183 @@ app.put('/api/dx-map/:icode', requireAdmin, async (req, res) => {
   }
 })
 
+/* ---------------- ThaiD / Provider ID (OAuth 2.0) ----------------
+ *   GET  /api/public/sso-providers     ปุ่มบนหน้าเข้าสู่ระบบ (demo หรือ live ที่ค่าครบ)
+ *   GET  /api/auth/sso/:p/start        → ไปหน้า ThaiD/Provider ID
+ *   GET  /api/auth/sso/:p/callback     ← ผู้ให้บริการส่งกลับ → ตั้ง cookie session → กลับหน้าแรก
+ *   ผู้ดูแล: /api/admin/sso ...
+ */
+app.get('/api/public/sso-providers', async (_req, res) => {
+  try {
+    const data = []
+    for (const p of SSO_PROVIDERS) {
+      const c = await getSsoConfig(dwPool, p)
+      if (c.mode === 'demo') data.push({ key: p, label: SSO_LABEL[p], demo: true })
+      else if (isLive(c)) data.push({ key: p, label: SSO_LABEL[p], demo: false })
+    }
+    res.json({ success: true, data })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.get('/api/auth/sso/:p/start', async (req, res) => {
+  const p = req.params.p
+  if (!isSsoProvider(p)) return res.status(404).send('ไม่รู้จักผู้ให้บริการ')
+  const c = await getSsoConfig(dwPool, p)
+  if (!isLive(c)) return res.status(404).send(`ยังไม่เปิดใช้การเข้าสู่ระบบด้วย ${SSO_LABEL[p]}`)
+  res.redirect(302, buildAuthorizeUrl(p, c))
+})
+
+app.get('/api/auth/sso/:p/callback', async (req, res) => {
+  const p = req.params.p
+  if (!isSsoProvider(p)) return res.status(404).send('ไม่รู้จักผู้ให้บริการ')
+  const c = await getSsoConfig(dwPool, p)
+  const back = (msg) => res.redirect(302, `${c.public_base || ''}/?sso_error=${encodeURIComponent(msg)}`)
+  if (!isLive(c)) return back(`ปิดใช้การเข้าสู่ระบบด้วย ${SSO_LABEL[p]}`)
+  if (req.query.error) return back(`${SSO_LABEL[p]}: ${String(req.query.error_description || req.query.error)}`)
+  const st = takeState(String(req.query.state || ''), p)
+  if (!st || !req.query.code) return back('คำขอหมดอายุหรือไม่ถูกต้อง กรุณาลองใหม่')
+  try {
+    const info = await exchangeCode(dwPool, p, c, String(req.query.code), st.verifier)
+    if (!info.cid) {
+      console.error(`[SSO] ${p}: ไม่พบฟิลด์เลขบัตร "${c.cid_claim}" — ฟิลด์ที่ได้:`, info.raw_keys.join(','))
+      return back(`ไม่พบเลขบัตรประชาชนจาก ${SSO_LABEL[p]} กรุณาให้ผู้ดูแลตรวจชื่อฟิลด์ในหน้าตั้งค่า`)
+    }
+    const found = await findLoginByCid(hosPool, dwPool, p, info.cid)
+    if (found.error === 'ambiguous') {
+      return back(`เลขบัตรนี้มีหลายบัญชีใน HOSxP (${found.logins.join(', ')}) กรุณาให้ผู้ดูแลผูกบัญชีที่ต้องการในหน้าตั้งค่า ${SSO_LABEL[p]}`)
+    }
+    if (found.error) return back(`บัญชี ${SSO_LABEL[p]} นี้ไม่ตรงกับผู้ใช้ HOSxP ที่ใช้งานได้ กรุณาตรวจเลขบัตรใน HOSxP หรือให้ผู้ดูแลผูกบัญชี`)
+    if (found.status === 'disabled') return back(`บัญชีนี้ถูกปิดการเข้าระบบด้วย ${SSO_LABEL[p]} กรุณาใช้ชื่อผู้ใช้และรหัสผ่านแทน`)
+    const user = await getAuthenticatedUserByLoginname(hosPool, dwPool, found.loginname)
+    if (!user) return back('บัญชีนี้ถูกระงับหรือไม่พบใน HOSxP กรุณาติดต่อผู้ดูแลระบบ')
+
+    // ThaiD / Provider ID ยืนยันตัวตนระดับสูงแล้ว จึงไม่ถาม 2FA ของระบบซ้ำ (เหมือน HRMS)
+    const token = generateToken()
+    await saveSession(dwPool, token, { user, loginAt: new Date().toISOString(), loginMethod: p, expiresAt: Date.now() + SESSION_MAX_AGE * 1000 })
+    await touchIdentity(dwPool, user.loginname, p, info.cid, info.subject).catch((e) => console.error('[SSO] identity:', e.message))
+    await dwPool.query('UPDATE dw_hd_check_user_2fa SET last_login_at = NOW() WHERE loginname = ?', [user.loginname]).catch(() => {})
+    console.log(`[SSO] ${user.loginname} เข้าสู่ระบบด้วย ${SSO_LABEL[p]}`)
+    setSessionCookie(res, token)
+    return res.redirect(302, `${c.public_base}/`)
+  } catch (err) {
+    console.error(`[SSO] ${p} callback error:`, err.message)
+    return back(`เข้าสู่ระบบด้วย ${SSO_LABEL[p]} ไม่สำเร็จ: ${err.message}`)
+  }
+})
+
+app.get('/api/admin/sso', requireAdmin, async (req, res) => {
+  try {
+    const data = {}
+    for (const p of SSO_PROVIDERS) {
+      const c = await getSsoConfig(dwPool, p)
+      const { client_secret_enc, ...safe } = c
+      data[p] = { ...safe, has_secret: Boolean(client_secret_enc), missing: missingFields(c), callback_url: c.public_base ? callbackUrl(c, p) : '' }
+    }
+    const [[linked]] = await dwPool.query('SELECT COUNT(DISTINCT loginname) AS n FROM dw_hd_check_user_sso_identities')
+    res.json({ success: true, data, linked_users: Number(linked.n), suggested_base: `${req.protocol}://${req.headers.host}` })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.put('/api/admin/sso/:p', requireAdmin, async (req, res) => {
+  const p = req.params.p
+  if (!isSsoProvider(p)) return res.status(404).json({ success: false, error: 'ไม่รู้จักผู้ให้บริการ' })
+  const b = req.body ?? {}
+  const str = (v) => (v === undefined ? undefined : String(v).trim())
+  for (const k of ['authorize_url', 'token_url', 'userinfo_url', 'public_base']) {
+    const v = str(b[k])
+    if (v && !/^https?:\/\/[^\s]+$/.test(v)) return res.status(400).json({ success: false, error: `${k} ต้องเป็น URL ที่ขึ้นต้นด้วย http(s)://` })
+  }
+  try {
+    const next = await saveSsoConfig(dwPool, p, {
+      mode: ['off', 'demo', 'live'].includes(b.mode) ? b.mode : undefined,
+      client_id: str(b.client_id),
+      client_secret: b.client_secret ? String(b.client_secret) : undefined,
+      authorize_url: str(b.authorize_url),
+      token_url: str(b.token_url),
+      userinfo_url: str(b.userinfo_url),
+      scope: str(b.scope),
+      cid_claim: str(b.cid_claim),
+      use_pkce: b.use_pkce === undefined ? undefined : Boolean(b.use_pkce),
+      public_base: str(b.public_base),
+    })
+    console.log(`[SSO] ${req.authUser.loginname} ตั้งค่า ${SSO_LABEL[p]}: ${next.mode}${b.client_secret ? ' (เปลี่ยน Secret)' : ''}`)
+    const missing = missingFields(next)
+    res.json({ success: true, mode: next.mode, active: next.mode === 'live' && missing.length === 0, missing })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+/** ตรวจว่าเซิร์ฟเวอร์ติดต่อปลายทางได้ (ไม่ส่งรหัสลับ) */
+app.post('/api/admin/sso/:p/check', requireAdmin, async (req, res) => {
+  const p = req.params.p
+  if (!isSsoProvider(p)) return res.status(404).json({ success: false, error: 'ไม่รู้จักผู้ให้บริการ' })
+  const c = await getSsoConfig(dwPool, p)
+  const results = []
+  for (const [name, url] of [['Authorization URL', c.authorize_url], ['Token URL', c.token_url]]) {
+    if (!url) {
+      results.push({ name, ok: false, detail: 'ยังไม่ได้กรอก' })
+      continue
+    }
+    try {
+      const r = await fetch(url, { method: 'GET', redirect: 'manual', signal: AbortSignal.timeout(8000) })
+      results.push({ name, ok: r.status < 500, detail: `ติดต่อได้ (HTTP ${r.status})` })
+    } catch (e) {
+      results.push({ name, ok: false, detail: `ติดต่อไม่ได้: ${e.cause?.code || e.message}` })
+    }
+  }
+  res.json({ success: true, missing: missingFields(c), results })
+})
+
+app.get('/api/admin/sso/:p/identities', requireAdmin, async (req, res) => {
+  const p = req.params.p
+  if (!isSsoProvider(p)) return res.status(404).json({ success: false, error: 'ไม่รู้จักผู้ให้บริการ' })
+  try {
+    res.json({ success: true, data: await listIdentities(dwPool, p) })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/admin/sso/:p/identities', requireAdmin, async (req, res) => {
+  const p = req.params.p
+  const loginname = String(req.body?.loginname || '').trim()
+  if (!isSsoProvider(p) || !loginname) return res.status(400).json({ success: false, error: 'ข้อมูลไม่ครบ' })
+  try {
+    const [rows] = await hosPool.query('SELECT loginname FROM opduser WHERE loginname = ? LIMIT 1', [loginname])
+    if (!rows.length) return res.status(404).json({ success: false, error: 'ไม่พบผู้ใช้นี้ใน HOSxP (opduser)' })
+    await linkManual(dwPool, rows[0].loginname, p, String(req.body?.cid || ''), req.authUser.name || req.authUser.loginname, String(req.body?.note || '').slice(0, 255) || null)
+    res.json({ success: true })
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message })
+  }
+})
+
+app.put('/api/admin/sso/identities/:id', requireAdmin, async (req, res) => {
+  try {
+    const status = req.body?.status === 'disabled' ? 'disabled' : 'active'
+    const [r] = await dwPool.query('UPDATE dw_hd_check_user_sso_identities SET status = ? WHERE id = ?', [status, Number(req.params.id)])
+    if (!r.affectedRows) return res.status(404).json({ success: false, error: 'ไม่พบรายการ' })
+    res.json({ success: true })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.delete('/api/admin/sso/identities/:id', requireAdmin, async (req, res) => {
+  try {
+    const [r] = await dwPool.query('DELETE FROM dw_hd_check_user_sso_identities WHERE id = ?', [Number(req.params.id)])
+    if (!r.affectedRows) return res.status(404).json({ success: false, error: 'ไม่พบรายการ' })
+    res.json({ success: true })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 /* ---------------- Auth & 2FA Management Endpoints ---------------- */
 const loginAttempts = new Map()
 app.post('/api/auth/login', async (req, res) => {
@@ -1012,6 +1207,7 @@ app.use((req, res, next) => {
 for (let attempt = 1; ; attempt++) {
   try {
     await initAuthTables(dwPool)
+    await initSsoTables(dwPool)
     break
   } catch (err) {
     const delaySec = Math.min(5 * attempt, 30)

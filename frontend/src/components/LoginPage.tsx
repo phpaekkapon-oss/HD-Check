@@ -1,5 +1,9 @@
-import { useState, type FC, type FormEvent } from 'react'
+import { useEffect, useState, type FC, type FormEvent } from 'react'
 import {
+  BadgeCheck,
+  Fingerprint,
+  Info,
+  X,
   ShieldCheck,
   Lock,
   User,
@@ -16,6 +20,17 @@ import {
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
 import type { TotpSetupData } from '@/types/auth.types'
+
+type SsoKey = 'thaid' | 'providerid'
+interface SsoProviderButton {
+  readonly key: SsoKey
+  readonly label: string
+  readonly demo: boolean
+}
+const SSO_META: Record<SsoKey, { icon: typeof Fingerprint; tone: string; iconColor: string; org: string; how: string }> = {
+  thaid: { icon: Fingerprint, tone: 'from-indigo-700 to-slate-900', iconColor: 'text-amber-300', org: 'กรมการปกครอง (DOPA)', how: 'แอป ThaiD บนมือถือ' },
+  providerid: { icon: BadgeCheck, tone: 'from-emerald-600 to-teal-800', iconColor: 'text-white', org: 'กระทรวงสาธารณสุข (MOPH)', how: ' Provider ID ของบุคลากรสาธารณสุข' },
+}
 
 export const LoginPage: FC = () => {
   const { login, verify2FA, init2FASetup, confirm2FASetup } = useAuth()
@@ -36,8 +51,27 @@ export const LoginPage: FC = () => {
   const [copiedKey, setCopiedKey] = useState(false)
   const [copiedBackup, setCopiedBackup] = useState(false)
 
-  const [error, setError] = useState<string | null>(null)
+  // The SSO callback redirects back with ?sso_error=… when sign-in fails
+  const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('sso_error'))
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // ThaiD / Provider ID buttons (configured by admin; demo = preview only)
+  const [ssoProviders, setSsoProviders] = useState<readonly SsoProviderButton[]>([])
+  const [ssoDemo, setSsoDemo] = useState<SsoProviderButton | null>(null)
+
+  useEffect(() => {
+    // Drop ?sso_error=… (already shown via the initial error state) so a refresh doesn't repeat it
+    const params = new URLSearchParams(window.location.search)
+    if (params.has('sso_error')) {
+      params.delete('sso_error')
+      const qs = params.toString()
+      window.history.replaceState(null, '', `${window.location.pathname}${qs ? `?${qs}` : ''}`)
+    }
+    fetch('/api/public/sso-providers', { credentials: 'same-origin' })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.success) setSsoProviders(data.data) })
+      .catch(() => {})
+  }, [])
 
   // Step 1: Login with HOSxP Username & Password
   const handleLoginSubmit = async (e: FormEvent) => {
@@ -282,11 +316,86 @@ export const LoginPage: FC = () => {
                 )}
               </button>
 
+              {ssoProviders.length > 0 && (
+                <div className="pt-1">
+                  <div className="flex items-center gap-3 text-[11px] text-slate-400 my-3">
+                    <span className="h-px flex-1 bg-white/10" />
+                    หรือเข้าสู่ระบบด้วย
+                    <span className="h-px flex-1 bg-white/10" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {ssoProviders.map((sp) => {
+                      const meta = SSO_META[sp.key]
+                      const Icon = meta.icon
+                      return (
+                        <button
+                          key={sp.key}
+                          type="button"
+                          onClick={() => {
+                            if (sp.demo) setSsoDemo(sp)
+                            else window.location.href = `/api/auth/sso/${sp.key}/start`
+                          }}
+                          className={`relative min-h-12 rounded-xl bg-gradient-to-br ${meta.tone} text-white text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer ring-1 ring-white/10 hover:brightness-110`}
+                        >
+                          <Icon className={`size-5 ${meta.iconColor}`} />
+                          <span>{sp.label}</span>
+                          {sp.demo && (
+                            <span className="absolute -top-2 -right-1.5 px-1.5 py-0.5 rounded-md bg-amber-400 text-[10px] font-black text-slate-900 shadow">
+                              DEMO
+                            </span>
+                          )}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="pt-2 text-center text-[11px] text-slate-400 flex items-center justify-center gap-1.5">
                 <ShieldCheck className="size-3.5 text-emerald-400" />
                 <span>รองรับการยืนยันตัวตนแบบ 2 ขั้นตอน (2FA) ตามมาตรฐานกระทรวงฯ</span>
               </div>
             </form>
+          )}
+
+          {ssoDemo && (
+            <div className="absolute inset-0 z-20 rounded-2xl bg-slate-950/90 backdrop-blur-sm p-5 sm:p-8 flex flex-col justify-center animate-fade-in">
+              <button
+                type="button"
+                onClick={() => setSsoDemo(null)}
+                className="absolute top-3 right-3 size-10 grid place-items-center rounded-xl text-slate-400 hover:text-white hover:bg-white/10 cursor-pointer"
+                aria-label="ปิด"
+              >
+                <X className="size-5" />
+              </button>
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`size-11 grid place-items-center rounded-xl bg-gradient-to-br ${SSO_META[ssoDemo.key].tone}`}>
+                  {(() => {
+                    const Icon = SSO_META[ssoDemo.key].icon
+                    return <Icon className={`size-6 ${SSO_META[ssoDemo.key].iconColor}`} />
+                  })()}
+                </span>
+                <div>
+                  <p className="text-base font-bold text-white">เข้าสู่ระบบด้วย {ssoDemo.label}</p>
+                  <p className="text-xs text-slate-400">{SSO_META[ssoDemo.key].org}</p>
+                </div>
+              </div>
+              <div className="rounded-xl bg-amber-400/10 border border-amber-400/30 p-3 text-xs text-amber-200 leading-relaxed flex gap-2">
+                <Info className="size-4 shrink-0 mt-0.5 text-amber-300" />
+                <span>
+                  นี่คือ <b>โหมดสาธิต (Demo)</b> ระบบยังไม่ได้เชื่อมต่อกับ {ssoDemo.label} จริง
+                  เมื่อเปิดใช้งานจริง ปุ่มนี้จะพาไปยืนยันตัวตนด้วย{SSO_META[ssoDemo.key].how} แล้วเข้าสู่ระบบด้วยบัญชี HOSxP ที่ตรงกับเลขบัตรประชาชนของคุณ
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 mt-3">ระหว่างนี้กรุณาเข้าสู่ระบบด้วยชื่อผู้ใช้และรหัสผ่าน HOSxP</p>
+              <button
+                type="button"
+                onClick={() => setSsoDemo(null)}
+                className="mt-4 min-h-11 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold cursor-pointer"
+              >
+                กลับไปเข้าสู่ระบบด้วยรหัสผ่าน
+              </button>
+            </div>
           )}
 
           {/* STEP 2: 2FA VERIFY STEP */}
