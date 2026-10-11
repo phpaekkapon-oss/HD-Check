@@ -14,8 +14,8 @@ import { useTheme } from '@/context/ThemeContext'
 import { cn } from '@/lib/utils'
 
 export const LockScreenOverlay: FC = () => {
-  const { isLocked, unlockWithPin, pinLength } = usePinLock()
-  const { user, logout, login } = useAuth()
+  const { isLocked, unlockWithPin, unlockWithPassword, pinLength } = usePinLock()
+  const { user, logout } = useAuth()
   const { accent } = useTheme()
 
   // Dynamic PIN length (defaults to 6 if not specified, or 4 if configured as 4)
@@ -119,16 +119,13 @@ export const LockScreenOverlay: FC = () => {
     setIsVerifyingPass(true)
     setPassError(null)
 
-    const res = await login(user.loginname, hosPassword.trim())
+    // Passwords are not trimmed: spaces may be part of the real password
+    const res = await unlockWithPassword(hosPassword)
     setIsVerifyingPass(false)
 
     if (res.success) {
-      // Unlocked
       setShowPasswordModal(false)
       setHosPassword('')
-      // clear lock
-      clearStoredPinLock()
-      window.location.reload()
     } else {
       setPassError(res.error || 'รหัสผ่าน HOSxP ไม่ถูกต้อง')
     }
@@ -148,14 +145,14 @@ export const LockScreenOverlay: FC = () => {
 
       <div
         className={cn(
-          'relative my-auto w-full max-w-sm max-h-full overflow-y-auto rounded-3xl bg-slate-900/90 border border-white/10 p-4 sm:p-6 md:p-8 shadow-2xl backdrop-blur-xl flex flex-col items-center text-center transition-transform',
+          'relative my-auto w-full max-w-sm max-h-full overflow-y-auto rounded-2xl bg-slate-900/85 border border-white/15 ring-1 ring-white/10 p-4 sm:p-6 md:p-8 shadow-2xl backdrop-blur-2xl flex flex-col items-center text-center transition-transform',
           isShaking && 'animate-shake'
         )}
       >
         {/* Hospital Brand & Badge */}
-        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/10 text-xs text-slate-300 mb-5">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.08] border border-white/15 text-xs text-slate-200 mb-5">
           <Leaf className="size-3.5 text-emerald-400" />
-          <span>SMART-HOSCHECK • คุ้มครองข้อมูลเวชระเบียน</span>
+          <span>SMART-HOSCHECK • โรงพยาบาลพังโคน</span>
         </div>
 
         {/* Lock Icon Badge */}
@@ -247,7 +244,7 @@ export const LockScreenOverlay: FC = () => {
                   type="button"
                   onClick={() => handleKeyClick('clear')}
                   disabled={isSubmitting || pin.length === 0}
-                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-xs font-bold text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
+                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-45 disabled:hover:bg-white/5 text-xs font-bold text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   ล้าง (C)
                 </button>
@@ -260,7 +257,7 @@ export const LockScreenOverlay: FC = () => {
                   type="button"
                   onClick={() => handleKeyClick('backspace')}
                   disabled={isSubmitting || pin.length === 0}
-                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-30 disabled:hover:bg-white/5 text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
+                  className="min-h-12 rounded-2xl bg-white/5 hover:bg-white/10 active:scale-95 disabled:opacity-45 disabled:hover:bg-white/5 text-slate-300 transition-all flex items-center justify-center cursor-pointer touch-manipulation"
                 >
                   <Delete className="size-5" />
                 </button>
@@ -289,11 +286,11 @@ export const LockScreenOverlay: FC = () => {
         )}
 
         {/* Footer Actions */}
-        <div className="w-full flex items-center justify-between pt-4 border-t border-slate-700/80 text-xs">
+        <div className="w-full flex items-center justify-between pt-2 border-t border-white/10 text-xs">
           <button
             type="button"
             onClick={() => setShowPasswordModal(true)}
-            className="text-slate-300 hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
+            className="min-h-10 text-slate-300 hover:text-white transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
           >
             <KeyRound className="size-3.5 text-amber-400" />
             <span>ลืมรหัส PIN?</span>
@@ -305,7 +302,7 @@ export const LockScreenOverlay: FC = () => {
               clearStoredPinLock()
               logout()
             }}
-            className="text-rose-400 hover:text-rose-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
+            className="min-h-10 text-rose-400 hover:text-rose-300 transition-colors inline-flex items-center gap-1.5 cursor-pointer font-medium"
           >
             <LogOut className="size-3.5" />
             <span>ออกจากระบบ</span>

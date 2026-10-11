@@ -28,9 +28,11 @@ interface SsoProviderButton {
   readonly demo: boolean
 }
 const SSO_META: Record<SsoKey, { icon: typeof Fingerprint; tone: string; iconColor: string; org: string; how: string }> = {
-  thaid: { icon: Fingerprint, tone: 'from-indigo-700 to-slate-900', iconColor: 'text-amber-300', org: 'กรมการปกครอง (DOPA)', how: 'แอป ThaiD บนมือถือ' },
+  thaid: { icon: Fingerprint, tone: 'from-indigo-500 to-blue-700', iconColor: 'text-white', org: 'กรมการปกครอง (DOPA)', how: 'แอป ThaiD บนมือถือ' },
   providerid: { icon: BadgeCheck, tone: 'from-emerald-600 to-teal-800', iconColor: 'text-white', org: 'กระทรวงสาธารณสุข (MOPH)', how: ' Provider ID ของบุคลากรสาธารณสุข' },
 }
+
+const VERIFY_TTL_MS = 5 * 60 * 1000
 
 export const LoginPage: FC = () => {
   const { login, verify2FA, init2FASetup, confirm2FASetup } = useAuth()
@@ -54,6 +56,18 @@ export const LoginPage: FC = () => {
   // The SSO callback redirects back with ?sso_error=… when sign-in fails
   const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('sso_error'))
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  // Mirrors the backend's 5-minute temp session so the user knows when to restart
+  const [verifyExpiresAt, setVerifyExpiresAt] = useState(0)
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    if (step !== 'verify_2fa') return
+    const id = window.setInterval(() => setNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [step])
+  const verifySecondsLeft = Math.max(0, Math.ceil((verifyExpiresAt - now) / 1000))
+  const verifyExpired = step === 'verify_2fa' && verifyExpiresAt > 0 && verifySecondsLeft === 0
+  const otpComplete = isBackupMode ? otpCode.replace(/[^0-9A-Z]/g, '').length >= 8 : otpCode.length === 6
 
   // ThaiD / Provider ID buttons (configured by admin; demo = preview only)
   const [ssoProviders, setSsoProviders] = useState<readonly SsoProviderButton[]>([])
@@ -102,6 +116,7 @@ export const LoginPage: FC = () => {
           setStep('setup_2fa')
         } else {
           // User already has 2FA enabled, verify code
+          setVerifyExpiresAt(Date.now() + VERIFY_TTL_MS)
           setStep('verify_2fa')
         }
       }
@@ -335,9 +350,11 @@ export const LoginPage: FC = () => {
                             if (sp.demo) setSsoDemo(sp)
                             else window.location.href = `/api/auth/sso/${sp.key}/start`
                           }}
-                          className={`relative min-h-12 rounded-xl bg-gradient-to-br ${meta.tone} text-white text-sm font-bold flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer ring-1 ring-white/10 hover:brightness-110`}
+                          className={'relative min-h-12 rounded-xl bg-white/[0.04] hover:bg-white/[0.09] border border-white/15 hover:border-white/25 text-slate-100 text-sm font-semibold flex items-center justify-center gap-2.5 active:scale-98 transition cursor-pointer'}
                         >
-                          <Icon className={`size-5 ${meta.iconColor}`} />
+                          <span className={`size-7 grid place-items-center rounded-lg bg-gradient-to-br ${meta.tone} shadow-sm`}>
+                            <Icon className={`size-4 ${meta.iconColor}`} />
+                          </span>
                           <span>{sp.label}</span>
                           {sp.demo && (
                             <span className="absolute -top-2 -right-1.5 px-1.5 py-0.5 rounded-md bg-amber-400 text-[10px] font-black text-slate-900 shadow">
@@ -414,7 +431,7 @@ export const LoginPage: FC = () => {
                 <p className="text-[11.5px] text-slate-400 mt-0.5">
                   {isBackupMode
                     ? 'กรุณากรอกรหัสกู้คืนฉุกเฉิน (Backup Code 8 หลัก)'
-                    : 'เปิดแอป Google Authenticator แล้วกรอกรหัส 6 หลัก'}
+                    : 'เปิดแอป Authenticator (Google / Microsoft) แล้วกรอกรหัส 6 หลัก'}
                 </p>
               </div>
 
@@ -446,7 +463,8 @@ export const LoginPage: FC = () => {
                   autoComplete="one-time-code"
                   maxLength={isBackupMode ? 9 : 6}
                   autoFocus
-                  disabled={isSubmitting}
+                  aria-label={isBackupMode ? 'รหัสกู้คืนฉุกเฉิน' : 'รหัสยืนยัน 6 หลัก'}
+                  disabled={isSubmitting || verifyExpired}
                   value={otpCode}
                   onChange={(e) => {
                     const rawVal = e.target.value
@@ -455,7 +473,7 @@ export const LoginPage: FC = () => {
                     } else {
                       const digits = rawVal.replace(/\D/g, '').slice(0, 6)
                       setOtpCode(digits)
-                      if (digits.length === 6 && !isSubmitting) {
+                      if (digits.length === 6 && !isSubmitting && !verifyExpired) {
                         handleVerify2FASubmit(undefined, digits)
                       }
                     }
@@ -469,12 +487,19 @@ export const LoginPage: FC = () => {
                   placeholder={isBackupMode ? 'เช่น A8F2-9X1B' : '000000'}
                   className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-3 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition disabled:opacity-60"
                 />
+                {verifyExpiresAt > 0 && (
+                  <p className={`mt-2 text-center text-[11px] ${verifyExpired ? 'text-rose-300' : verifySecondsLeft <= 60 ? 'text-amber-300' : 'text-slate-400'}`}>
+                    {verifyExpired
+                      ? 'หมดเวลายืนยันตัวตน กรุณากลับไปหน้าเข้าสู่ระบบแล้วลองใหม่'
+                      : `รหัสในแอปเปลี่ยนทุก 30 วินาที · เหลือเวลา ${Math.floor(verifySecondsLeft / 60)}:${String(verifySecondsLeft % 60).padStart(2, '0')} นาที`}
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
-                disabled={isSubmitting}
-                className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer"
+                disabled={isSubmitting || !otpComplete || verifyExpired}
+                className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.titleBarHex} 100%)`,
                   boxShadow: `0 4px 18px ${accent.glow}`,
@@ -493,7 +518,7 @@ export const LoginPage: FC = () => {
                 )}
               </button>
 
-              <div className="flex items-center justify-between text-xs pt-1">
+              <div className="flex flex-wrap items-center justify-between gap-x-3 text-xs">
                 <button
                   type="button"
                   onClick={() => {
@@ -501,7 +526,7 @@ export const LoginPage: FC = () => {
                     setOtpCode('')
                     setError(null)
                   }}
-                  className="text-slate-400 hover:text-white transition cursor-pointer"
+                  className="min-h-10 text-slate-400 hover:text-white transition cursor-pointer"
                 >
                   {isBackupMode ? '← ใช้รหัสจาก Authenticator' : 'ทำโทรศัพท์หาย? ใช้รหัสกู้คืนฉุกเฉิน'}
                 </button>
@@ -512,9 +537,9 @@ export const LoginPage: FC = () => {
                     setStep('login')
                     setError(null)
                   }}
-                  className="text-slate-400 hover:text-amber-400 transition cursor-pointer"
+                  className="min-h-10 text-slate-400 hover:text-amber-400 transition cursor-pointer"
                 >
-                  ← กลับไปหน้า Login
+                  ← กลับไปหน้าเข้าสู่ระบบ
                 </button>
               </div>
             </form>

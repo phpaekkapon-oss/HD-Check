@@ -8,7 +8,10 @@ import {
   type FC,
   type ReactNode,
 } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useAuth } from './AuthContext'
+
+type UnlockResult = { success: boolean; error?: string; forceLogout?: boolean }
 
 interface PinLockContextType {
   readonly isLocked: boolean
@@ -17,8 +20,11 @@ interface PinLockContextType {
   readonly pinLength: number
   readonly autoLockMinutes: number
   readonly isEnforced: boolean
+  /** Hospital enforces PIN lock and this user has no PIN yet: must set one before using the app */
+  readonly pinSetupRequired: boolean
   readonly lockNow: () => void
-  readonly unlockWithPin: (pin: string) => Promise<{ success: boolean; error?: string }>
+  readonly unlockWithPin: (pin: string) => Promise<UnlockResult>
+  readonly unlockWithPassword: (password: string) => Promise<UnlockResult>
   readonly setupPin: (pin: string, autoLockMinutes?: number) => Promise<{ success: boolean; error?: string }>
   readonly disablePin: () => Promise<{ success: boolean; error?: string }>
   readonly updatePinSettings: (pinEnabled: boolean, autoLockMinutes: number) => Promise<{ success: boolean; error?: string }>
@@ -26,181 +32,196 @@ interface PinLockContextType {
 
 const PinLockContext = createContext<PinLockContextType | null>(null)
 
-const STORAGE_LOCK_KEY = 'smarthoscheck_pin_locked'
-
-const readStoredLock = () => {
-  try {
-    return sessionStorage.getItem(STORAGE_LOCK_KEY) === 'true'
-  } catch {
-    return false
-  }
-}
-
+/** Remove the lock flag older versions kept in sessionStorage (the server owns lock state now). */
 export const clearStoredPinLock = () => {
   try {
-    sessionStorage.removeItem(STORAGE_LOCK_KEY)
+    sessionStorage.removeItem('smarthoscheck_pin_locked')
   } catch {
-    // The lock state still updates in memory when browser storage is unavailable.
+    // Storage unavailable: nothing to clear.
   }
 }
 
-const storePinLock = () => {
+// Keeps every open tab in step: lock / unlock / user activity
+type TabMessage = 'lock' | 'unlock' | 'activity'
+const openChannel = (): BroadcastChannel | null => {
   try {
-    sessionStorage.setItem(STORAGE_LOCK_KEY, 'true')
+    return typeof BroadcastChannel === 'undefined' ? null : new BroadcastChannel('hd-check-screen-lock')
   } catch {
-    // Keep the lock active for this app session even if storage is unavailable.
+    return null
   }
+}
+
+const postJson = async (path: string, body?: unknown) => {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'same-origin',
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  const data = await res.json().catch(() => ({}))
+  return { ok: res.ok && data.success !== false, data }
 }
 
 export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
-  const { user, updateUser, isAuthenticated } = useAuth()
+  const { user, updateUser, isAuthenticated, serverLocked, logout } = useAuth()
 
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    return readStoredLock()
-  })
+  const [isLocked, setIsLocked] = useState(false)
+  // Server answered 428 (policy switched on after this tab loaded)
+  const [serverRequiresPin, setServerRequiresPin] = useState(false)
+  const queryClient = useQueryClient()
 
-  // User PIN configs from user object
   const hasPin = Boolean(user?.has_pin)
   const isEnforced = Boolean(user?.enforce_pin_lock)
   // If hospital enforces PIN, it's effectively active even if user didn't explicitly toggle it, provided they have a PIN
   const pinEnabled = Boolean((user?.pin_enabled || isEnforced) && hasPin)
   const pinLength = Number(user?.pin_length || 6)
   const autoLockMinutes = Number(user?.auto_lock_minutes ?? user?.default_auto_lock_minutes ?? 5)
+  const pinSetupRequired = Boolean(isAuthenticated && !hasPin && (isEnforced || serverRequiresPin))
 
   const lastActivityRef = useRef<number>(Date.now())
+  const lastBroadcastRef = useRef<number>(0)
+  const channelRef = useRef<BroadcastChannel | null>(null)
 
-  // Lock screen immediately
+  const broadcast = (msg: TabMessage) => channelRef.current?.postMessage(msg)
+
+  // Session was locked before this tab loaded (refresh / new tab)
+  useEffect(() => {
+    clearStoredPinLock()
+    if (serverLocked) setIsLocked(true)
+  }, [serverLocked])
+
+  // Any API answering 423 means the server-side session is locked (e.g. locked from another device)
+  useEffect(() => {
+    const original = window.fetch
+    window.fetch = async (...args) => {
+      const res = await original(...args)
+      if (res.status === 423) setIsLocked(true)
+      if (res.status === 428) setServerRequiresPin(true)
+      return res
+    }
+    return () => {
+      window.fetch = original
+    }
+  }, [])
+
+  useEffect(() => {
+    const channel = openChannel()
+    channelRef.current = channel
+    if (!channel) return
+    channel.onmessage = (e: MessageEvent<TabMessage>) => {
+      if (e.data === 'lock') setIsLocked(true)
+      if (e.data === 'unlock') setIsLocked(false)
+      if (e.data === 'unlock' || e.data === 'activity') lastActivityRef.current = Date.now()
+    }
+    return () => {
+      channel.close()
+      channelRef.current = null
+    }
+  }, [])
+
   const lockNow = useCallback(() => {
     if (!isAuthenticated || !hasPin) return
     setIsLocked(true)
-    storePinLock()
+    channelRef.current?.postMessage('lock')
+    // Server lock is what actually blocks data; the overlay is only the UI for it
+    void postJson('/api/auth/lock').catch(() => {})
   }, [isAuthenticated, hasPin])
 
-  // Unlock with PIN
-  const unlockWithPin = async (pin: string): Promise<{ success: boolean; error?: string }> => {
+  const finishUnlock = (ok: boolean, data: { error?: string; forceLogout?: boolean }, fallback: string): UnlockResult => {
+    if (data.forceLogout) {
+      setIsLocked(false)
+      logout()
+      return { success: false, forceLogout: true, error: data.error }
+    }
+    if (!ok) return { success: false, error: data.error || fallback }
+    setIsLocked(false)
+    lastActivityRef.current = Date.now()
+    broadcast('unlock')
+    void queryClient.invalidateQueries()
+    return { success: true }
+  }
+
+  const unlockWithPin = async (pin: string): Promise<UnlockResult> => {
     if (!user) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' }
     try {
-      const res = await fetch('/api/auth/pin/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginname: user.loginname, pin }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'รหัส PIN ไม่ถูกต้อง' }
-      }
-
-      if (data.user) {
-        updateUser(data.user)
-      }
-      setIsLocked(false)
-      clearStoredPinLock()
-      lastActivityRef.current = Date.now()
-      return { success: true }
+      const { ok, data } = await postJson('/api/auth/pin/verify', { pin })
+      return finishUnlock(ok, data, 'รหัส PIN ไม่ถูกต้อง')
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }
   }
 
-  // Setup PIN
+  const unlockWithPassword = async (password: string): Promise<UnlockResult> => {
+    if (!user) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' }
+    try {
+      const { ok, data } = await postJson('/api/auth/unlock-password', { password })
+      return finishUnlock(ok, data, 'รหัสผ่าน HOSxP ไม่ถูกต้อง')
+    } catch (err) {
+      return { success: false, error: (err as Error).message }
+    }
+  }
+
   const setupPin = async (pin: string, minutes = autoLockMinutes): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' }
     try {
-      const res = await fetch('/api/auth/pin/setup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginname: user.loginname, pin, autoLockMinutes: minutes }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'ตั้งรหัส PIN ไม่สำเร็จ' }
-      }
-
+      const { ok, data } = await postJson('/api/auth/pin/setup', { pin, autoLockMinutes: minutes })
+      if (!ok) return { success: false, error: data.error || 'ตั้งรหัส PIN ไม่สำเร็จ' }
       updateUser({
         ...user,
         has_pin: true,
         pin_enabled: true,
-        pin_length: pin.length,
-        auto_lock_minutes: minutes,
+        pin_length: data.pin_length ?? pin.length,
+        auto_lock_minutes: data.auto_lock_minutes ?? minutes,
       })
+      setServerRequiresPin(false)
+      void queryClient.invalidateQueries()
       return { success: true }
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }
   }
 
-  // Disable PIN
   const disablePin = async (): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' }
     try {
-      const res = await fetch('/api/auth/pin/disable', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginname: user.loginname }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'ปิด PIN ไม่สำเร็จ' }
-      }
-
+      const { ok, data } = await postJson('/api/auth/pin/disable')
+      if (!ok) return { success: false, error: data.error || 'ปิด PIN ไม่สำเร็จ' }
       setIsLocked(false)
-      clearStoredPinLock()
-      updateUser({
-        ...user,
-        has_pin: false,
-        pin_enabled: false,
-      })
+      updateUser({ ...user, has_pin: false, pin_enabled: false })
       return { success: true }
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }
   }
 
-  // Update Settings
-  const updatePinSettings = async (
-    enabled: boolean,
-    minutes: number
-  ): Promise<{ success: boolean; error?: string }> => {
+  const updatePinSettings = async (enabled: boolean, minutes: number): Promise<{ success: boolean; error?: string }> => {
     if (!user) return { success: false, error: 'ไม่พบข้อมูลผู้ใช้' }
     try {
-      const res = await fetch('/api/auth/pin/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          loginname: user.loginname,
-          pinEnabled: enabled,
-          autoLockMinutes: minutes,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok || !data.success) {
-        return { success: false, error: data.error || 'บันทึกการตั้งค่าไม่สำเร็จ' }
-      }
-
-      updateUser({
-        ...user,
-        pin_enabled: enabled,
-        auto_lock_minutes: minutes,
-      })
+      const { ok, data } = await postJson('/api/auth/pin/settings', { pinEnabled: enabled, autoLockMinutes: minutes })
+      if (!ok) return { success: false, error: data.error || 'บันทึกการตั้งค่าไม่สำเร็จ' }
+      updateUser({ ...user, pin_enabled: data.pin_enabled ?? enabled, auto_lock_minutes: data.auto_lock_minutes ?? minutes })
       return { success: true }
     } catch (err) {
       return { success: false, error: (err as Error).message }
     }
   }
 
-  // Activity Detector & Inactivity Auto-Lock Loop
+  // Logged out: drop the overlay
   useEffect(() => {
-    if (!isAuthenticated || !pinEnabled) {
-      setIsLocked(false)
-      clearStoredPinLock()
-    }
-  }, [isAuthenticated, pinEnabled])
+    if (!isAuthenticated) setIsLocked(false)
+  }, [isAuthenticated])
 
+  // Activity detector & inactivity auto-lock (activity in any tab counts)
   useEffect(() => {
     if (!isAuthenticated || !pinEnabled || autoLockMinutes <= 0) return
 
     const handleUserActivity = () => {
-      lastActivityRef.current = Date.now()
+      const now = Date.now()
+      lastActivityRef.current = now
+      if (now - lastBroadcastRef.current > 15_000) {
+        lastBroadcastRef.current = now
+        channelRef.current?.postMessage('activity')
+      }
     }
 
     // Keyboard shortcut: Ctrl + L or Alt + L to lock instantly
@@ -213,19 +234,13 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
       }
     }
 
-    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll']
+    const events = ['mousemove', 'mousedown', 'touchstart', 'scroll']
     events.forEach((ev) => window.addEventListener(ev, handleUserActivity, { passive: true }))
     window.addEventListener('keydown', handleKeyDown)
 
-    // Check interval every 5 seconds
     const intervalId = window.setInterval(() => {
       if (isLocked) return
-      const idleTime = Date.now() - lastActivityRef.current
-      const lockThresholdMs = autoLockMinutes * 60 * 1000
-
-      if (idleTime >= lockThresholdMs) {
-        lockNow()
-      }
+      if (Date.now() - lastActivityRef.current >= autoLockMinutes * 60 * 1000) lockNow()
     }, 5000)
 
     return () => {
@@ -244,8 +259,10 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
         pinLength,
         autoLockMinutes,
         isEnforced,
+        pinSetupRequired,
         lockNow,
         unlockWithPin,
+        unlockWithPassword,
         setupPin,
         disablePin,
         updatePinSettings,

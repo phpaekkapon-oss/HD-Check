@@ -5,6 +5,8 @@ interface AuthContextType {
   readonly user: User | null
   readonly isAuthenticated: boolean
   readonly isLoading: boolean
+  /** Session was already screen-locked on the server when the app loaded (e.g. new tab / refresh) */
+  readonly serverLocked: boolean
   readonly login: (loginname: string, password: string) => Promise<LoginResult>
   readonly verify2FA: (tempToken: string, code: string) => Promise<{ success: boolean; user?: User; error?: string }>
   readonly init2FASetup: (loginname: string, tempToken?: string) => Promise<TotpSetupData>
@@ -30,6 +32,7 @@ const STORAGE_KEY_TOKEN = 'smarthoscheck_auth_token_v1'
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [serverLocked, setServerLocked] = useState(false)
 
   useEffect(() => {
     // Remove legacy browser-stored bearer tokens and restore the HttpOnly cookie session.
@@ -37,7 +40,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(STORAGE_KEY_USER)
     fetch('/api/auth/me', { credentials: 'same-origin' })
       .then((res) => res.ok ? res.json() : null)
-      .then((data) => { if (data?.success && data.user) setUser(data.user) })
+      .then((data) => {
+        if (data?.success && data.user) {
+          setUser(data.user)
+          setServerLocked(Boolean(data.locked))
+        }
+      })
       .catch(() => {})
       .finally(() => setIsLoading(false))
   }, [])
@@ -241,6 +249,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         user,
         isAuthenticated: Boolean(user),
         isLoading,
+        serverLocked,
         login,
         verify2FA,
         init2FASetup,

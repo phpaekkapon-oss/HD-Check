@@ -632,6 +632,42 @@ function hashPin(pin, salt = crypto.randomBytes(16).toString('hex')) {
   return { salt, hash }
 }
 
+export const PIN_MAX_FAILS = 5
+const MIN_LOCK_MINUTES = 1
+const MAX_LOCK_MINUTES = 60
+
+/**
+ * Valid auto-lock minutes: 1–60. When the hospital enforces PIN lock, users may only
+ * choose a time equal to or shorter than the hospital default.
+ */
+async function clampLockMinutes(dwPool, minutes) {
+  const policy = await getPinPolicy(dwPool)
+  let m = Math.round(Number(minutes))
+  if (!Number.isFinite(m) || m <= 0) m = policy.default_auto_lock_minutes
+  m = Math.min(MAX_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, m))
+  if (policy.enforce_pin_lock === 'Y') m = Math.min(m, policy.default_auto_lock_minutes)
+  return m
+}
+
+/** Current PIN fields for a user (sessions store a snapshot, so /me refreshes from here) */
+export async function getPinState(dwPool, loginname) {
+  const policy = await getPinPolicy(dwPool)
+  const [[row]] = await dwPool.query(
+    'SELECT pin_hash, pin_enabled, pin_length, auto_lock_minutes FROM dw_hd_check_user_2fa WHERE loginname = ? LIMIT 1',
+    [loginname]
+  )
+  return {
+    has_pin: Boolean(row?.pin_hash),
+    pin_enabled: Boolean(row?.pin_hash && row.pin_enabled === 1),
+    pin_length: Number(row?.pin_length || 6),
+    auto_lock_minutes: policy.enforce_pin_lock === 'Y'
+      ? Math.min(Number(row?.auto_lock_minutes ?? policy.default_auto_lock_minutes), policy.default_auto_lock_minutes)
+      : Number(row?.auto_lock_minutes ?? policy.default_auto_lock_minutes),
+    enforce_pin_lock: policy.enforce_pin_lock === 'Y',
+    default_auto_lock_minutes: policy.default_auto_lock_minutes,
+  }
+}
+
 /**
  * Setup or change PIN for a user
  */
@@ -640,9 +676,12 @@ export async function setupUserPin(dwPool, loginname, pin, autoLockMinutes = 5) 
   if (!cleanPin || cleanPin.length < 4 || cleanPin.length > 8 || !/^\d+$/.test(cleanPin)) {
     throw new Error('รหัส PIN ต้องเป็นตัวเลข 4-8 หลักเท่านั้น')
   }
+  if (/^(\d)\1+$/.test(cleanPin) || '0123456789'.includes(cleanPin) || '9876543210'.includes(cleanPin)) {
+    throw new Error('รหัส PIN เดาง่ายเกินไป (เช่น 1111, 1234) กรุณาตั้งใหม่')
+  }
 
   const { salt, hash: pHash } = hashPin(cleanPin)
-  const lockMinutes = Number(autoLockMinutes) || 5
+  const lockMinutes = await clampLockMinutes(dwPool, autoLockMinutes)
   const pinLength = cleanPin.length
 
   await dwPool.query(
@@ -712,6 +751,9 @@ export async function verifyUserPin(dwPool, loginname, pin) {
  * Disable PIN Lock
  */
 export async function disableUserPin(dwPool, loginname) {
+  if ((await getPinPolicy(dwPool)).enforce_pin_lock === 'Y') {
+    throw new Error('โรงพยาบาลบังคับใช้ PIN Lock อยู่ จึงปิด PIN ไม่ได้ (เปลี่ยนรหัส PIN ได้)')
+  }
   await dwPool.query(
     `UPDATE dw_hd_check_user_2fa
      SET pin_enabled = 0, pin_hash = NULL, updated_at = NOW()
@@ -731,7 +773,12 @@ export async function disableUserPin(dwPool, loginname) {
  */
 export async function updatePinSettings(dwPool, loginname, pinEnabled, autoLockMinutes) {
   const enabledVal = pinEnabled ? 1 : 0
-  const minutesVal = Number(autoLockMinutes) || 5
+  const minutesVal = await clampLockMinutes(dwPool, autoLockMinutes)
+  const state = await getPinState(dwPool, loginname)
+  if (enabledVal && !state.has_pin) throw new Error('กรุณาตั้งรหัส PIN ก่อนเปิดใช้งาน')
+  if (!enabledVal && state.enforce_pin_lock) {
+    throw new Error('โรงพยาบาลบังคับใช้ PIN Lock อยู่ จึงปิดการล็อกหน้าจอไม่ได้')
+  }
 
   await dwPool.query(
     `UPDATE dw_hd_check_user_2fa
@@ -769,7 +816,7 @@ export async function getPinPolicy(dwPool) {
  */
 export async function setPinPolicy(dwPool, enforce, defaultMinutes = 5) {
   const enforceVal = enforce === 'Y' ? 'Y' : 'N'
-  const minutesVal = String(Number(defaultMinutes) || 5)
+  const minutesVal = String(Math.min(MAX_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, Math.round(Number(defaultMinutes)) || 5)))
 
   await Promise.all([
     dwPool.query(

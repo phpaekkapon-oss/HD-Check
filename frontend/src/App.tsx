@@ -20,6 +20,7 @@ import { isAdminUser } from '@/types/auth.types'
 import { PinLockProvider } from '@/context/PinLockContext'
 import { LoginPage } from '@/components/LoginPage'
 import { LockScreenOverlay } from '@/components/LockScreenOverlay'
+import { PinSetupRequiredOverlay } from '@/components/PinSetupRequiredOverlay'
 
 const DashboardView: FC = () => {
   const { user } = useAuth()
@@ -369,6 +370,7 @@ export const App: FC = () => {
     <PinLockProvider>
       <DashboardView />
       <LockScreenOverlay />
+      <PinSetupRequiredOverlay />
     </PinLockProvider>
   ) : (
     <LoginPage />

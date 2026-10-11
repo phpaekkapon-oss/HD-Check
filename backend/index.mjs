@@ -34,6 +34,8 @@ import {
   generateToken,
   saveSession,
   getAuthenticatedUserByLoginname,
+  getPinState,
+  PIN_MAX_FAILS,
 } from './auth.mjs'
 import {
   SSO_PROVIDERS,
@@ -185,10 +187,30 @@ function isAdminUser(user) {
   return false
 }
 
+// PIN state per user, cached briefly so the "PIN required" check doesn't hit the DB on every request
+const pinStateCache = new Map()
+async function cachedPinState(loginname) {
+  const hit = pinStateCache.get(loginname)
+  if (hit && Date.now() - hit.at < 30_000) return hit.state
+  const state = await getPinState(dwPool, loginname)
+  pinStateCache.set(loginname, { state, at: Date.now() })
+  return state
+}
+const invalidatePinState = (loginname) => (loginname ? pinStateCache.delete(loginname) : pinStateCache.clear())
+
 function requireSession(req, res, next) {
   getSession(req)
-    .then((session) => {
+    .then(async (session) => {
       if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+      // Screen lock is enforced here, not only in the browser: no data while locked
+      if (session.locked) return res.status(423).json({ success: false, locked: true, error: 'หน้าจอถูกล็อก กรุณาปลดล็อกด้วยรหัส PIN' })
+      // Hospital enforces PIN lock: no data until this user has set a PIN (account routes stay open so they can)
+      if (!req.path.startsWith('/api/auth/')) {
+        const pin = await cachedPinState(session.user.loginname)
+        if (pin.enforce_pin_lock && !pin.has_pin) {
+          return res.status(428).json({ success: false, pinSetupRequired: true, error: 'โรงพยาบาลบังคับใช้ PIN Lock กรุณาตั้งรหัส PIN ก่อนใช้งาน' })
+        }
+      }
       req.authSession = session
       req.authUser = session.user
       next()
@@ -876,7 +898,61 @@ app.get('/api/auth/me', async (req, res) => {
   }
   const avatarUrl = await getUserAvatarUrl(dwPool, session.user.loginname)
   session.user.avatar_url = avatarUrl
-  res.json({ success: true, user: session.user })
+  // The session keeps a login-time snapshot; PIN settings may have changed since
+  const pinState = await getPinState(dwPool, session.user.loginname).catch(() => ({}))
+  res.json({ success: true, user: { ...session.user, ...pinState }, locked: Boolean(session.locked) })
+})
+
+/* ---------------- Screen lock (server-side) ----------------
+ * Lock state lives on the session so a new tab, a refresh, or a direct API call
+ * cannot get past it. Unlock needs the PIN (max PIN_MAX_FAILS wrong tries, then the
+ * session ends) or the user's HOSxP password.
+ */
+async function updateSession(req, session, patch) {
+  Object.assign(session, patch)
+  await saveSession(dwPool, readCookie(req, SESSION_COOKIE), session)
+}
+
+async function failUnlock(req, res, session, message) {
+  const fails = Number(session.pinFails || 0) + 1
+  if (fails >= PIN_MAX_FAILS) {
+    console.warn(`[LOCK] ${session.user.loginname}: unlock failed ${fails} times, session ended`)
+    await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
+    clearSessionCookie(res)
+    return res.status(401).json({
+      success: false,
+      forceLogout: true,
+      error: `ใส่รหัสผิด ${PIN_MAX_FAILS} ครั้ง ระบบออกจากระบบให้เพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน`,
+    })
+  }
+  await updateSession(req, session, { pinFails: fails })
+  return res.status(401).json({ success: false, attemptsLeft: PIN_MAX_FAILS - fails, error: `${message} (เหลืออีก ${PIN_MAX_FAILS - fails} ครั้ง)` })
+}
+
+app.post('/api/auth/lock', async (req, res) => {
+  const session = await getSession(req)
+  if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+  const pinState = await getPinState(dwPool, session.user.loginname)
+  if (!pinState.has_pin) return res.status(400).json({ success: false, error: 'กรุณาตั้งรหัส PIN ก่อนใช้การล็อกหน้าจอ' })
+  if (!session.locked) await updateSession(req, session, { locked: true, pinFails: 0 })
+  res.json({ success: true, locked: true })
+})
+
+app.post('/api/auth/unlock-password', async (req, res) => {
+  const session = await getSession(req)
+  if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+  const password = String(req.body?.password ?? '')
+  if (!password) return res.status(400).json({ success: false, error: 'กรุณากรอกรหัสผ่าน' })
+  try {
+    const result = await authenticateHosUser(hosPool, dwPool, session.user.loginname, password)
+    // Only the password check matters here; discard any new session it created
+    if (result.token) await logoutSession(result.token, dwPool)
+  } catch (err) {
+    if (err.code === 'AUTH_INVALID_CREDENTIALS') return failUnlock(req, res, session, 'รหัสผ่าน HOSxP ไม่ถูกต้อง')
+    return res.status(err.code === 'AUTH_ACCOUNT_DISABLED' ? 403 : 503).json({ success: false, error: err.message })
+  }
+  await updateSession(req, session, { locked: false, pinFails: 0 })
+  res.json({ success: true, message: 'ปลดล็อกหน้าจอสำเร็จ' })
 })
 
 app.get('/api/auth/profile', requireSession, async (req, res) => {
@@ -1095,7 +1171,9 @@ app.post('/api/auth/pin/setup', requireSession, async (req, res) => {
   try {
     const { pin, autoLockMinutes } = req.body ?? {}
     if (!pin) return res.status(400).json({ success: false, error: 'ข้อมูลไม่ครบถ้วน' })
-    res.json(await setupUserPin(dwPool, req.authUser.loginname, pin, autoLockMinutes))
+    const result = await setupUserPin(dwPool, req.authUser.loginname, pin, autoLockMinutes)
+    invalidatePinState(req.authUser.loginname)
+    res.json(result)
   } catch (err) {
     fail(res, err, 400)
   }
@@ -1103,63 +1181,46 @@ app.post('/api/auth/pin/setup', requireSession, async (req, res) => {
 
 app.post('/api/auth/pin/verify', async (req, res) => {
   try {
-    const { pin, loginname } = req.body ?? {}
+    const { pin } = req.body ?? {}
     if (!pin) return res.status(400).json({ success: false, error: 'กรุณากรอกรหัส PIN' })
 
+    // A PIN only unlocks an existing session. It must never create one: a 4–8 digit
+    // PIN is far weaker than password + 2FA, so an expired session means log in again.
     const session = await getSession(req)
-    const targetLogin = session?.user?.loginname || loginname
-    if (!targetLogin) {
-      return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+    if (!session?.user) {
+      return res.status(401).json({ success: false, forceLogout: true, error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน' })
     }
 
-    // Verify PIN against DW database
-    const pinResult = await verifyUserPin(dwPool, targetLogin, pin)
-
-    // If session was missing or expired (e.g. server was restarted while locked),
-    // but PIN was successfully verified, re-issue a valid session automatically!
-    let activeUser = session?.user
-    if (!session || !activeUser) {
-      activeUser = await getAuthenticatedUserByLoginname(hosPool, dwPool, targetLogin)
-      if (activeUser) {
-        const token = generateToken()
-        const newSession = {
-          user: activeUser,
-          loginAt: new Date().toISOString(),
-          expiresAt: Date.now() + SESSION_MAX_AGE * 1000,
-        }
-        await saveSession(dwPool, token, newSession)
-        setSessionCookie(res, token)
-        return res.json({
-          success: true,
-          message: 'ปลดล็อกหน้าจอสำเร็จ',
-          user: activeUser,
-        })
-      }
+    try {
+      await verifyUserPin(dwPool, session.user.loginname, pin)
+    } catch (err) {
+      return failUnlock(req, res, session, err.message)
     }
-
-    res.json({
-      ...pinResult,
-      user: activeUser || undefined,
-    })
+    await updateSession(req, session, { locked: false, pinFails: 0 })
+    res.json({ success: true, message: 'ปลดล็อกหน้าจอสำเร็จ' })
   } catch (err) {
-    fail(res, err, 401)
+    fail(res, err)
   }
 })
 
 app.post('/api/auth/pin/disable', requireSession, async (req, res) => {
   try {
-    res.json(await disableUserPin(dwPool, req.authUser.loginname))
+    const result = await disableUserPin(dwPool, req.authUser.loginname)
+    invalidatePinState(req.authUser.loginname)
+    res.json(result)
   } catch (err) {
-    fail(res, err)
+    fail(res, err, 400)
   }
 })
 
 app.post('/api/auth/pin/settings', requireSession, async (req, res) => {
   try {
     const { pinEnabled, autoLockMinutes } = req.body ?? {}
-    res.json(await updatePinSettings(dwPool, req.authUser.loginname, pinEnabled, autoLockMinutes))
+    const result = await updatePinSettings(dwPool, req.authUser.loginname, pinEnabled, autoLockMinutes)
+    invalidatePinState(req.authUser.loginname)
+    res.json(result)
   } catch (err) {
-    fail(res, err)
+    fail(res, err, 400)
   }
 })
 
@@ -1174,7 +1235,9 @@ app.get('/api/admin/pin-policy', requireAdmin, async (_req, res) => {
 app.post('/api/admin/pin-policy', requireAdmin, async (req, res) => {
   try {
     const { enforce_pin_lock, default_auto_lock_minutes } = req.body ?? {}
-    res.json(await setPinPolicy(dwPool, enforce_pin_lock, default_auto_lock_minutes))
+    const result = await setPinPolicy(dwPool, enforce_pin_lock, default_auto_lock_minutes)
+    invalidatePinState()
+    res.json(result)
   } catch (err) {
     fail(res, err)
   }
@@ -1184,7 +1247,9 @@ app.post('/api/admin/reset-user-pin', requireAdmin, async (req, res) => {
   try {
     const { loginname } = req.body ?? {}
     if (!loginname) return res.status(400).json({ success: false, error: 'กรุณาระบุชื่อผู้ใช้' })
-    res.json(await resetUserPin(dwPool, loginname))
+    const result = await resetUserPin(dwPool, loginname)
+    invalidatePinState(loginname)
+    res.json(result)
   } catch (err) {
     fail(res, err)
   }
