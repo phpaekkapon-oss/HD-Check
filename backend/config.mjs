@@ -43,7 +43,10 @@ export const DW_DB_BASE = {
 export const API_PORT = Number(process.env.API_PORT ?? 3002)
 // Data sync writes snapshots into the DW; require an explicit opt-in per environment.
 export const SYNC_ENABLED = process.env.SYNC_ENABLED === 'true'
-export const AUTO_SYNC_MINUTES = Number(process.env.AUTO_SYNC_MINUTES ?? 1)
+// Each auto-sync replaces the whole month in the DW, so keep it at least 5 minutes apart
+// (default 15). 0 turns auto-sync off.
+const rawAutoSync = Number(process.env.AUTO_SYNC_MINUTES ?? 15)
+export const AUTO_SYNC_MINUTES = !Number.isFinite(rawAutoSync) || rawAutoSync <= 0 ? 0 : Math.max(5, rawAutoSync)
 
 /** Herbal drug filter (same criteria as SQL Query 2) */
 export const HERB_DRUG_FILTER = `

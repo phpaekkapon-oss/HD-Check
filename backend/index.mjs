@@ -322,7 +322,7 @@ app.get('/api/status', requireSession, async (_req, res) => {
     let latestVisitDate = null
     if (activeCodes.length > 0) {
       const [[p]] = await dwPool.query(
-        'SELECT COUNT(*) AS total FROM dw_hd_check_prescriptions WHERE drug_icode IN (?)',
+        'SELECT COUNT(*) AS total FROM dw_hd_check_prescriptions WHERE drug_icode IN (?) AND drug_qty > 0',
         [activeCodes]
       )
       prescriptionTotal = Number(p.total)
@@ -384,7 +384,8 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
              hn, patient_name, pttype_name, drug_icode, drug_name, drug_qty, COALESCE(drug_units, '') AS drug_units, department_name,
              main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5, doctor_code, doctor_name
       FROM dw_hd_check_prescriptions
-      WHERE visit_date BETWEEN ? AND ?`
+      WHERE visit_date BETWEEN ? AND ?
+        AND drug_qty > 0`
     const params = [startDate, endDate]
     const activeHerbs = await getActiveHerbalDrugs()
     if (activeHerbs.length === 0) {
@@ -533,7 +534,7 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
     const [rows] = await dwPool.query(
       `SELECT pdx, dx0, dx1, dx2, dx3, dx4, dx5
        FROM dw_hd_check_prescriptions
-       WHERE drug_icode = ?${dateFilter}`,
+       WHERE drug_icode = ? AND drug_qty > 0${dateFilter}`,
       params
     )
 
