@@ -31,6 +31,7 @@ export interface TotpSetupData {
   readonly secret: string
   readonly otpAuthUrl: string
   readonly qrUrl: string
+  readonly expiresAt: number
 }
 
 export interface User2FAAdminItem {

@@ -412,7 +412,7 @@ export async function verify2FALogin(dwPool, tempToken, code) {
 export async function init2FASetup(loginname) {
   const cleanLogin = String(loginname ?? '').trim()
   if (!cleanLogin) throw new Error('ไม่พบชื่อผู้ใช้สำหรับตั้งค่า 2FA')
-  const secret = generateBase32Secret(20)
+  const secret = generateBase32Secret(32)
   pending2FASetups.set(cleanLogin, { secret, expiresAt: Date.now() + 5 * 60 * 1000 })
   const otpAuthUrl = generateOtpAuthUrl(cleanLogin, secret)
   const qrUrl = getQrCodeSvgUrl(otpAuthUrl)
@@ -423,6 +423,7 @@ export async function init2FASetup(loginname) {
     secret,
     otpAuthUrl,
     qrUrl,
+    expiresAt: pending2FASetups.get(cleanLogin).expiresAt,
   }
 }
 

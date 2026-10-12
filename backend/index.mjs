@@ -1157,6 +1157,27 @@ app.get('/api/admin/users-2fa', requireAdmin, async (_req, res) => {
   }
 })
 
+app.post('/api/admin/users/:loginname/account-status', requireAdmin, async (req, res) => {
+  try {
+    const loginname = String(req.params.loginname ?? '').trim()
+    const disabled = req.body?.disabled
+    if (!loginname || typeof disabled !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'ระบุผู้ใช้และสถานะบัญชีให้ถูกต้อง' })
+    }
+    if (loginname.toLowerCase() === String(req.authUser.loginname ?? '').toLowerCase() && disabled) {
+      return res.status(400).json({ success: false, error: 'ไม่สามารถปิดบัญชีของผู้ดูแลที่กำลังใช้งานอยู่ได้' })
+    }
+    const [result] = await hosPool.query(
+      'UPDATE opduser SET account_disable = ? WHERE loginname = ?',
+      [disabled ? 'Y' : 'N', loginname]
+    )
+    if (!result.affectedRows) return res.status(404).json({ success: false, error: 'ไม่พบบัญชีนี้ใน HOSxP' })
+    res.json({ success: true, loginname, disabled, message: disabled ? 'ปิดบัญชี HOSxP แล้ว' : 'เปิดบัญชี HOSxP แล้ว' })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 app.post('/api/admin/reset-user-2fa', requireAdmin, async (req, res) => {
   try {
     const { loginname } = req.body ?? {}

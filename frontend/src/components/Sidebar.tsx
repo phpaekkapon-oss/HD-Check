@@ -244,11 +244,12 @@ export const Sidebar: FC<SidebarProps> = ({
           <button
             type="button"
             onClick={() => {
-              setSecurityInitialTab('my_profile')
+              // Admins usually open this panel to manage staff security and 2FA.
+              setSecurityInitialTab('admin_policy')
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
-            title={isCollapsedView ? 'ความปลอดภัย 2FA & PIN (เฉพาะ Admin / IT)' : undefined}
+            title={isCollapsedView ? 'บัญชีผู้ใช้ HOSxP และความปลอดภัย 2FA & PIN' : undefined}
             className={cn(
               'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
               isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
@@ -262,7 +263,7 @@ export const Sidebar: FC<SidebarProps> = ({
             </div>
             {!isCollapsedView && (
               <div className="flex-1 flex items-center justify-between min-w-0">
-                <span className="text-xs font-medium truncate">ความปลอดภัย 2FA & PIN</span>
+                <span className="text-xs font-medium truncate">บัญชีผู้ใช้ HOSxP / 2FA & PIN</span>
                 {user?.two_factor_enabled ? (
                   <span className="text-[9.5px] font-mono text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1 rounded">
                     ON

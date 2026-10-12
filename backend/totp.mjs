@@ -3,11 +3,26 @@ import crypto from 'node:crypto'
 // Base32 Alphabet (RFC 4648)
 const BASE32_CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
 
-export function generateBase32Secret(length = 20) {
-  const randomBytes = crypto.randomBytes(length)
+export function generateBase32Secret(length = 32) {
+  // Encode random bytes as RFC 4648 Base32. Mapping each byte with `% 32`
+  // produces non-canonical trailing bits that strict authenticator apps reject.
+  const randomBytes = crypto.randomBytes(Math.ceil((length * 5) / 8))
+  let bits = 0
+  let value = 0
   let secret = ''
-  for (let i = 0; i < randomBytes.length; i++) {
-    secret += BASE32_CHARS[randomBytes[i] % 32]
+
+  for (const byte of randomBytes) {
+    value = (value << 8) | byte
+    bits += 8
+    while (bits >= 5 && secret.length < length) {
+      secret += BASE32_CHARS[(value >>> (bits - 5)) & 31]
+      bits -= 5
+    }
+    value &= (1 << bits) - 1
+  }
+
+  if (bits > 0 && secret.length < length) {
+    secret += BASE32_CHARS[(value << (5 - bits)) & 31]
   }
   return secret
 }

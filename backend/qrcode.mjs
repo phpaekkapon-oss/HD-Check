@@ -5,5 +5,7 @@
 
 // Simple QR generator using Google Chart API fallback URL + inline SVG data
 export function getQrCodeSvgUrl(otpAuthUrl) {
-  return `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(otpAuthUrl)}`
+  // Render a larger, high error-correction QR so authenticator apps can scan it
+  // reliably from a monitor. The QR contains an otpauth:// URI, not a web link.
+  return `https://api.qrserver.com/v1/create-qr-code/?size=400x400&ecc=H&margin=2&data=${encodeURIComponent(otpAuthUrl)}`
 }

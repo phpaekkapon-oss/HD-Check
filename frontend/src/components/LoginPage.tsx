@@ -61,12 +61,14 @@ export const LoginPage: FC = () => {
   const [verifyExpiresAt, setVerifyExpiresAt] = useState(0)
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
-    if (step !== 'verify_2fa') return
+    if (step !== 'verify_2fa' && step !== 'setup_2fa') return
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
   }, [step])
   const verifySecondsLeft = Math.max(0, Math.ceil((verifyExpiresAt - now) / 1000))
   const verifyExpired = step === 'verify_2fa' && verifyExpiresAt > 0 && verifySecondsLeft === 0
+  const setupSecondsLeft = setupData ? Math.max(0, Math.ceil((setupData.expiresAt - now) / 1000)) : 0
+  const setupExpired = step === 'setup_2fa' && Boolean(setupData) && setupSecondsLeft === 0
   const otpComplete = isBackupMode ? otpCode.replace(/[^0-9A-Z]/g, '').length >= 8 : otpCode.length === 6
 
   // ThaiD / Provider ID buttons (configured by admin; demo = preview only)
@@ -157,6 +159,10 @@ export const LoginPage: FC = () => {
   const handleSetupConfirmSubmit = async (e?: FormEvent, codeOverride?: string) => {
     if (e) e.preventDefault()
     if (isSubmitting) return
+    if (setupExpired) {
+      setError('คีย์ตั้งค่า 2FA หมดอายุแล้ว กรุณาเริ่มเข้าสู่ระบบและตั้งค่าใหม่')
+      return
+    }
 
     const targetCode = (codeOverride ?? setupVerifyCode).trim()
     if (!targetCode || !setupData) {
@@ -557,7 +563,7 @@ export const LoginPage: FC = () => {
                   ตั้งค่า 2FA ครั้งแรก (ผูก Authenticator)
                 </h2>
                 <p className="text-xs text-slate-400 mt-1">
-                  กรุณาใช้แอป <strong>Google Authenticator</strong> หรือ <strong>Microsoft Authenticator</strong> บนมือถือสแกน QR Code ด้านล่าง
+                  เปิดแอป <strong>Google Authenticator</strong> หรือ <strong>Microsoft Authenticator</strong> แล้วเลือกเพิ่มบัญชีด้วย QR Code (กล้อง iPhone ปกติสแกนรหัสชนิดนี้ไม่ได้)
                 </p>
               </div>
 
@@ -569,13 +575,19 @@ export const LoginPage: FC = () => {
               )}
 
               {/* QR Code Card */}
-              <div className="bg-white p-3 rounded-2xl mx-auto w-48 h-48 flex items-center justify-center shadow-md">
+              <div className="bg-white p-3 rounded-2xl mx-auto w-52 h-52 flex items-center justify-center shadow-md">
                 <img
                   src={setupData.qrUrl}
                   alt="2FA QR Code"
                   className="w-full h-full object-contain"
                 />
               </div>
+
+              <p className={`text-center text-xs font-semibold ${setupExpired ? 'text-rose-300' : 'text-amber-300'}`}>
+                {setupExpired
+                  ? 'คีย์หมดอายุแล้ว กรุณายกเลิกแล้วเริ่มตั้งค่าใหม่'
+                  : `คีย์ตั้งค่านี้หมดอายุใน ${Math.floor(setupSecondsLeft / 60)}:${String(setupSecondsLeft % 60).padStart(2, '0')}`}
+              </p>
 
               {/* Secret Key manual input */}
               <div className="bg-white/[0.04] p-3 rounded-xl border border-white/10 text-xs space-y-1">
@@ -605,7 +617,7 @@ export const LoginPage: FC = () => {
                   autoComplete="one-time-code"
                   maxLength={6}
                   autoFocus
-                  disabled={isSubmitting}
+                  disabled={isSubmitting || setupExpired}
                   value={setupVerifyCode}
                   onChange={(e) => {
                     const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -627,7 +639,7 @@ export const LoginPage: FC = () => {
 
               <button
                 type="submit"
-                disabled={isSubmitting}
+                disabled={isSubmitting || setupExpired}
                 className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer"
                 style={{
                   background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.titleBarHex} 100%)`,

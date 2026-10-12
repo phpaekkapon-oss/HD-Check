@@ -221,6 +221,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
   // My 2FA states
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null)
+  const [setupNow, setSetupNow] = useState(() => Date.now())
   const [verifyCode, setVerifyCode] = useState('')
   const [backupCodes, setBackupCodes] = useState<string[]>([])
   const [isSettingUp, setIsSettingUp] = useState(false)
@@ -228,6 +229,13 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   const [mySuccess, setMySuccess] = useState<string | null>(null)
   const [copiedKey, setCopiedKey] = useState(false)
   const [copiedBackup, setCopiedBackup] = useState(false)
+  useEffect(() => {
+    if (!isSettingUp || !setupData) return
+    const id = window.setInterval(() => setSetupNow(Date.now()), 1000)
+    return () => window.clearInterval(id)
+  }, [isSettingUp, setupData])
+  const setupSecondsLeft = setupData ? Math.max(0, Math.ceil((setupData.expiresAt - setupNow) / 1000)) : 0
+  const setupExpired = isSettingUp && Boolean(setupData) && setupSecondsLeft === 0
 
   // My PIN states
   const [pinInput, setPinInput] = useState('')
@@ -248,6 +256,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   const [searchQuery, setSearchQuery] = useState('')
   const [resettingUser, setResettingUser] = useState<string | null>(null)
   const [resettingPinUser, setResettingPinUser] = useState<string | null>(null)
+  const [updatingAccountUser, setUpdatingAccountUser] = useState<string | null>(null)
   const [adminNotice, setAdminNotice] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, type: 'key' | 'backup') => {
@@ -420,6 +429,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   }
 
   const handleConfirmSetup = async (codeOverride?: string) => {
+    if (setupExpired) {
+      setMyError('คีย์ตั้งค่า 2FA หมดอายุแล้ว กรุณายกเลิกแล้วเริ่มตั้งค่าใหม่')
+      return
+    }
     const targetCode = (codeOverride ?? verifyCode).trim()
     if (!user || !setupData || !targetCode) return
     setMyError(null)
@@ -561,6 +574,31 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }
 
+  const handleToggleHosxpAccount = async (targetLogin: string, disabled: boolean) => {
+    const action = disabled ? 'ปิด' : 'เปิด'
+    if (!confirm(`ยืนยัน${action}บัญชี HOSxP ของ "${targetLogin}" หรือไม่? ${disabled ? 'ผู้ใช้นี้จะเข้าสู่ระบบ HOSxP และ SMART-HOSCHECK ไม่ได้' : 'ผู้ใช้จะกลับเข้าสู่ระบบได้ตามปกติ'}`)) return
+    setUpdatingAccountUser(targetLogin)
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/account-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ disabled }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAdminNotice(`${action}บัญชี HOSxP ของ ${targetLogin} เรียบร้อยแล้ว`)
+        await fetchUsers()
+        setTimeout(() => setAdminNotice(null), 5000)
+      } else {
+        setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสถานะบัญชีไม่สำเร็จ'}`)
+      }
+    } catch (err) {
+      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+    } finally {
+      setUpdatingAccountUser(null)
+    }
+  }
+
   // Filtered users for staff directory
   const filteredUsers = useMemo(() => {
     const list = Array.isArray(usersList) ? usersList : []
@@ -691,7 +729,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 )}
               >
                 <Users className={cn('size-3.5', activeTab === 'admin_policy' ? 'text-amber-400' : 'text-slate-400')} />
-                <span>นโยบายโรงพยาบาล</span>
+                <span>บัญชีผู้ใช้ HOSxP / นโยบาย 2FA</span>
                 {(enforcePolicy === 'Y' || enforcePinPolicy === 'Y') && (
                   <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
                     บังคับใช้
@@ -983,10 +1021,15 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
                     <div className="flex flex-col items-center p-4 rounded-xl bg-slate-950/60 border border-slate-800/80 text-center">
-                      <p className="text-xs font-medium text-slate-300 mb-3">1. สแกน QR Code ด้วย Authenticator App</p>
+                      <p className="text-xs font-medium text-slate-300 mb-3">1. เปิด Authenticator แล้วเลือกเพิ่มบัญชีด้วย QR Code (กล้อง iPhone ปกติใช้สแกนรหัสนี้ไม่ได้)</p>
                       <div className="p-3 bg-white rounded-xl shadow-md">
-                        <img src={setupData.qrUrl} alt="2FA QR Code" className="size-44" />
+                        <img src={setupData.qrUrl} alt="2FA QR Code" className="size-48" />
                       </div>
+                      <p className={cn('text-xs font-semibold mt-2', setupExpired ? 'text-rose-300' : 'text-amber-300')}>
+                        {setupExpired
+                          ? 'คีย์หมดอายุแล้ว กรุณายกเลิกแล้วเริ่มใหม่'
+                          : `คีย์ตั้งค่านี้หมดอายุใน ${Math.floor(setupSecondsLeft / 60)}:${String(setupSecondsLeft % 60).padStart(2, '0')}`}
+                      </p>
                       <p className="text-[11px] text-slate-400 mt-3 font-normal">Google Authenticator • Microsoft Authenticator</p>
                     </div>
 
@@ -1018,6 +1061,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                             inputMode="numeric"
                             autoComplete="one-time-code"
                             maxLength={6}
+                            disabled={setupExpired}
                             value={verifyCode}
                             onChange={(e) => {
                               const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
@@ -1038,7 +1082,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                           <button
                             type="button"
                             onClick={() => handleConfirmSetup()}
-                            disabled={verifyCode.length !== 6}
+                            disabled={verifyCode.length !== 6 || setupExpired}
                             className="px-5 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 transition cursor-pointer shadow-sm active:scale-95"
                           >
                             เปิดใช้งาน
@@ -1529,8 +1573,16 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                             {u.has_pin && <Lock className="size-3" />} PIN: {u.has_pin ? `มี (${u.auto_lock_minutes ?? 5} น.)` : 'ไม่มี'}
                           </span>
                         </div>
-                        {(u.two_factor_enabled || u.has_pin) && (
-                          <div className="flex flex-wrap gap-2 pt-1">
+                        <div className="flex flex-wrap gap-2 pt-1">
+                          <button
+                            type="button"
+                            disabled={updatingAccountUser === u.loginname}
+                            onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
+                            className={cn('min-h-11 px-3 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60', u.account_disable ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25')}
+                          >
+                            {updatingAccountUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+                            {u.account_disable ? 'เปิดบัญชี HOSxP' : 'ปิดบัญชี HOSxP'}
+                          </button>
                             {u.two_factor_enabled && (
                               <button
                                 type="button"
@@ -1553,8 +1605,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                 รีเซ็ต PIN
                               </button>
                             )}
-                          </div>
-                        )}
+                        </div>
                       </div>
                     ))
                   )}
@@ -1570,7 +1621,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                           <th className="py-3 px-4 min-w-[140px] whitespace-nowrap">กลุ่มงาน/ตำแหน่ง</th>
                           <th className="py-3 px-3 text-center w-[110px] whitespace-nowrap">2FA</th>
                           <th className="py-3 px-3 text-center w-[130px] whitespace-nowrap">PIN Lock</th>
-                          <th className="py-3 px-4 text-right w-[140px] whitespace-nowrap">การจัดการ</th>
+                          <th className="py-3 px-4 text-right min-w-[230px] whitespace-nowrap">การจัดการบัญชี / ความปลอดภัย</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -1629,8 +1680,17 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                 )}
                               </td>
                               <td className="py-2 px-4 text-right align-middle">
-                                {u.two_factor_enabled || u.has_pin ? (
-                                  <div className="inline-flex items-center gap-1.5 justify-end">
+                                <div className="inline-flex items-center gap-1.5 justify-end">
+                                    <button
+                                      type="button"
+                                      disabled={updatingAccountUser === u.loginname}
+                                      onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
+                                      className={cn('px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer flex items-center gap-1 whitespace-nowrap disabled:opacity-60', u.account_disable ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/25')}
+                                      title={u.account_disable ? 'เปิดบัญชีผู้ใช้ใน HOSxP' : 'ปิดบัญชีผู้ใช้ใน HOSxP'}
+                                    >
+                                      {updatingAccountUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
+                                      <span>{u.account_disable ? 'เปิดบัญชี' : 'ปิดบัญชี'}</span>
+                                    </button>
                                     {u.two_factor_enabled && (
                                       <button
                                         type="button"
@@ -1664,10 +1724,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                         <span>รีเซ็ต PIN</span>
                                       </button>
                                     )}
-                                  </div>
-                                ) : (
-                                  <span className="text-slate-600 text-xs select-none pr-2">-</span>
-                                )}
+                                </div>
                               </td>
                             </tr>
                           ))
@@ -1979,7 +2036,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           <div className="text-slate-400 font-normal">
             {activeTab === 'admin_system'
               ? 'SMART-HOSCHECK • HerbDx ระบบบริหารจัดการและควบคุมส่วนกลางสำหรับ Admin'
-              : 'PIN/2FA เก็บในฐาน dw_hd-check เท่านั้น — ไม่แตะฐาน HOSxP'}
+              : activeTab === 'admin_policy'
+                ? 'ปุ่มเปิด/ปิดบัญชีแก้สถานะใน HOSxP • การรีเซ็ต 2FA/PIN แก้ข้อมูลใน dw_hd-check'
+                : 'PIN/2FA เก็บในฐาน dw_hd-check เท่านั้น'}
           </div>
           <button
             type="button"
