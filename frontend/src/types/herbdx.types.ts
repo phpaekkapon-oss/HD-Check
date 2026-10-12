@@ -39,6 +39,8 @@ export interface AuditRecord {
   readonly drug_icode: string
   readonly drug_name: string
   readonly drug_qty: number
+  readonly min_qty?: number
+  readonly is_qty_fail?: boolean
   readonly drug_units?: string
   readonly department_name: string
   readonly main_pdx: string
@@ -97,13 +99,16 @@ export interface DxMapRecord {
   readonly icode: string
   readonly drug_name: string
   readonly dx_prefixes: string
+  readonly min_qty?: number
   readonly indication: string
   readonly updated_at: string
 }
 
 export interface DxMapUpdate {
   readonly icode: string
+  readonly drug_name?: string
   readonly dx_prefixes: string
+  readonly min_qty?: number
   readonly indication: string
 }
 
@@ -111,6 +116,7 @@ export interface DxMapPreview {
   readonly success: true
   readonly icode: string
   readonly periodDays: number
+  readonly min_qty?: number
   readonly total: number
   readonly pass: number
   readonly fail: number

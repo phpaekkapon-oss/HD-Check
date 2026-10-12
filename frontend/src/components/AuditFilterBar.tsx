@@ -52,7 +52,7 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
   onSearchChange,
   result,
   onResultChange,
-  patientType = 'ALL',
+  patientType = 'OPD',
   onPatientTypeChange,
   counts,
   onExport,

@@ -257,6 +257,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   const [resettingUser, setResettingUser] = useState<string | null>(null)
   const [resettingPinUser, setResettingPinUser] = useState<string | null>(null)
   const [updatingAccountUser, setUpdatingAccountUser] = useState<string | null>(null)
+  const [updatingAdminUser, setUpdatingAdminUser] = useState<string | null>(null)
   const [adminNotice, setAdminNotice] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string, type: 'key' | 'backup') => {
@@ -596,6 +597,31 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
       setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
     } finally {
       setUpdatingAccountUser(null)
+    }
+  }
+
+  const handleToggleAdmin = async (targetLogin: string, enabled: boolean) => {
+    const action = enabled ? 'กำหนด' : 'ถอด'
+    if (!confirm(`ยืนยัน${action}สิทธิ์ Admin ของบัญชี "${targetLogin}" หรือไม่? ${enabled ? 'ผู้ใช้นี้จะเข้าถึงและแก้ไขการตั้งค่าระดับผู้ดูแลได้' : 'หากกลุ่มงานหรือตำแหน่งใน HOSxP ยังเข้าเงื่อนไข Admin บัญชีอาจยังมีสิทธิ์อยู่'}`)) return
+    setUpdatingAdminUser(targetLogin)
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/admin-role`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ enabled }),
+      })
+      const data = await res.json()
+      if (data.success) {
+        setAdminNotice(`${action}สิทธิ์ Admin ให้ ${targetLogin} เรียบร้อยแล้ว ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่`)
+        await fetchUsers()
+        setTimeout(() => setAdminNotice(null), 6000)
+      } else {
+        setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสิทธิ์ Admin ไม่สำเร็จ'}`)
+      }
+    } catch (err) {
+      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+    } finally {
+      setUpdatingAdminUser(null)
     }
   }
 
@@ -1335,6 +1361,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   <span>{adminNotice}</span>
                 </div>
               )}
+              <p className="text-[11px] text-slate-400">
+                กำหนด Admin จะให้สิทธิ์จัดการระบบใน SMART-HOSCHECK แก่ผู้ใช้คนนั้น ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่เพื่อให้สิทธิ์มีผล
+              </p>
 
               {/* Policy Controls Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1576,6 +1605,15 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         <div className="flex flex-wrap gap-2 pt-1">
                           <button
                             type="button"
+                            disabled={updatingAdminUser === u.loginname}
+                            onClick={() => handleToggleAdmin(u.loginname, !u.admin_enabled)}
+                            className={cn('min-h-11 px-3 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60', u.admin_enabled ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-slate-800 text-slate-200 border-slate-700')}
+                          >
+                            {updatingAdminUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
+                            {u.admin_enabled ? 'ถอดสิทธิ์ Admin' : 'กำหนดเป็น Admin'}
+                          </button>
+                          <button
+                            type="button"
                             disabled={updatingAccountUser === u.loginname}
                             onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
                             className={cn('min-h-11 px-3 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60', u.account_disable ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25')}
@@ -1621,7 +1659,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                           <th className="py-3 px-4 min-w-[140px] whitespace-nowrap">กลุ่มงาน/ตำแหน่ง</th>
                           <th className="py-3 px-3 text-center w-[110px] whitespace-nowrap">2FA</th>
                           <th className="py-3 px-3 text-center w-[130px] whitespace-nowrap">PIN Lock</th>
-                          <th className="py-3 px-4 text-right min-w-[230px] whitespace-nowrap">การจัดการบัญชี / ความปลอดภัย</th>
+                          <th className="py-3 px-4 text-right min-w-[340px] whitespace-nowrap">สิทธิ์ Admin / การจัดการบัญชี</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -1681,6 +1719,16 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                               </td>
                               <td className="py-2 px-4 text-right align-middle">
                                 <div className="inline-flex items-center gap-1.5 justify-end">
+                                    <button
+                                      type="button"
+                                      disabled={updatingAdminUser === u.loginname}
+                                      onClick={() => handleToggleAdmin(u.loginname, !u.admin_enabled)}
+                                      className={cn('px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer flex items-center gap-1 whitespace-nowrap disabled:opacity-60', u.admin_enabled ? 'bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border-violet-500/25' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700')}
+                                      title={u.admin_enabled ? 'ถอดสิทธิ์ Admin ของ SMART-HOSCHECK' : 'กำหนดสิทธิ์ Admin ของ SMART-HOSCHECK'}
+                                    >
+                                      {updatingAdminUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
+                                      <span>{u.admin_enabled ? 'ถอด Admin' : 'ตั้ง Admin'}</span>
+                                    </button>
                                     <button
                                       type="button"
                                       disabled={updatingAccountUser === u.loginname}

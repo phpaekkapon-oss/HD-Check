@@ -105,10 +105,13 @@ export async function initDatabaseAndTables() {
       icode VARCHAR(20) PRIMARY KEY,
       drug_name VARCHAR(255) NULL,
       dx_prefixes VARCHAR(500) NOT NULL DEFAULT '',
+      min_qty INT NOT NULL DEFAULT 0,
       indication VARCHAR(255) NOT NULL DEFAULT '',
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=tis620
   `)
+
+  await conn.query("ALTER TABLE dw_hd_check_drug_dx_map ADD COLUMN IF NOT EXISTS min_qty INT NOT NULL DEFAULT 0 AFTER dx_prefixes").catch(() => {})
 
   // 4) Sync history
   await conn.query(`

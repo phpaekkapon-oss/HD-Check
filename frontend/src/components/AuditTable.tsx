@@ -25,6 +25,7 @@ import { DataTablePagination } from '@/components/DataTablePagination'
 import { DataTableViewOptions } from '@/components/DataTableViewOptions'
 import { cn } from '@/lib/utils'
 import { toThaiDate } from '@/lib/format'
+import { CopyButton } from '@/components/CopyButton'
 
 interface AuditTableProps {
   readonly records: readonly AuditRecord[]
@@ -157,9 +158,12 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           <DataTableColumnHeader column={column} title="HN" />
         ),
         cell: ({ row }) => (
-          <span className="font-mono font-bold text-slate-900 dark:text-white whitespace-nowrap">
-            {row.original.hn}
-          </span>
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="font-mono font-bold text-slate-900 dark:text-white">
+              {row.original.hn}
+            </span>
+            <CopyButton text={row.original.hn} title="คัดลอก HN" />
+          </div>
         ),
       },
       {
@@ -168,9 +172,12 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           <DataTableColumnHeader column={column} title="ชื่อผู้รับบริการ" />
         ),
         cell: ({ row }) => (
-          <span className="font-medium text-slate-900 dark:text-white whitespace-nowrap">
-            {row.original.patient_name}
-          </span>
+          <div className="flex items-center gap-1.5 whitespace-nowrap">
+            <span className="font-medium text-slate-900 dark:text-white">
+              {row.original.patient_name}
+            </span>
+            <CopyButton text={row.original.patient_name} title="คัดลอกชื่อผู้รับบริการ" />
+          </div>
         ),
       },
       {
@@ -218,14 +225,37 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
         ),
         cell: ({ row }) => {
           const shortUnit = cleanDrugUnit(row.original.drug_units)
+          const minQty = row.original.min_qty ?? 0
+          const isQtyFail = Boolean(row.original.is_qty_fail || (minQty > 0 && row.original.drug_qty < minQty))
           return (
-            <div className="flex items-center justify-center gap-1.5 font-mono whitespace-nowrap">
-              <span className="text-sm font-bold text-slate-850 dark:text-slate-100">
-                {row.original.drug_qty}
-              </span>
-              {shortUnit ? (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium font-sans bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border border-slate-200/60 dark:border-slate-700/60">
-                  {shortUnit}
+            <div className="flex flex-col items-center justify-center gap-0.5 whitespace-nowrap">
+              <div className="flex items-center justify-center gap-1.5 font-mono">
+                <span
+                  className={cn(
+                    'text-sm font-bold',
+                    isQtyFail
+                      ? 'text-rose-600 dark:text-rose-400 font-extrabold animate-pulse'
+                      : 'text-slate-850 dark:text-slate-100'
+                  )}
+                >
+                  {row.original.drug_qty}
+                </span>
+                {shortUnit ? (
+                  <span
+                    className={cn(
+                      'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium font-sans border',
+                      isQtyFail
+                        ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
+                        : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
+                    )}
+                  >
+                    {shortUnit}
+                  </span>
+                ) : null}
+              </div>
+              {isQtyFail && minQty > 0 ? (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800">
+                  ขั้นต่ำ {minQty} {shortUnit}
                 </span>
               ) : null}
             </div>

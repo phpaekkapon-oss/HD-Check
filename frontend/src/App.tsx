@@ -16,7 +16,7 @@ import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useSyncHerbDx
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange } from '@/types/herbdx.types'
 import { currentMonthRange, downloadExcel, toThaiDate } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
-import { isAdminUser } from '@/types/auth.types'
+import { canManageHerbDx } from '@/types/auth.types'
 import { PinLockProvider } from '@/context/PinLockContext'
 import { LoginPage } from '@/components/LoginPage'
 import { LockScreenOverlay } from '@/components/LockScreenOverlay'
@@ -32,7 +32,7 @@ const DashboardView: FC = () => {
   const [hn, setHn] = useState<string>('')
   const [search, setSearch] = useState<string>('')
   const [resultFilter, setResultFilter] = useState<AuditResultFilter>('ALL')
-  const [patientTypeFilter, setPatientTypeFilter] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
+  const [patientTypeFilter, setPatientTypeFilter] = useState<'ALL' | 'OPD' | 'IPD'>('OPD')
 
   const filterParams: AuditFilterParams = {
     ...range,
@@ -331,7 +331,7 @@ const DashboardView: FC = () => {
           drugs={drugSummaries}
           dxMap={dxMap}
           mismatches={mismatchResponse?.data ?? []}
-          canEdit={isAdminUser(user)}
+          canEdit={canManageHerbDx(user)}
           loading={isDrugsLoading || isDxMapLoading || isMismatchLoading}
         />
       )}
@@ -343,7 +343,7 @@ const DashboardView: FC = () => {
           range={range}
           onRangeChange={handleRangeChange}
           latestVisitDate={status?.latestVisitDate ?? null}
-          canEdit={isAdminUser(user)}
+          canEdit={canManageHerbDx(user)}
           loading={isMismatchLoading}
         />
       )}

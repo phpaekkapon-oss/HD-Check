@@ -171,6 +171,7 @@ function clearSessionCookie(res) {
 
 function isAdminUser(user) {
   if (!user) return false
+  if (user.admin_enabled === true || Number(user.admin_enabled) === 1) return true
   const login = String(user.loginname ?? '').toLowerCase().trim()
   const group = String(user.groupname ?? '').toLowerCase().trim()
   const pos = String(user.position || user.entryposition || '').toLowerCase().trim()
@@ -228,6 +229,44 @@ function requireAdmin(req, res, next) {
   })
 }
 
+function canManageHerbDx(user) {
+  if (!user) return false
+  if (isAdminUser(user)) return true
+  const group = String(user.groupname ?? '').toLowerCase().trim()
+  const pos = String(user.position || user.entryposition || '').toLowerCase().trim()
+
+  // Thai Traditional Medicine staff (แพทย์แผนไทย, นักการแพทย์แผนไทย, แพทย์แผนไทยประยุกต์, แผนไทย)
+  if (
+    pos.includes('แพทย์แผนไทย') ||
+    pos.includes('แผนไทย') ||
+    pos.includes('การแพทย์ทางเลือก') ||
+    group.includes('แพทย์แผนไทย') ||
+    group.includes('แผนไทย') ||
+    group.includes('การแพทย์ทางเลือก')
+  ) {
+    return true
+  }
+
+  // Pharmacy staff
+  if (pos.includes('เภสัช') || group.includes('เภสัช')) {
+    return true
+  }
+
+  return false
+}
+
+function requireHerbDxManager(req, res, next) {
+  return requireSession(req, res, () => {
+    if (!canManageHerbDx(req.authUser)) {
+      return res.status(403).json({
+        success: false,
+        error: 'คุณไม่มีสิทธิ์แก้ไขหรือเพิ่มเกณฑ์ ICD-10 (จำกัดเฉพาะผู้ดูแลระบบ, เจ้าหน้าที่การแพทย์แผนไทย หรือเภสัชกร)',
+      })
+    }
+    next()
+  })
+}
+
 function canManageLogin(user, loginname) {
   return String(user?.loginname ?? '').toLowerCase() === String(loginname ?? '').trim().toLowerCase() || isAdminUser(user)
 }
@@ -255,8 +294,9 @@ const readRange = (q) => {
 
 /* ---------------- Audit rule ---------------- */
 async function loadDxMap() {
-  const [rows] = await dwPool.query('SELECT icode, dx_prefixes FROM dw_hd_check_drug_dx_map')
+  const [rows] = await dwPool.query('SELECT icode, dx_prefixes, min_qty FROM dw_hd_check_drug_dx_map')
   const map = new Map()
+  const minQtyMap = new Map()
   for (const r of rows) {
     map.set(
       r.icode,
@@ -265,34 +305,83 @@ async function loadDxMap() {
         .map((s) => s.trim().toUpperCase().replace('.', ''))
         .filter(Boolean)
     )
+    minQtyMap.set(r.icode, Number(r.min_qty ?? 0))
   }
-  return map
+  return { dxMap: map, minQtyMap }
 }
 
 // ICD codes may be stored with or without the decimal separator (for example K30 / K30.0).
 // Strip separators on both sides so the configured rule and HOSxP value use the same form.
 const normalizeIcdCode = (value) => String(value ?? '').trim().toUpperCase().replace(/\./g, '')
 
-function evaluate(row, dxMap) {
+function evaluate(row, dxMap, minQtyMap) {
+  const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
+  const qty = Number(row.drug_qty ?? 0)
+  const isQtyFail = minQty > 0 && qty < minQty
+  const units = row.drug_units ? ` ${row.drug_units}` : ''
+
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
     .map(normalizeIcdCode)
     .filter(Boolean)
   const unique = [...new Set(dxList)]
   if (unique.length === 0) {
-    return { audit_result: 'NO_DX', matched_dx: [], allowed_dx: [], audit_reason: 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)' }
+    return {
+      audit_result: 'NO_DX',
+      matched_dx: [],
+      allowed_dx: [],
+      min_qty: minQty,
+      is_qty_fail: isQtyFail,
+      audit_reason: isQtyFail
+        ? `ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง) และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
+        : 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)',
+    }
   }
   const allowed = dxMap.get(row.drug_icode) ?? []
   const matched = unique.filter((dx) => allowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
-  if (matched.length > 0) {
-    return { audit_result: 'PASS', matched_dx: matched, allowed_dx: allowed, audit_reason: 'พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (เป็นผลตรวจของระบบ)' }
-  }
+
   if (allowed.length === 0) {
-    return { audit_result: 'NO_MAP', matched_dx: [], allowed_dx: [], audit_reason: 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้' }
+    return {
+      audit_result: 'NO_MAP',
+      matched_dx: [],
+      allowed_dx: [],
+      min_qty: minQty,
+      is_qty_fail: isQtyFail,
+      audit_reason: isQtyFail
+        ? `ยังไม่ได้กำหนด ICD และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
+        : 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้',
+    }
+  }
+
+  // หากมียาที่มีการกำหนดจ่ายขั้นต่ำ และจ่ายน้อยกว่าเกณฑ์ จะถือว่าไม่ผ่าน (FAIL) เพราะจะเบิกเคลมไม่ผ่าน
+  if (isQtyFail) {
+    return {
+      audit_result: 'FAIL',
+      matched_dx: matched,
+      allowed_dx: allowed,
+      min_qty: minQty,
+      is_qty_fail: true,
+      audit_reason: matched.length > 0
+        ? `จ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์กำหนดขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`
+        : `ไม่พบ DX ที่ตรงกับเกณฑ์ และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์ขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`,
+    }
+  }
+
+  if (matched.length > 0) {
+    return {
+      audit_result: 'PASS',
+      matched_dx: matched,
+      allowed_dx: allowed,
+      min_qty: minQty,
+      is_qty_fail: false,
+      audit_reason: 'พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (เป็นผลตรวจของระบบ)',
+    }
   }
   return {
     audit_result: 'FAIL',
     matched_dx: [],
     allowed_dx: allowed,
+    min_qty: minQty,
+    is_qty_fail: false,
     audit_reason: `ไม่พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (พบ ${unique.join(', ')}; เกณฑ์ ${allowed.join(', ')})`,
   }
 }
@@ -406,8 +495,8 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
     sql += ' ORDER BY visit_date DESC, visit_time DESC, id ASC'
 
     const [rows] = await dwPool.query(sql, params)
-    const dxMap = await loadDxMap()
-    const evaluated = rows.map((r) => ({ ...r, drug_qty: Number(r.drug_qty), ...evaluate(r, dxMap) }))
+    const { dxMap, minQtyMap } = await loadDxMap()
+    const evaluated = rows.map((r) => ({ ...r, drug_qty: Number(r.drug_qty), ...evaluate(r, dxMap, minQtyMap) }))
 
     const count = (k) => evaluated.filter((r) => r.audit_result === k).length
     const kpi = {
@@ -487,33 +576,63 @@ app.get('/api/drugs', requireSession, async (req, res) => {
 app.get('/api/dx-map', requireSession, async (_req, res) => {
   try {
     const activeHerbs = await getActiveHerbalDrugs()
-    if (activeHerbs.length === 0) return res.json({ success: true, data: [] })
-    const activeCodes = activeHerbs.map((drug) => drug.icode)
     const [mappedRows] = await dwPool.query(
-      `SELECT icode, COALESCE(dx_prefixes, '') AS dx_prefixes,
+      `SELECT icode, drug_name, COALESCE(dx_prefixes, '') AS dx_prefixes,
+              COALESCE(min_qty, 0) AS min_qty,
               COALESCE(indication, '') AS indication,
               COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s'), '') AS updated_at
-       FROM dw_hd_check_drug_dx_map WHERE icode IN (?)`,
-      [activeCodes]
+       FROM dw_hd_check_drug_dx_map`
     )
     const mapByCode = new Map(mappedRows.map((row) => [String(row.icode), row]))
-    const rows = activeHerbs.map((drug) => {
+    const allDrugsMap = new Map()
+    for (const h of activeHerbs) {
+      allDrugsMap.set(h.icode, { icode: h.icode, drug_name: h.drug_name })
+    }
+    for (const m of mappedRows) {
+      if (!allDrugsMap.has(m.icode)) {
+        allDrugsMap.set(m.icode, { icode: m.icode, drug_name: m.drug_name || m.icode })
+      }
+    }
+    const rows = Array.from(allDrugsMap.values()).map((drug) => {
       const mapped = mapByCode.get(drug.icode)
       return {
         icode: drug.icode,
-        drug_name: drug.drug_name,
+        drug_name: mapped?.drug_name || drug.drug_name,
         dx_prefixes: mapped?.dx_prefixes ?? '',
+        min_qty: Number(mapped?.min_qty ?? 0),
         indication: mapped?.indication ?? '',
         updated_at: mapped?.updated_at ?? '',
       }
-    })
+    }).sort((a, b) => a.drug_name.localeCompare(b.drug_name, 'th'))
     res.json({ success: true, data: rows })
   } catch (err) {
     fail(res, err)
   }
 })
 
-app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
+app.get('/api/dx-map/search-drugs', requireHerbDxManager, async (req, res) => {
+  try {
+    const q = String(req.query.q ?? '').trim()
+    if (!q) return res.json({ success: true, data: [] })
+    const [rows] = await hosPool.query(
+      `SELECT d.icode, d.name, d.units
+       FROM drugitems d
+       WHERE d.istatus = 'Y'
+         AND (d.name LIKE ? OR d.icode LIKE ?)
+       ORDER BY d.name
+       LIMIT 30`,
+      [`%${q}%`, `%${q}%`]
+    )
+    res.json({
+      success: true,
+      data: rows.map((r) => ({ icode: String(r.icode), name: r.name ?? String(r.icode), units: r.units ?? '' })),
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) => {
   try {
     const icode = String(req.params.icode ?? '').trim()
     const prefixes = String(req.body?.dx_prefixes ?? '')
@@ -523,7 +642,11 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
     const periodDays = Number(req.body?.periodDays ?? 90)
     if (!icode) return res.status(400).json({ success: false, error: 'ไม่พบรหัสยา' })
     const activeHerbs = await getActiveHerbalDrugs()
-    if (!activeHerbs.some((drug) => drug.icode === icode)) return res.status(404).json({ success: false, error: 'ไม่พบยาสมุนไพรที่เปิดใช้งานใน HOSxP' })
+    const isHerb = activeHerbs.some((drug) => drug.icode === icode)
+    if (!isHerb) {
+      const [hosRows] = await hosPool.query('SELECT icode FROM drugitems WHERE icode = ? LIMIT 1', [icode])
+      if (!hosRows.length) return res.status(404).json({ success: false, error: 'ไม่พบรหัสยานี้ในฐานข้อมูล HOSxP' })
+    }
     if (![30, 90, 365, 0].includes(periodDays)) {
       return res.status(400).json({ success: false, error: 'ช่วงเวลาทดลองไม่ถูกต้อง' })
     }
@@ -538,11 +661,15 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
       params
     )
 
+    const [mapRows] = await dwPool.query('SELECT min_qty FROM dw_hd_check_drug_dx_map WHERE icode = ? LIMIT 1', [icode])
+    const currentMinQty = mapRows[0]?.min_qty ? Number(mapRows[0].min_qty) : 0
+    const proposedMinQty = req.body?.min_qty !== undefined ? Math.max(0, parseInt(req.body.min_qty, 10) || 0) : currentMinQty
     const proposedMap = new Map([[icode, [...new Set(prefixes)]]])
+    const proposedMinQtyMap = new Map([[icode, proposedMinQty]])
     const totals = { pass: 0, fail: 0, noDx: 0, noMap: 0 }
     const codeCounts = new Map()
     for (const row of rows) {
-      const result = evaluate({ ...row, drug_icode: icode }, proposedMap)
+      const result = evaluate({ ...row, drug_icode: icode }, proposedMap, proposedMinQtyMap)
       if (result.audit_result === 'PASS') totals.pass += 1
       else if (result.audit_result === 'FAIL') totals.fail += 1
       else if (result.audit_result === 'NO_DX') totals.noDx += 1
@@ -565,28 +692,37 @@ app.post('/api/dx-map/:icode/preview', requireAdmin, async (req, res) => {
       .sort((a, b) => b.count - a.count || a.code.localeCompare(b.code))
       .slice(0, 12)
 
-    res.json({ success: true, icode, periodDays, total: rows.length, ...totals, frequentDx })
+    res.json({ success: true, icode, periodDays, min_qty: proposedMinQty, total: rows.length, ...totals, frequentDx })
   } catch (err) {
     fail(res, err)
   }
 })
 
-app.put('/api/dx-map/:icode', requireAdmin, async (req, res) => {
+app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
   try {
     const { icode } = req.params
-    const activeHerbs = await getActiveHerbalDrugs()
-    if (!activeHerbs.some((drug) => drug.icode === String(icode))) return res.status(404).json({ success: false, error: 'ไม่พบยาสมุนไพรที่เปิดใช้งานใน HOSxP' })
+    const [hosDrugs] = await hosPool.query('SELECT icode, name FROM drugitems WHERE icode = ? LIMIT 1', [icode])
+    let drugName = String(req.body?.drug_name ?? '').trim()
+    if (!drugName && hosDrugs.length) {
+      drugName = hosDrugs[0].name
+    }
+    if (!hosDrugs.length) {
+      const [dwDrugs] = await dwPool.query('SELECT drug_name FROM dw_hd_check_drug_dx_map WHERE icode = ? LIMIT 1', [icode])
+      if (!dwDrugs.length) return res.status(404).json({ success: false, error: 'ไม่พบรหัสยานี้ในฐานข้อมูล HOSxP (drugitems)' })
+      drugName = drugName || dwDrugs[0].drug_name || String(icode)
+    }
     const prefixes = String(req.body?.dx_prefixes ?? '')
       .split(/[,\s]+/)
       .map((s) => s.trim().toUpperCase().replace('.', ''))
       .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
+    const min_qty = Math.max(0, parseInt(req.body?.min_qty ?? 0, 10) || 0)
     const indication = String(req.body?.indication ?? '').slice(0, 255)
     await dwPool.query(
-      `INSERT INTO dw_hd_check_drug_dx_map (icode, dx_prefixes, indication) VALUES (?, ?, ?)
-       ON DUPLICATE KEY UPDATE dx_prefixes = VALUES(dx_prefixes), indication = VALUES(indication)`,
-      [icode, [...new Set(prefixes)].join(','), indication]
+      `INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name, dx_prefixes, min_qty, indication) VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE drug_name = COALESCE(VALUES(drug_name), drug_name), dx_prefixes = VALUES(dx_prefixes), min_qty = VALUES(min_qty), indication = VALUES(indication)`,
+      [icode, drugName, [...new Set(prefixes)].join(','), min_qty, indication]
     )
-    res.json({ success: true, icode, dx_prefixes: [...new Set(prefixes)].join(','), indication })
+    res.json({ success: true, icode, drug_name: drugName, dx_prefixes: [...new Set(prefixes)].join(','), min_qty, indication })
   } catch (err) {
     fail(res, err)
   }
@@ -1152,6 +1288,34 @@ app.get('/api/admin/users-2fa', requireAdmin, async (_req, res) => {
   try {
     const users = await listAllUsers2FA(hosPool, dwPool)
     res.json({ success: true, data: users })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/admin/users/:loginname/admin-role', requireAdmin, async (req, res) => {
+  try {
+    const loginname = String(req.params.loginname ?? '').trim()
+    const enabled = req.body?.enabled
+    if (!loginname || typeof enabled !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'ระบุผู้ใช้และสถานะ Admin ให้ถูกต้อง' })
+    }
+    if (!enabled && loginname.toLowerCase() === String(req.authUser.loginname ?? '').toLowerCase()) {
+      return res.status(400).json({ success: false, error: 'ไม่สามารถถอดสิทธิ์ Admin ของบัญชีที่กำลังใช้งานอยู่ได้' })
+    }
+    const [users] = await hosPool.query(
+      'SELECT loginname, name, groupname FROM opduser WHERE loginname = ? LIMIT 1',
+      [loginname]
+    )
+    if (!users.length) return res.status(404).json({ success: false, error: 'ไม่พบบัญชีนี้ใน HOSxP' })
+    const target = users[0]
+    await dwPool.query(
+      `INSERT INTO dw_hd_check_user_2fa (loginname, name, user_type, groupname, admin_enabled)
+       VALUES (?, ?, 'opduser', ?, ?)
+       ON DUPLICATE KEY UPDATE admin_enabled = VALUES(admin_enabled), name = VALUES(name), groupname = VALUES(groupname)`,
+      [target.loginname, target.name || target.loginname, target.groupname || null, enabled ? 1 : 0]
+    )
+    res.json({ success: true, loginname: target.loginname, admin_enabled: enabled })
   } catch (err) {
     fail(res, err)
   }

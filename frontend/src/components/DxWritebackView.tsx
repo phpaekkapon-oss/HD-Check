@@ -3,6 +3,7 @@ import { AlertTriangle, CalendarClock, CircleHelp, LockKeyhole, Send, ShieldChec
 import type { AuditRecord, DateRange } from '@/types/herbdx.types'
 import { DateRangeFields } from '@/components/AuditFilterBar'
 import { fmtNum, toThaiDateShort } from '@/lib/format'
+import { CopyButton } from '@/components/CopyButton'
 
 interface DxWritebackViewProps {
   readonly records: readonly AuditRecord[]
@@ -57,7 +58,7 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
   }
 
   if (!canEdit) {
-    return <section className="rounded-2xl border border-rose-300/50 bg-rose-50 p-6 text-center dark:border-rose-900/50 dark:bg-rose-950/25"><LockKeyhole className="mx-auto size-7 text-rose-700 dark:text-rose-300" /><h1 className="mt-2 font-bold text-rose-950 dark:text-rose-100">จำกัดสิทธิ์ผู้ดูแลระบบ</h1><p className="mt-1 text-sm text-rose-800 dark:text-rose-200">หน้านี้มีข้อมูลรายครั้งรับบริการและเปิดให้เฉพาะผู้ดูแลระบบตรวจทาน</p></section>
+    return <section className="rounded-2xl border border-rose-300/50 bg-rose-50 p-6 text-center dark:border-rose-900/50 dark:bg-rose-950/25"><LockKeyhole className="mx-auto size-7 text-rose-700 dark:text-rose-300" /><h1 className="mt-2 font-bold text-rose-950 dark:text-rose-100">จำกัดสิทธิ์ผู้ดูแลระบบและแพทย์แผนไทย</h1><p className="mt-1 text-sm text-rose-800 dark:text-rose-200">หน้านี้มีข้อมูลรายครั้งรับบริการและเปิดให้เฉพาะผู้ดูแลระบบและแพทย์แผนไทยตรวจทาน</p></section>
   }
 
   return (
@@ -89,7 +90,21 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
           {loading ? <div role="status" className="p-8 text-center text-sm text-slate-500">กำลังโหลดรายการตามช่วงวันที่…</div> : filtered.length === 0 ? <div className="p-8 text-center"><CircleHelp className="mx-auto size-6 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">ไม่พบ VN ที่ต้องทบทวนในช่วงนี้</p><p className="mt-1 text-xs text-slate-500">ลองเปลี่ยนช่วงวันที่ หรือเลือกเดือนที่มีข้อมูลล่าสุด</p></div> : (
             <div className="max-h-[60vh] overflow-auto divide-y divide-slate-100 dark:divide-white/5">
               {filtered.slice(0, 300).map((visit) => <button key={visit.vn} type="button" onClick={() => setSelectedVN(visit.vn)} className={`w-full px-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.03] ${selectedVN === visit.vn ? 'bg-violet-50 dark:bg-violet-950/25' : ''}`}>
-                <span className="flex items-start justify-between gap-3"><span className="min-w-0"><span className="block truncate text-sm font-semibold text-slate-900 dark:text-white">{visit.patientName || 'ไม่พบชื่อผู้ป่วย'}</span><span className="mt-1 block font-mono text-[11px] text-slate-500">HN {visit.hn} · VN {visit.vn}</span></span><span className="shrink-0 text-xs text-slate-500">{toThaiDateShort(visit.date)}</span></span>
+                <span className="flex items-start justify-between gap-3">
+                  <span className="min-w-0">
+                    <span className="truncate text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-1">
+                      <span>{visit.patientName || 'ไม่พบชื่อผู้ป่วย'}</span>
+                      {visit.patientName ? <CopyButton text={visit.patientName} title="คัดลอกชื่อผู้ป่วย" iconSize="size-3" /> : null}
+                    </span>
+                    <span className="mt-1 flex items-center gap-1 font-mono text-[11px] text-slate-500">
+                      <span>HN {visit.hn}</span>
+                      <CopyButton text={visit.hn} title="คัดลอก HN" iconSize="size-3" />
+                      <span>· VN {visit.vn}</span>
+                      <CopyButton text={visit.vn} title="คัดลอก VN" iconSize="size-3" />
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs text-slate-500">{toThaiDateShort(visit.date)}</span>
+                </span>
                 <span className="mt-1 block truncate text-xs text-slate-600 dark:text-slate-300">{visit.records.map((row) => row.drug_name).join(' · ')}</span>
               </button>)}
               {filtered.length > 300 && <p className="p-3 text-center text-xs text-slate-500">แสดง 300 จาก {fmtNum(filtered.length)} VN · กรุณาค้นหาด้วย HN หรือ VN เพื่อจำกัดรายการ</p>}
@@ -99,7 +114,21 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
 
         <div className="rounded-xl border border-themed bg-themed-card p-4">
           {!selected ? <div className="grid min-h-48 place-items-center text-center"><div><ShieldCheck className="mx-auto size-7 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">เลือกรายการทางซ้ายเพื่อดูรายละเอียด</p><p className="mt-1 text-xs text-slate-500">ระบบจะแสดง DX ที่มีอยู่และผลตรวจของ VN ที่เลือก</p></div></div> : <>
-            <div className="flex items-start justify-between gap-3"><div><h2 className="text-base font-bold text-slate-900 dark:text-white">{selected.patientName}</h2><p className="mt-1 font-mono text-xs text-slate-500">HN {selected.hn} · VN {selected.vn}</p></div><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-white/5">{toThaiDateShort(selected.date)}</span></div>
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base font-bold text-slate-900 dark:text-white">{selected.patientName}</h2>
+                  <CopyButton text={selected.patientName} title="คัดลอกชื่อผู้ป่วย" />
+                </div>
+                <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-slate-500">
+                  <span>HN {selected.hn}</span>
+                  <CopyButton text={selected.hn} title="คัดลอก HN" iconSize="size-3" />
+                  <span>· VN {selected.vn}</span>
+                  <CopyButton text={selected.vn} title="คัดลอก VN" iconSize="size-3" />
+                </div>
+              </div>
+              <span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 text-xs dark:bg-white/5">{toThaiDateShort(selected.date)}</span>
+            </div>
             <div className="mt-4 space-y-3">
               <section><h3 className="text-xs font-semibold text-slate-500">รายการยาและผลตรวจ</h3><div className="mt-1 space-y-1">{selected.records.map((row) => <div key={row.id} className="rounded-lg border border-themed bg-themed-app px-3 py-2"><p className="text-sm font-medium text-slate-900 dark:text-white">{row.drug_name}</p><p className="mt-0.5 text-xs text-rose-700 dark:text-rose-300">{row.audit_reason}</p></div>)}</div></section>
               <section>

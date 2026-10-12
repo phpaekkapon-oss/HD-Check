@@ -8,10 +8,12 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck } from 'lucide-react'
 import { herbDxApi } from '@/api/herbdx.api'
+import { useAuth } from '@/context/AuthContext'
 import { useDxMap, useUpdateDxMap } from '@/hooks/useHerbDx'
 import type { DxMapPreview, DxMapRecord } from '@/types/herbdx.types'
+import { canManageHerbDx } from '@/types/auth.types'
 import {
   Table,
   TableBody,
@@ -44,11 +46,14 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
 }
 
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
+  const { user } = useAuth()
+  const canEdit = canManageHerbDx(user)
   const { data: dxMap = [], isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
   const [prefixes, setPrefixes] = useState('')
+  const [minQty, setMinQty] = useState<number>(0)
   const [indication, setIndication] = useState('')
   const [search, setSearch] = useState(initialIcode ?? '')
   const initializedIcode = useRef<string | undefined>(undefined)
@@ -57,7 +62,82 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
   const [periodDays, setPeriodDays] = useState(90)
+  const [saveError, setSaveError] = useState<string | null>(null)
   const broadPrefixes = prefixes.split(/[ ,\s]+/).map((prefix) => prefix.trim()).filter((prefix) => prefix.length === 1)
+
+  // State for adding a new herbal drug from HOSxP
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
+  const [addSearchQuery, setAddSearchQuery] = useState('')
+  const [searchResults, setSearchResults] = useState<readonly { icode: string; name: string; units?: string }[]>([])
+  const [isSearchingDrugs, setIsSearchingDrugs] = useState(false)
+  const [selectedDrug, setSelectedDrug] = useState<{ icode: string; name: string; units?: string } | null>(null)
+  const [newPrefixes, setNewPrefixes] = useState('')
+  const [newMinQty, setNewMinQty] = useState<number>(0)
+  const [newIndication, setNewIndication] = useState('')
+  const [addError, setAddError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!isAddModalOpen || !addSearchQuery.trim()) {
+      setSearchResults([])
+      setIsSearchingDrugs(false)
+      return
+    }
+    const timer = setTimeout(async () => {
+      setIsSearchingDrugs(true)
+      try {
+        const res = await herbDxApi.searchDrugs(addSearchQuery.trim())
+        setSearchResults(res.data)
+      } catch (err) {
+        console.error(err)
+        setSearchResults([])
+      } finally {
+        setIsSearchingDrugs(false)
+      }
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [addSearchQuery, isAddModalOpen])
+
+  const handleSelectDrugToAdd = (drug: { icode: string; name: string; units?: string }) => {
+    setSelectedDrug(drug)
+    const existing = dxMap.find((item) => item.icode === drug.icode)
+    if (existing) {
+      setNewPrefixes(existing.dx_prefixes)
+      setNewMinQty(existing.min_qty ?? 0)
+      setNewIndication(existing.indication)
+    } else {
+      setNewPrefixes('')
+      setNewMinQty(0)
+      setNewIndication('')
+    }
+    setAddError(null)
+  }
+
+  const handleSaveNewDrug = () => {
+    if (!selectedDrug) return
+    setAddError(null)
+    updateMap(
+      {
+        icode: selectedDrug.icode,
+        drug_name: selectedDrug.name,
+        dx_prefixes: newPrefixes,
+        min_qty: newMinQty,
+        indication: newIndication,
+      },
+      {
+        onSuccess: () => {
+          setIsAddModalOpen(false)
+          setSelectedDrug(null)
+          setAddSearchQuery('')
+          setNewPrefixes('')
+          setNewMinQty(0)
+          setNewIndication('')
+        },
+        onError: (err) => {
+          setAddError(err instanceof Error ? err.message : 'บันทึกเกณฑ์ไม่สำเร็จ')
+        },
+      }
+    )
+  }
 
   useEffect(() => {
     if (!initialIcode || isLoading || initializedIcode.current === initialIcode) return
@@ -68,6 +148,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     setSearch(initialIcode)
     setEditingIcode(item.icode)
     setPrefixes(item.dx_prefixes)
+    setMinQty(item.min_qty ?? 0)
     setIndication(item.indication)
     setPreview(null)
     setPreviewError(null)
@@ -76,6 +157,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const handleStartEdit = (item: DxMapRecord) => {
     setEditingIcode(item.icode)
     setPrefixes(item.dx_prefixes)
+    setMinQty(item.min_qty ?? 0)
     setIndication(item.indication)
     setPreview(null)
     setPreviewError(null)
@@ -96,9 +178,13 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
   const handleSave = () => {
     if (!editingIcode) return
+    setSaveError(null)
     updateMap(
-      { icode: editingIcode, dx_prefixes: prefixes, indication },
-      { onSuccess: () => setEditingIcode(null) }
+      { icode: editingIcode, dx_prefixes: prefixes, min_qty: minQty, indication },
+      {
+        onSuccess: () => setEditingIcode(null),
+        onError: (error) => setSaveError(error instanceof Error ? error.message : 'บันทึกเกณฑ์ไม่สำเร็จ'),
+      }
     )
   }
 
@@ -194,6 +280,41 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         },
       },
       {
+        accessorKey: 'min_qty',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="จ่ายขั้นต่ำ" className="justify-center" />
+        ),
+        cell: ({ row }) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          if (isEditing) {
+            return (
+              <div className="flex items-center justify-center">
+                <input
+                  type="number"
+                  min="0"
+                  value={minQty}
+                  onChange={(e) => setMinQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  placeholder="0"
+                  className="w-16 rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 font-mono text-center text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
+                />
+              </div>
+            )
+          }
+          return (
+            <div className="flex items-center justify-center font-mono">
+              {item.min_qty && item.min_qty > 0 ? (
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50">
+                  ≥ {item.min_qty}
+                </span>
+              ) : (
+                <span className="text-slate-400 text-xs">-</span>
+              )}
+            </div>
+          )
+        },
+      },
+      {
         accessorKey: 'indication',
         header: ({ column }) => (
           <DataTableColumnHeader column={column} title="ข้อบ่งใช้ / สรรพคุณ" />
@@ -252,6 +373,13 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               </div>
             )
           }
+          if (!canEdit) {
+            return (
+              <div className="text-center whitespace-nowrap">
+                <span className="text-[11px] text-slate-400 dark:text-slate-500">ดูอย่างเดียว</span>
+              </div>
+            )
+          }
           return (
             <div className="text-center whitespace-nowrap">
               <button
@@ -267,7 +395,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         enableSorting: false,
       },
     ],
-    [editingIcode, prefixes, indication, isPending]
+    [editingIcode, prefixes, indication, isPending, canEdit]
   )
 
   const table = useReactTable({
@@ -294,10 +422,17 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         <div className="grid place-items-center size-8 rounded-xl bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
           <Info className="size-4.5" />
         </div>
-        <div className="space-y-1">
-          <strong className="text-sm font-bold block text-slate-900 dark:text-white tracking-tight">
-            เกณฑ์การจับคู่ยาสมุนไพรกับรหัสการวินิจฉัยโรค (ICD-10 / ICD-10-TM)
-          </strong>
+        <div className="space-y-1 flex-1">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <strong className="text-sm font-bold block text-slate-900 dark:text-white tracking-tight">
+              เกณฑ์การจับคู่ยาสมุนไพรกับรหัสการวินิจฉัยโรค (ICD-10 / ICD-10-TM)
+            </strong>
+            {canEdit && (
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+                <BadgeCheck className="size-3.5" /> บัญชีมีสิทธิ์จัดการเกณฑ์ (แพทย์แผนไทย / Admin)
+              </span>
+            )}
+          </div>
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
             ระบบจะตรวจสอบว่าการสั่งจ่ายยานั้น มีรหัส PDX หรือ DX0-DX5 ที่ขึ้นต้นด้วยคำนำหน้าที่กำหนดไว้หรือไม่ (เช่น ระบุ <code className="font-mono bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded font-bold border border-teal-500/30">M</code> จะครอบคลุมทุกรหัสโรคกล้ามเนื้อ M00-M99) หรือหากมีรหัสแพทย์แผนไทยที่ขึ้นต้นด้วย <code className="font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">U</code> ระบบจะให้ <strong className="text-emerald-700 dark:text-emerald-300 font-bold">ผ่านเกณฑ์อัตโนมัติ</strong>
           </p>
@@ -307,7 +442,19 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         </div>
       </div>
 
-      {/* Search Header */}
+      {!canEdit && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/20 dark:text-amber-200">
+          <ShieldAlert className="mt-0.5 size-4 shrink-0" />
+          <p>บัญชีนี้ดูเกณฑ์ได้ แต่แก้ไขหรือบันทึกไม่ได้ (สิทธิ์แก้ไขเปิดให้ผู้ดูแลระบบ, เจ้าหน้าที่การแพทย์แผนไทย และเภสัชกร)</p>
+        </div>
+      )}
+      {saveError && (
+        <div role="alert" className="rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2.5 text-xs text-rose-800 dark:border-rose-500/25 dark:bg-rose-950/20 dark:text-rose-200">
+          บันทึกไม่สำเร็จ: {saveError}
+        </div>
+      )}
+
+      {/* Search & Action Header */}
       <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-xs dark:shadow-sm">
         <div className="relative w-full sm:flex-1 sm:max-w-md">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -318,8 +465,28 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
-          ตั้งค่าทั้งหมด {dxMap.length} รายการ
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
+            ตั้งค่าทั้งหมด {dxMap.length} รายการ
+          </div>
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedDrug(null)
+                setAddSearchQuery('')
+                setSearchResults([])
+                setNewPrefixes('')
+                setNewIndication('')
+                setAddError(null)
+                setIsAddModalOpen(true)
+              }}
+              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all"
+            >
+              <Plus className="size-3.5" />
+              <span>ตั้งค่าเพิ่มรายการยา</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -470,9 +637,11 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                   <p className="mt-1 font-mono text-xs text-slate-500 dark:text-slate-400">รหัสยา {item.icode}</p>
                 </div>
                 {!isEditing && (
-                  <button type="button" onClick={() => handleStartEdit(item)} className="min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 touch-manipulation">
-                    <Edit3 className="size-3.5" /> แก้ไข
-                  </button>
+                  canEdit ? (
+                    <button type="button" onClick={() => handleStartEdit(item)} className="min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 touch-manipulation">
+                      <Edit3 className="size-3.5" /> แก้ไข
+                    </button>
+                  ) : <span className="shrink-0 text-[11px] text-slate-400">ดูอย่างเดียว</span>
                 )}
               </div>
 
@@ -536,6 +705,197 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         })}
         <DataTablePagination table={table} pageSizeOptions={[10, 15, 25, 50]} />
       </div>
+
+      {/* Modal: เพิ่มรายการยาและกำหนดเกณฑ์ใหม่ */}
+      {isAddModalOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-in fade-in"
+        >
+          <div className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#181b2e] border border-slate-200 dark:border-[#2d284a] shadow-2xl p-5 space-y-4 max-h-[90dvh] overflow-y-auto">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="grid place-items-center size-8 rounded-xl bg-violet-100 dark:bg-violet-500/20 text-violet-600 dark:text-violet-400">
+                  <Plus className="size-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900 dark:text-white">
+                    ตั้งค่าเพิ่มรายการยา / เกณฑ์ ICD-10
+                  </h2>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    ค้นหาและกำหนดยาสมุนไพรจากฐานข้อมูล HOSxP
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddModalOpen(false)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+              >
+                <X className="size-4.5" />
+              </button>
+            </div>
+
+            {addError && (
+              <div className="rounded-xl border border-rose-300/60 bg-rose-50 px-3 py-2 text-xs text-rose-800 dark:border-rose-500/25 dark:bg-rose-950/20 dark:text-rose-200">
+                {addError}
+              </div>
+            )}
+
+            {!selectedDrug ? (
+              <div className="space-y-3">
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    ค้นหายาจาก HOSxP (drugitems)
+                  </span>
+                  <div className="relative">
+                    <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      type="text"
+                      value={addSearchQuery}
+                      onChange={(e) => setAddSearchQuery(e.target.value)}
+                      placeholder="พิมพ์ชื่อยา หรือรหัสยา เช่น ขมิ้น, ฟ้าทะลาย, 1540012..."
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] pl-9 pr-8 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                      autoFocus
+                    />
+                    {isSearchingDrugs && (
+                      <Loader2 className="size-4 absolute right-3 top-1/2 -translate-y-1/2 text-violet-500 animate-spin" />
+                    )}
+                  </div>
+                </label>
+
+                {searchResults.length > 0 && (
+                  <div className="space-y-1.5 max-h-56 overflow-y-auto border border-slate-200 dark:border-[#2d284a] rounded-xl p-1 bg-slate-50/50 dark:bg-black/20">
+                    <p className="px-2 py-1 text-[10px] font-semibold text-slate-400">
+                      พบ {searchResults.length} รายการ (คลิกเพื่อเลือก)
+                    </p>
+                    {searchResults.map((d) => (
+                      <button
+                        key={d.icode}
+                        type="button"
+                        onClick={() => handleSelectDrugToAdd(d)}
+                        className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 flex items-center justify-between text-xs cursor-pointer transition-colors group"
+                      >
+                        <div>
+                          <p className="font-semibold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-300">
+                            {d.name}
+                          </p>
+                          <p className="text-[10px] font-mono text-slate-400">
+                            รหัส: {d.icode} {d.units ? `• หน่วย: ${d.units}` : ''}
+                          </p>
+                        </div>
+                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 group-hover:bg-violet-600 group-hover:text-white transition-colors">
+                          เลือก
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {addSearchQuery.trim() && !isSearchingDrugs && searchResults.length === 0 && (
+                  <p className="text-center py-6 text-xs text-slate-400">
+                    ไม่พบรายการยาที่ตรงกับ "{addSearchQuery}" ใน HOSxP
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {/* Selected Drug Card */}
+                <div className="flex items-center justify-between p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-500/25">
+                  <div>
+                    <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+                      รายการยาที่เลือก
+                    </span>
+                    <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                      {selectedDrug.name}
+                    </h3>
+                    <p className="text-xs font-mono text-slate-500 dark:text-slate-400">
+                      รหัส: {selectedDrug.icode} {selectedDrug.units ? `• หน่วย: ${selectedDrug.units}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedDrug(null)}
+                    className="text-xs text-violet-600 dark:text-violet-400 hover:underline cursor-pointer"
+                  >
+                    เปลี่ยนยา
+                  </button>
+                </div>
+
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)
+                  </span>
+                  <input
+                    type="text"
+                    value={newPrefixes}
+                    onChange={(e) => setNewPrefixes(e.target.value)}
+                    placeholder="เช่น M, S หรือ K30, R14"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    autoFocus
+                  />
+                  <span className="text-[10px] text-slate-400 block">
+                    ใส่คำนำหน้า เช่น <code className="text-teal-500">M</code> (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น <code className="text-teal-500">K30, R14</code>
+                  </span>
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    เกณฑ์จ่ายขั้นต่ำ (หน่วยตามยา เช่น 3 ขวด หรือ 42 แคปซูล)
+                  </span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={newMinQty}
+                    onChange={(e) => setNewMinQty(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    placeholder="0 (ไม่กำหนดขั้นต่ำ)"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                  <span className="text-[10px] text-slate-400 block">
+                    หากจ่ายน้อยกว่าเกณฑ์ ระบบจะตรวจเป็นสีแดง (ไม่ผ่าน) เพราะจะเบิกเคลมไม่ผ่าน
+                  </span>
+                </label>
+
+                <label className="block space-y-1">
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    ข้อบ่งใช้ / สรรพคุณทางคลินิก
+                  </span>
+                  <input
+                    type="text"
+                    value={newIndication}
+                    onChange={(e) => setNewIndication(e.target.value)}
+                    placeholder="เช่น ปวดเมื่อยกล้ามเนื้อ, ท้องอืด ท้องเฟ้อ"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  />
+                </label>
+
+                <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/10">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAddModalOpen(false)
+                      setSelectedDrug(null)
+                    }}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
+                  >
+                    ยกเลิก
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isPending}
+                    onClick={handleSaveNewDrug}
+                    className="btn-pill-action inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
+                  >
+                    <Check className="size-3.5" />
+                    <span>{isPending ? 'กำลังบันทึก…' : 'บันทึกเกณฑ์ยา'}</span>
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

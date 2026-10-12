@@ -4,6 +4,7 @@ import type { AuditRecord } from '@/types/herbdx.types'
 import { cleanDrugUnit } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 import { toThaiDate, fmtNum } from '@/lib/format'
+import { CopyButton } from '@/components/CopyButton'
 
 interface AuditCardListProps {
   readonly records: readonly AuditRecord[]
@@ -64,10 +65,11 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
           <div key={`${rec.id}-${i}`} className={cardBorder}>
             {/* Top row: HN, Visit time, and Status */}
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-[#292440]">
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#101326] text-slate-800 dark:text-slate-200">
                   HN {rec.hn}
                 </span>
+                <CopyButton text={rec.hn} title="คัดลอก HN" iconSize="size-3" />
                 <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                   <Clock className="size-3 text-slate-400" />
                   {toThaiDate(rec.visit_date)} {rec.visit_time.slice(0, 5)}
@@ -113,29 +115,50 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
               <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                 <User className="size-3.5 text-indigo-600 dark:text-indigo-400" />
                 <span>{rec.patient_name}</span>
+                <CopyButton text={rec.patient_name} title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3" />
               </div>
               <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">{rec.pttype_name}</p>
             </div>
 
             {/* Herbal Drug Prescribed */}
-            <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-100 dark:border-[#292440] flex items-center justify-between gap-2">
-              <div className="flex items-center gap-2 min-w-0">
-                <Pill className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                <div className="flex flex-col min-w-0">
-                  <span className={cn('text-xs font-semibold truncate', isFail || isNoDx ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-slate-800 dark:text-slate-200')}>
-                    {rec.drug_name}
-                  </span>
-                  {rec.drug_units && (
-                    <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
-                      {rec.drug_units}
+            {(() => {
+              const minQty = rec.min_qty ?? 0
+              const isQtyFail = Boolean(rec.is_qty_fail || (minQty > 0 && rec.drug_qty < minQty))
+              return (
+                <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-100 dark:border-[#292440] flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Pill className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div className="flex flex-col min-w-0">
+                      <span className={cn('text-xs font-semibold truncate', isFail || isNoDx ? 'text-rose-700 dark:text-rose-300 font-bold' : 'text-slate-800 dark:text-slate-200')}>
+                        {rec.drug_name}
+                      </span>
+                      {rec.drug_units && (
+                        <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
+                          {rec.drug_units}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex flex-col items-end shrink-0">
+                    <span
+                      className={cn(
+                        'text-xs font-mono font-bold px-2 py-0.5 rounded whitespace-nowrap',
+                        isQtyFail
+                          ? 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300 ring-1 ring-rose-300 dark:ring-rose-800 animate-pulse'
+                          : 'text-slate-900 dark:text-white bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a]'
+                      )}
+                    >
+                      x {rec.drug_qty} {cleanDrugUnit(rec.drug_units)}
                     </span>
-                  )}
+                    {isQtyFail && minQty > 0 ? (
+                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold mt-0.5">
+                        ขั้นต่ำ {minQty} {cleanDrugUnit(rec.drug_units)}
+                      </span>
+                    ) : null}
+                  </div>
                 </div>
-              </div>
-              <span className="text-xs font-mono font-bold text-slate-900 dark:text-white px-2 py-0.5 rounded bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#34304a] shrink-0 whitespace-nowrap">
-                x {rec.drug_qty} {cleanDrugUnit(rec.drug_units)}
-              </span>
-            </div>
+              )
+            })()}
 
             {/* Diagnoses are displayed without implying that a code is valid by its prefix alone */}
             <div className="space-y-1 text-xs">
