@@ -495,7 +495,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         {/* Table Toolbar Header with Shadcn title */}
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
           <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            <span className="font-semibold text-slate-900 dark:text-white">Shadcn Data Table</span>
+            <span className="font-semibold text-slate-900 dark:text-white">ตารางข้อมูล</span>
             <span className="text-slate-400 dark:text-slate-500">•</span>
             <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
           </div>

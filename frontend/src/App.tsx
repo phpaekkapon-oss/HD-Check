@@ -146,7 +146,8 @@ const DashboardView: FC = () => {
     const noMap = list.filter((r) => r.audit_result === 'NO_MAP').length
     const totalQty = list.reduce((s, r) => s + r.drug_qty, 0)
     const uniquePatients = new Set(list.map((r) => r.hn)).size
-    const passRate = list.length > 0 ? (pass / list.length) * 100 : 0
+    // Same 1-decimal rounding as the server KPI, otherwise the card shows 57.943925233644855%
+    const passRate = list.length > 0 ? Math.round((pass / list.length) * 1000) / 10 : 0
     return {
       total: list.length,
       pass,
