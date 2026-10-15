@@ -8,6 +8,8 @@ import type {
   DxMapUpdate,
   PrescriptionResponse,
   SyncResult,
+  HealthMedRecord,
+  HealthMedKpi,
 } from '@/types/herbdx.types'
 
 export class ApiError extends Error {
@@ -37,14 +39,20 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return body as T
 }
 
-const qs = (params: Record<string, string>) => new URLSearchParams(params).toString()
+const qs = (params: Record<string, string | undefined>) => {
+  const clean: Record<string, string> = {}
+  for (const [k, v] of Object.entries(params)) {
+    if (v !== undefined) clean[k] = v
+  }
+  return new URLSearchParams(clean).toString()
+}
 
 export const herbDxApi = {
   status: () => request<DbStatus>('/api/status'),
 
   prescriptions: (f: AuditFilterParams) =>
     request<PrescriptionResponse>(
-      `/api/prescriptions?${qs({ startDate: f.startDate, endDate: f.endDate, hn: f.hn, search: f.search, result: f.result })}`
+      `/api/prescriptions?${qs({ startDate: f.startDate, endDate: f.endDate, hn: f.hn || '', search: f.search, result: f.result })}`
     ),
 
   drugs: (r: DateRange) =>
@@ -70,4 +78,14 @@ export const herbDxApi = {
     }),
 
   sync: (r: DateRange) => request<SyncResult>('/api/sync', { method: 'POST', body: JSON.stringify(r) }),
+
+  healthMedAudit: (f: AuditFilterParams) =>
+    request<{
+      success: true
+      data: readonly HealthMedRecord[]
+      kpi: HealthMedKpi
+      meta: { total: number; startDate: string; endDate: string }
+    }>(
+      `/api/healthmed/audit?${qs({ startDate: f.startDate, endDate: f.endDate, search: f.search || '', result: f.result || 'ALL' })}`
+    ),
 }

@@ -8,7 +8,8 @@
     "start": "node index.mjs",
     "dev": "node --watch index.mjs",
     "sync": "node sync.mjs",
-    "init-db": "node init-db.mjs"
+    "init-db": "node init-db.mjs",
+    "test": "node --test"
   },
   "dependencies": {
     "cors": "^2.8.6",

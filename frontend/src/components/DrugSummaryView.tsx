@@ -9,7 +9,7 @@ import {
   type VisibilityState,
   flexRender,
 } from '@tanstack/react-table'
-import { Download, Search, DollarSign, Pill } from 'lucide-react'
+import { Download, Search, DollarSign, Pill, Users, Layers } from 'lucide-react'
 import type { DateRange, DrugSummaryRecord } from '@/types/herbdx.types'
 import { cleanDrugUnit } from '@/types/herbdx.types'
 import {
@@ -24,7 +24,8 @@ import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { DataTableViewOptions } from '@/components/DataTableViewOptions'
 import { DateRangeFields } from '@/components/AuditFilterBar'
-import { downloadExcel, fmtNum, toThaiDateShort } from '@/lib/format'
+import { downloadExcel, fmtNum, toThaiDateShort, type ExcelColumn, toReporter } from '@/lib/format'
+import { useAuth } from '@/context/AuthContext'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { cn } from '@/lib/utils'
 
@@ -48,6 +49,7 @@ const DRUG_COLUMN_LABELS: Record<string, string> = {
 }
 
 export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRangeChange, latestVisitDate }) => {
+  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
   const [sorting, setSorting] = useState<SortingState>([
@@ -235,16 +237,16 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
   }
 
   const handleExport = () => {
-    const headers = [
-      'ลำดับ',
-      'รหัสยา',
-      'รายการยา',
-      'จ่ายผู้ป่วยนอก',
-      'จ่ายผู้ป่วยใน',
-      'ราคาต้นทุน',
-      'จำนวน',
-      'รวมต้นทุน',
-      'รหัส 24 หลัก',
+    const columns: ExcelColumn[] = [
+      { header: 'ลำดับ', type: 'center', width: 7 },
+      { header: 'รหัสยา', type: 'center' },
+      { header: 'รายการยา', width: 44 },
+      { header: 'จ่ายผู้ป่วยนอก', type: 'int', total: true },
+      { header: 'จ่ายผู้ป่วยใน', type: 'int', total: true },
+      { header: 'ราคาต้นทุน (บาท)', type: 'money' },
+      { header: 'รวมจำนวน', type: 'int', total: true },
+      { header: 'รวมต้นทุน (บาท)', type: 'money', total: true },
+      { header: 'รหัส 24 หลัก', type: 'center' },
     ]
     const rows = filteredData.map((d, i) => [
       i + 1,
@@ -252,88 +254,182 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
       d.name,
       d.opd_qty,
       d.ipd_qty,
-      d.unitcost.toFixed(2),
+      d.unitcost,
       d.total_qty,
-      d.total_cost.toFixed(2),
+      d.total_cost,
       d.nhso_adp_code,
     ])
-    downloadExcel(`สรุปการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`, headers, rows, 'สรุปการจ่ายยาสมุนไพร')
+    const sum = (pick: (d: DrugSummaryRecord) => number) => filteredData.reduce((s, d) => s + pick(d), 0)
+    void downloadExcel({
+      filename: `สรุปการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`,
+      sheetName: 'สรุปการจ่ายยาสมุนไพร',
+      title: 'รายงานสรุปการจ่ายยาสมุนไพรและต้นทุน',
+      range,
+      reporter: toReporter(user),
+      columns,
+      rows,
+      summary: [
+        { label: 'รายการยา', value: `${fmtNum(filteredData.length)} รายการ` },
+        { label: 'จ่ายผู้ป่วยนอก', value: sum((d) => d.opd_qty) },
+        { label: 'จ่ายผู้ป่วยใน', value: sum((d) => d.ipd_qty) },
+        { label: 'ต้นทุนรวม', value: `${fmtNum(sum((d) => d.total_cost), 2)} บาท`, tone: 'good' },
+      ],
+    })
   }
 
   return (
     <div className="space-y-4">
       {/* Metric summary banner with interactive filtering */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {/* Card 1: OPD */}
         <button
           type="button"
           onClick={() => setFilterType((prev) => (prev === 'OPD' ? 'ALL' : 'OPD'))}
           className={cn(
-            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
-            filterType === 'OPD' && 'ring-2 ring-cyan-500 bg-cyan-500/10 dark:bg-cyan-500/15 border-cyan-500/50'
+            'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
+            filterType === 'OPD'
+              ? 'border-cyan-500 dark:border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-cyan-500/[0.06] dark:bg-cyan-950/40 -translate-y-0.5'
+              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-cyan-400/60 dark:hover:border-cyan-500/40 hover:-translate-y-0.5'
           )}
         >
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยนอก (OPD)</div>
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                จ่ายผู้ป่วยนอก (OPD)
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300 border-cyan-500/30">
+                <Users className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-cyan-600 dark:text-cyan-400">
+                <AnimatedNumber value={totalOpd} />
+              </span>
+              <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-300 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25">
+                หน่วย
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+            <span className="text-slate-500 dark:text-slate-400 font-medium truncate">บริการคลินิกผู้ป่วยนอก</span>
             {filterType === 'OPD' && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-cyan-500 text-white font-bold">กำลังกรอง</span>
+              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                <span className="size-1 rounded-full bg-cyan-400 animate-pulse" />
+                กรองอยู่
+              </span>
             )}
           </div>
-          <div className="text-xl sm:text-2xl font-extrabold font-mono text-cyan-600 dark:text-cyan-400 mt-1 tracking-tight">
-            <AnimatedNumber value={totalOpd} suffix=" หน่วย" />
-          </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการผู้ป่วยนอก (คลิกเพื่อกรอง)</div>
         </button>
 
+        {/* Card 2: IPD */}
         <button
           type="button"
           onClick={() => setFilterType((prev) => (prev === 'IPD' ? 'ALL' : 'IPD'))}
           className={cn(
-            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
-            filterType === 'IPD' && 'ring-2 ring-indigo-500 bg-indigo-500/10 dark:bg-indigo-500/15 border-indigo-500/50'
+            'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
+            filterType === 'IPD'
+              ? 'border-indigo-500 dark:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.3)] bg-indigo-500/[0.06] dark:bg-indigo-950/40 -translate-y-0.5'
+              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-indigo-400/60 dark:hover:border-indigo-500/40 hover:-translate-y-0.5'
           )}
         >
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold">จ่ายผู้ป่วยใน (IPD)</div>
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                จ่ายผู้ป่วยใน (IPD)
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-indigo-500/15 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-500/30">
+                <Layers className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-indigo-600 dark:text-indigo-400">
+                <AnimatedNumber value={totalIpd} />
+              </span>
+              <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25">
+                หน่วย
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+            <span className="text-slate-500 dark:text-slate-400 font-medium truncate">บริการหอผู้ป่วยใน</span>
             {filterType === 'IPD' && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-indigo-500 text-white font-bold">กำลังกรอง</span>
+              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                <span className="size-1 rounded-full bg-indigo-400 animate-pulse" />
+                กรองอยู่
+              </span>
             )}
           </div>
-          <div className="text-xl sm:text-2xl font-extrabold font-mono text-indigo-600 dark:text-indigo-400 mt-1 tracking-tight">
-            <AnimatedNumber value={totalIpd} suffix=" หน่วย" />
-          </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">บริการหอผู้ป่วยใน (คลิกเพื่อกรอง)</div>
         </button>
 
+        {/* Card 3: Grand Total */}
         <button
           type="button"
           onClick={() => setFilterType('ALL')}
           className={cn(
-            'text-left rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs transition-all hover:scale-[1.01] cursor-pointer focus:outline-none',
-            filterType === 'ALL' && 'ring-2 ring-accent/60 bg-accent/5'
+            'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
+            filterType === 'ALL'
+              ? 'border-teal-500 dark:border-teal-400 shadow-[0_0_20px_rgba(20,184,166,0.3)] bg-teal-500/[0.06] dark:bg-teal-950/40 -translate-y-0.5'
+              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-teal-400/60 dark:hover:border-teal-500/40 hover:-translate-y-0.5'
           )}
         >
-          <div className="flex items-center justify-between">
-            <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-              <Pill className="size-3.5 text-accent" /> รวมจำนวนที่จ่ายทั้งหมด
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                รวมจำนวนจ่ายทั้งหมด
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-teal-500/15 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/30">
+                <Pill className="size-3.5" />
+              </div>
             </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-slate-900 dark:text-white">
+                <AnimatedNumber value={grandTotalQty} />
+              </span>
+              <span className="text-[11px] font-semibold text-teal-600 dark:text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25">
+                หน่วย
+              </span>
+            </div>
+          </div>
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+            <span className="text-slate-500 dark:text-slate-400 font-medium truncate">รวมทุกขนานยาสมุนไพร</span>
             {filterType === 'ALL' && (
-              <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-accent text-white font-bold">แสดงทั้งหมด</span>
+              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                <span className="size-1 rounded-full bg-teal-400 animate-pulse" />
+                แสดงทั้งหมด
+              </span>
             )}
           </div>
-          <div className="text-xl sm:text-2xl font-extrabold font-mono text-accent mt-1 tracking-tight">
-            <AnimatedNumber value={grandTotalQty} suffix=" หน่วย" />
-          </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">รวมทุกขนานยา (คลิกดูทั้งหมด)</div>
         </button>
 
-        <div className="rounded-2xl bg-themed-card border-themed border p-3.5 sm:p-4 shadow-xs">
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-semibold flex items-center gap-1.5">
-            <DollarSign className="size-3.5 text-amber-600 dark:text-amber-400" /> รวมต้นทุนยาสมุนไพร
+        {/* Card 4: Cost */}
+        <div className="rounded-2xl p-3.5 text-left transition-all duration-200 relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-amber-400/60 dark:hover:border-amber-500/40 hover:-translate-y-0.5">
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                รวมมูลค่าต้นทุนยา
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 border-amber-500/30">
+                <DollarSign className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-amber-600 dark:text-amber-400">
+                <AnimatedNumber value={grandTotalCost} decimals={2} prefix="฿" />
+              </span>
+            </div>
           </div>
-          <div className="text-xl sm:text-2xl font-extrabold font-mono text-amber-600 dark:text-amber-400 mt-1 tracking-tight">
-            <AnimatedNumber value={grandTotalCost} decimals={2} prefix="฿" />
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+            <span>คำนวณจากราคาต้นทุน</span>
+            <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">บาท</span>
           </div>
-          <div className="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">คำนวณจากราคาต้นทุน</div>
         </div>
       </div>
 

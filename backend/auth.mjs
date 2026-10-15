@@ -650,15 +650,13 @@ const MIN_LOCK_MINUTES = 1
 const MAX_LOCK_MINUTES = 60
 
 /**
- * Valid auto-lock minutes: 1–60. When the hospital enforces PIN lock, users may only
- * choose a time equal to or shorter than the hospital default.
+ * Valid auto-lock minutes: 1–60. When not specified or invalid, fallback to hospital default.
  */
 async function clampLockMinutes(dwPool, minutes) {
   const policy = await getPinPolicy(dwPool)
   let m = Math.round(Number(minutes))
   if (!Number.isFinite(m) || m <= 0) m = policy.default_auto_lock_minutes
   m = Math.min(MAX_LOCK_MINUTES, Math.max(MIN_LOCK_MINUTES, m))
-  if (policy.enforce_pin_lock === 'Y') m = Math.min(m, policy.default_auto_lock_minutes)
   return m
 }
 
@@ -673,9 +671,7 @@ export async function getPinState(dwPool, loginname) {
     has_pin: Boolean(row?.pin_hash),
     pin_enabled: Boolean(row?.pin_hash && row.pin_enabled === 1),
     pin_length: Number(row?.pin_length || 6),
-    auto_lock_minutes: policy.enforce_pin_lock === 'Y'
-      ? Math.min(Number(row?.auto_lock_minutes ?? policy.default_auto_lock_minutes), policy.default_auto_lock_minutes)
-      : Number(row?.auto_lock_minutes ?? policy.default_auto_lock_minutes),
+    auto_lock_minutes: Number(row?.auto_lock_minutes ?? policy.default_auto_lock_minutes ?? 5),
     enforce_pin_lock: policy.enforce_pin_lock === 'Y',
     default_auto_lock_minutes: policy.default_auto_lock_minutes,
   }

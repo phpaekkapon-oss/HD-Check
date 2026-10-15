@@ -14,6 +14,7 @@ import {
   Send,
   Cpu,
   ExternalLink,
+  Activity,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
@@ -33,6 +34,7 @@ export interface NavItem {
 export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'dashboard', label: 'หน้าแรก / ภาพรวมระบบ', shortLabel: 'หน้าแรก', hint: 'สรุปภาพรวมและตัวชี้วัด', icon: LayoutDashboard },
   { id: 'audit', label: 'ตรวจสอบการจ่ายยาสมุนไพร', shortLabel: 'ตรวจสอบยา', hint: 'ยา + DX ตรงข้อบ่งใช้', icon: ClipboardCheck },
+  { id: 'healthmed', label: 'ตรวจหัตถการแผนไทย', shortLabel: 'ตรวจหัตถการ', hint: 'นวด/ประคบ/ซ้ำ/หลังคลอด', icon: Activity },
   { id: 'drugs', label: 'รายการจ่ายยาสมุนไพร', shortLabel: 'รายการจ่ายยา', hint: 'OPD / IPD / ต้นทุน', icon: Pill },
   { id: 'mapping', label: 'ตรวจรหัสยาและ ICD-10', shortLabel: 'ตรวจรหัส', hint: 'รหัสว่าง / เกณฑ์ไม่ครบ', icon: ScanSearch },
   { id: 'dxwriteback', label: 'ทบทวน DX รายครั้งรับบริการ', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },

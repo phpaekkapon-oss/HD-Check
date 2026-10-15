@@ -1,0 +1,843 @@
+import { useState, useMemo, type FC } from 'react'
+import {
+  useReactTable,
+  getCoreRowModel,
+  getSortedRowModel,
+  getPaginationRowModel,
+  type ColumnDef,
+  type SortingState,
+  flexRender,
+} from '@tanstack/react-table'
+import {
+  Activity,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  Search,
+  Users,
+  Baby,
+  Bone,
+  Layers,
+  ShieldAlert,
+  Loader2,
+  Sparkles,
+  Eye,
+  X,
+  Stethoscope,
+  Clock,
+  User,
+  FileText,
+} from 'lucide-react'
+import { useHealthMedAudit } from '@/hooks/useHerbDx'
+import type { DateRange, HealthMedRecord } from '@/types/herbdx.types'
+import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
+import { DataTablePagination } from '@/components/DataTablePagination'
+import { AnimatedNumber } from '@/components/AnimatedNumber'
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table'
+import { cn } from '@/lib/utils'
+
+interface HealthMedAuditViewProps {
+  readonly range: DateRange
+}
+
+type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'DUPLICATE' | 'KNEE' | 'POSTPARTUM' | 'EP'
+
+export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
+  const [kpiFilter, setKpiFilter] = useState<KpiFilterType>('ALL')
+  const [search, setSearch] = useState('')
+  const [sorting, setSorting] = useState<SortingState>([])
+  const [selectedRecord, setSelectedRecord] = useState<HealthMedRecord | null>(null)
+
+  const { data, isLoading } = useHealthMedAudit({
+    startDate: range.startDate,
+    endDate: range.endDate,
+    result: 'ALL',
+    search: '',
+    hn: '',
+  })
+
+  const rawRecords = useMemo(() => data?.data ?? [], [data?.data])
+  const kpi = data?.kpi
+
+  // Filter records based on active KPI filter & search input
+  const filteredRecords = useMemo(() => {
+    return rawRecords.filter((r) => {
+      // 1. KPI Category Filter
+      if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
+      if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
+      if (kpiFilter === 'DUPLICATE' && !r.failures?.some((f) => f.includes('ซ้ำ'))) return false
+      if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า'))) return false
+      if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด'))) return false
+      if (kpiFilter === 'EP' && !r.failures?.some((f) => f.includes('EP'))) return false
+
+      // 2. Text Search Filter
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason}`.toLowerCase()
+        if (!text.includes(q)) return false
+      }
+      return true
+    })
+  }, [rawRecords, kpiFilter, search])
+
+  const columns = useMemo<ColumnDef<HealthMedRecord>[]>(
+    () => [
+      {
+        id: 'index',
+        header: () => <span className="text-center block w-full">#</span>,
+        cell: ({ row, table }) => {
+          const { pageIndex, pageSize } = table.getState().pagination
+          return (
+            <span className="font-mono text-slate-400 dark:text-slate-500 font-semibold text-center block w-8 mx-auto text-xs">
+              {pageIndex * pageSize + row.index + 1}
+            </span>
+          )
+        },
+        size: 45,
+      },
+      {
+        accessorKey: 'visit_date',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="วันที่ / เวลา" />,
+        cell: ({ row }) => (
+          <div className="font-mono text-xs whitespace-nowrap min-w-[85px]">
+            <div className="text-slate-900 dark:text-slate-100 font-semibold">{row.original.visit_date}</div>
+            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5">
+              <Clock className="size-3 text-slate-400 shrink-0" />
+              <span>{row.original.visit_time ? `${row.original.visit_time.substring(0, 5)} น.` : '—'}</span>
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'patient_name',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้รับบริการ / HN" />,
+        cell: ({ row }) => (
+          <div className="whitespace-nowrap min-w-[150px] max-w-[200px]">
+            <button
+              type="button"
+              onClick={() => setSelectedRecord(row.original)}
+              className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 group"
+            >
+              <span className="truncate">{row.original.patient_name}</span>
+              <Eye className="size-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
+            </button>
+            <div className="flex items-center gap-1.5 mt-1 text-[10.5px]">
+              <span className="px-1.5 py-0.2 rounded font-mono font-semibold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
+                HN: {row.original.hn}
+              </span>
+              {row.original.vn && (
+                <span className="font-mono text-slate-400 dark:text-slate-500 text-[10px]">
+                  VN: {row.original.vn}
+                </span>
+              )}
+            </div>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'age_y',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="อายุ" className="justify-center" />,
+        cell: ({ row }) => {
+          const age = row.original.age_y
+          const isKneeIssue = age < 40 && (row.original.pdx === 'M179' || row.original.dx0 === 'M179')
+          return (
+            <div className="flex justify-center whitespace-nowrap min-w-[65px]">
+              <span
+                className={cn(
+                  'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1 border shrink-0',
+                  isKneeIssue
+                    ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse'
+                    : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10'
+                )}
+              >
+                {isKneeIssue && <span className="text-[10px]">⚠️</span>}
+                {age} ปี
+              </span>
+            </div>
+          )
+        },
+        size: 70,
+      },
+      {
+        accessorKey: 'pttype_name',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="สิทธิการรักษา" />,
+        cell: ({ row }) => (
+          <div className="max-w-[150px]">
+            <span
+              className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
+              title={row.original.pttype_name || undefined}
+            >
+              {row.original.pttype_name || '—'}
+            </span>
+          </div>
+        ),
+      },
+      {
+        accessorKey: 'doctor_name',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="แพทย์ / ผู้ให้บริการ" />,
+        cell: ({ row }) => (
+          <div className="text-xs text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[130px] flex items-center gap-1.5">
+            <div className="size-6 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0">
+              <User className="size-3.5" />
+            </div>
+            <span className="truncate max-w-[140px]" title={row.original.doctor_name || undefined}>
+              {row.original.doctor_name || <span className="text-slate-400 italic">— ไม่ระบุ —</span>}
+            </span>
+          </div>
+        ),
+      },
+      {
+        id: 'services',
+        header: 'รายการค่าบริการ / หัตถการ',
+        cell: ({ row }) => {
+          const raw = String(row.original.service_items_raw || '')
+          const items = raw.split('||').filter(Boolean)
+          if (items.length === 0) {
+            return <span className="text-slate-400 text-xs italic">— ไม่มีรายการ —</span>
+          }
+
+          // แยกหัตถการแพทย์แผนไทย (รหัส 58xxx หรือชื่อมีนวด/ประคบ/อบ/ทับหม้อเกลือ)
+          const parsed = items.map((s) => {
+            const [code, name, qty, price] = s.split(':')
+            const isThaiMed =
+              Boolean(code && ['58101', '58130', '58131', '58220', '58301'].includes(code)) ||
+              Boolean(name?.includes('นวด')) ||
+              Boolean(name?.includes('ประคบ')) ||
+              Boolean(name?.includes('ทับหม้อเกลือ')) ||
+              Boolean(name?.includes('อบไอน้ำ'))
+            const isDup =
+              (code === '58130' && row.original.count_58130 >= 2) ||
+              (code === '58101' && row.original.count_58101 >= 2)
+            return { code, name, qty, price, isThaiMed, isDup }
+          })
+
+          const thaiMedItems = parsed.filter((p) => p.isThaiMed)
+          const otherItems = parsed.filter((p) => !p.isThaiMed)
+
+          return (
+            <div className="space-y-1 min-w-[210px] max-w-[260px]">
+              {thaiMedItems.length > 0 ? (
+                thaiMedItems.map((p, idx) => (
+                  <div
+                    key={idx}
+                    className={cn(
+                      'text-[11px] flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-lg border transition shadow-2xs',
+                      p.isDup
+                        ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40'
+                        : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
+                    )}
+                  >
+                    <span className="truncate flex items-center gap-1">
+                      <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                        [{p.code}]
+                      </strong>
+                      <span className="truncate" title={p.name}>
+                        {p.name}
+                      </span>
+                    </span>
+                    <span className="font-mono font-bold shrink-0 text-[10px] text-slate-500 dark:text-slate-400">
+                      x{p.qty} ({Number(p.price || 0).toLocaleString()}.-)
+                    </span>
+                  </div>
+                ))
+              ) : (
+                <div className="text-[11px] text-slate-400 italic">
+                  ไม่มีรหัสหัตถการหลัก 58xxx
+                </div>
+              )}
+
+              {otherItems.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedRecord(row.original)}
+                  className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 font-mono block pl-1 cursor-pointer transition text-left"
+                >
+                  + ยา/เวชภัณฑ์อื่น {otherItems.length} รายการ (คลิกดู)
+                </button>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        id: 'diagnoses',
+        header: 'รหัสวินิจฉัย (PDX, DX0–DX5)',
+        cell: ({ row }) => {
+          const rawDxs = [
+            row.original.pdx ? { code: row.original.pdx, isPdx: true } : null,
+            row.original.dx0 ? { code: row.original.dx0, isPdx: false } : null,
+            row.original.dx1 ? { code: row.original.dx1, isPdx: false } : null,
+            row.original.dx2 ? { code: row.original.dx2, isPdx: false } : null,
+            row.original.dx3 ? { code: row.original.dx3, isPdx: false } : null,
+            row.original.dx4 ? { code: row.original.dx4, isPdx: false } : null,
+            row.original.dx5 ? { code: row.original.dx5, isPdx: false } : null,
+          ].filter(Boolean) as { code: string; isPdx: boolean }[]
+
+          const seen = new Set<string>()
+          const dxs = rawDxs.filter((d) => {
+            if (seen.has(d.code)) return false
+            seen.add(d.code)
+            return true
+          })
+
+          if (dxs.length === 0) {
+            return <span className="text-rose-400 font-semibold text-[11px] italic">ไม่มีรหัส DX</span>
+          }
+
+          return (
+            <div className="flex flex-wrap gap-1 max-w-[200px]">
+              {dxs.map((item, idx) => {
+                const isU = item.code.startsWith('U')
+                const isM = item.code.startsWith('M')
+                const isEP = item.code.startsWith('EP')
+                const isOorZ = item.code.startsWith('O') || item.code.startsWith('Z')
+                return (
+                  <span
+                    key={idx}
+                    className={cn(
+                      'px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-bold border transition shadow-2xs',
+                      item.isPdx && 'ring-1 ring-offset-0',
+                      isU
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300/60 ring-emerald-400/50'
+                        : isM
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-blue-400/50'
+                        : isOorZ
+                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-300/60 ring-purple-400/50'
+                        : isEP
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-400 ring-rose-400/50'
+                        : 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300 border-slate-200 dark:border-white/10'
+                    )}
+                    title={item.isPdx ? `PDX (รหัสโรคหลัก): ${item.code}` : `DX: ${item.code}`}
+                  >
+                    {item.code}
+                  </span>
+                )
+              })}
+            </div>
+          )
+        },
+      },
+      {
+        accessorKey: 'audit_result',
+        header: ({ column }) => <DataTableColumnHeader column={column} title="ผลการตรวจ" className="justify-center" />,
+        cell: ({ row }) => {
+          const isFail = row.original.audit_result === 'FAIL'
+          return (
+            <div className="flex flex-col items-center gap-1 min-w-[150px] max-w-[190px] mx-auto text-center">
+              {isFail ? (
+                <>
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
+                    <XCircle className="size-3.5 text-rose-500" /> ไม่ผ่าน
+                  </span>
+                  <p className="text-[10px] leading-snug text-rose-600 dark:text-rose-300/90 font-sans mt-0.5 font-medium">
+                    {row.original.audit_reason}
+                  </p>
+                </>
+              ) : (
+                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" /> ผ่านเกณฑ์
+                </span>
+              )}
+            </div>
+          )
+        },
+      },
+      {
+        id: 'actions',
+        header: '',
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={() => setSelectedRecord(row.original)}
+            className="p-1.5 rounded-xl text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 hover:bg-teal-500/10 transition cursor-pointer border border-transparent hover:border-teal-500/20"
+            title="ดูรายละเอียดการรับบริการ"
+          >
+            <Eye className="size-4" />
+          </button>
+        ),
+        size: 40,
+      },
+    ],
+    []
+  )
+
+  const table = useReactTable({
+    data: filteredRecords,
+    columns,
+    state: {
+      sorting,
+    },
+    onSortingChange: setSorting,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 25,
+      },
+    },
+  })
+
+  // Enterprise-Grade KPI Cards Configuration with Rich Corporate Colors
+  // Enterprise-Grade KPI Cards Configuration with Seamless Single Borders
+  const kpiCards = [
+    {
+      id: 'ALL' as const,
+      label: 'ทั้งหมด',
+      value: kpi?.total ?? 0,
+      sub: 'ผู้รับบริการทั้งหมด',
+      icon: Users,
+      iconBg: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-500/20',
+      valueColor: 'text-slate-900 dark:text-white',
+      subColor: 'text-slate-500 dark:text-slate-400',
+      activeBorder: 'border-indigo-500 dark:border-indigo-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(99,102,241,0.25)]',
+      activeBg: 'bg-indigo-500/[0.06] dark:bg-indigo-950/40',
+      hoverBorder: 'hover:border-indigo-400/60 dark:hover:border-indigo-500/40',
+    },
+    {
+      id: 'PASS' as const,
+      label: 'ผ่านเกณฑ์',
+      value: kpi?.pass ?? 0,
+      rate: kpi?.passRate ?? 0,
+      sub: 'ถูกต้องตามเกณฑ์',
+      icon: CheckCircle2,
+      iconBg: 'bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-500/30',
+      valueColor: 'text-emerald-600 dark:text-emerald-400',
+      subColor: 'text-emerald-700/80 dark:text-emerald-400/80',
+      activeBorder: 'border-emerald-500 dark:border-emerald-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(16,185,129,0.3)]',
+      activeBg: 'bg-emerald-500/[0.06] dark:bg-emerald-950/40',
+      hoverBorder: 'hover:border-emerald-400/60 dark:hover:border-emerald-500/40',
+    },
+    {
+      id: 'FAIL' as const,
+      label: 'ไม่ผ่าน / พบปัญหา',
+      value: kpi?.fail ?? 0,
+      sub: 'ต้องทบทวนแก้ไข',
+      icon: AlertTriangle,
+      iconBg: 'bg-rose-500/15 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300 border border-rose-500/30',
+      valueColor: 'text-rose-600 dark:text-rose-400',
+      subColor: 'text-rose-700/80 dark:text-rose-400/80',
+      activeBorder: 'border-rose-500 dark:border-rose-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(244,63,94,0.3)]',
+      activeBg: 'bg-rose-500/[0.06] dark:bg-rose-950/40',
+      hoverBorder: 'hover:border-rose-400/60 dark:hover:border-rose-500/40',
+    },
+    {
+      id: 'DUPLICATE' as const,
+      label: 'คิดค่าบริการซ้ำ',
+      value: kpi?.duplicateFail ?? 0,
+      sub: (kpi?.duplicateFail ?? 0) > 0 ? 'นวด/ประคบซ้ำ 2 ครั้ง' : '✓ ปกติ ไม่มีเบิกซ้ำ',
+      icon: Layers,
+      iconBg: 'bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-500/30',
+      valueColor: (kpi?.duplicateFail ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.duplicateFail ?? 0) > 0 ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-slate-400 dark:text-slate-500',
+      activeBorder: 'border-amber-500 dark:border-amber-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]',
+      activeBg: 'bg-amber-500/[0.06] dark:bg-amber-950/40',
+      hoverBorder: 'hover:border-amber-400/60 dark:hover:border-amber-500/40',
+    },
+    {
+      id: 'KNEE' as const,
+      label: 'ข้อเข่า < 40 ปี',
+      value: kpi?.kneeFail ?? 0,
+      sub: (kpi?.kneeFail ?? 0) > 0 ? 'M179 อายุต่ำกว่า 40' : '✓ ปกติ ตามเกณฑ์อายุ',
+      icon: Bone,
+      iconBg: 'bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300 border border-cyan-500/30',
+      valueColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-700/80 dark:text-cyan-400/80' : 'text-slate-400 dark:text-slate-500',
+      activeBorder: 'border-cyan-500 dark:border-cyan-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
+      activeBg: 'bg-cyan-500/[0.06] dark:bg-cyan-950/40',
+      hoverBorder: 'hover:border-cyan-400/60 dark:hover:border-cyan-500/40',
+    },
+    {
+      id: 'POSTPARTUM' as const,
+      label: 'มารดาหลังคลอด',
+      value: kpi?.postpartumFail ?? 0,
+      sub: (kpi?.postpartumFail ?? 0) > 0 ? 'รหัสคลอด/U506 ไม่ครบ' : '✓ ปกติ ลงรหัสถูกต้อง',
+      icon: Baby,
+      iconBg: 'bg-fuchsia-500/15 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-300 border border-fuchsia-500/30',
+      valueColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-700/80 dark:text-fuchsia-400/80' : 'text-slate-400 dark:text-slate-500',
+      activeBorder: 'border-fuchsia-500 dark:border-fuchsia-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(217,70,239,0.3)]',
+      activeBg: 'bg-fuchsia-500/[0.06] dark:bg-fuchsia-950/40',
+      hoverBorder: 'hover:border-fuchsia-400/60 dark:hover:border-fuchsia-500/40',
+    },
+    {
+      id: 'EP' as const,
+      label: 'ปิดสิทธิ (EP)',
+      value: kpi?.epFail ?? 0,
+      sub: (kpi?.epFail ?? 0) > 0 ? 'ติดรหัสปิดสิทธิ UC' : '✓ ปกติ ไม่มีปิดสิทธิ',
+      icon: ShieldAlert,
+      iconBg: 'bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30',
+      valueColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-700/80 dark:text-red-400/80' : 'text-slate-400 dark:text-slate-500',
+      activeBorder: 'border-red-500 dark:border-red-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
+      activeBg: 'bg-red-500/[0.06] dark:bg-red-950/40',
+      hoverBorder: 'hover:border-red-400/60 dark:hover:border-red-500/40',
+    },
+  ]
+
+  return (
+    <div className="space-y-4">
+      {/* Header Banner - Enterprise Style */}
+      <div className="rounded-2xl bg-themed-card p-4 sm:p-5 border border-themed shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="size-10 rounded-xl bg-teal-500/15 text-teal-400 grid place-items-center">
+              <Activity className="size-5" />
+            </div>
+            <div>
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+                <span>ตรวจหัตถการแพทย์แผนไทย</span>
+                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
+                  <Sparkles className="size-3" /> HOSxP Audit Engine
+                </span>
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                คลิกที่การ์ดสรุปตัวชี้วัดด้านล่าง เพื่อกรองดูรายชื่อผู้ป่วยในแต่ละกลุ่มได้ทันที
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Interactive KPI Cards Grid - Seamless Executive Cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10">
+          {kpiCards.map((card) => {
+            const isSelected = kpiFilter === card.id
+            const Icon = card.icon
+            return (
+              <button
+                key={card.id}
+                type="button"
+                onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
+                className={cn(
+                  'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
+                  'border-2 flex flex-col justify-between min-h-[120px]',
+                  'backdrop-blur-md',
+                  isSelected
+                    ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5')
+                    : cn(
+                        'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:-translate-y-0.5',
+                        card.hoverBorder
+                      )
+                )}
+              >
+                {/* Top row: Label & Icon */}
+                <div>
+                  <div className="flex items-center justify-between gap-1 mb-2">
+                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                      {card.label}
+                    </span>
+                    <div className={cn('size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
+                      <Icon className="size-3.5" />
+                    </div>
+                  </div>
+
+                  {/* Metric Value */}
+                  <div className="flex items-baseline gap-2 flex-wrap">
+                    <span className={cn('text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none', card.valueColor)}>
+                      <AnimatedNumber value={card.value} />
+                    </span>
+                    {card.rate !== undefined && (
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                        {card.rate}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Bottom row: Subtext or Active Badge */}
+                <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+                  <span className={cn('truncate font-medium', card.subColor)}>
+                    {card.sub}
+                  </span>
+                  {isSelected && (
+                    <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                      <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
+                      เลือก
+                    </span>
+                  )}
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Filter Status Badge & Search Toolbar */}
+      <div className="flex flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center gap-2">
+          {kpiFilter !== 'ALL' && (
+            <div
+              className={cn(
+                'flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs shadow-2xs transition-all animate-in fade-in',
+                kpiFilter === 'PASS' && 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200',
+                kpiFilter === 'FAIL' && 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200',
+                kpiFilter === 'DUPLICATE' && 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200',
+                kpiFilter === 'KNEE' && 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-500/30 text-cyan-800 dark:text-cyan-200',
+                kpiFilter === 'POSTPARTUM' && 'bg-fuchsia-50 dark:bg-fuchsia-950/40 border-fuchsia-200 dark:border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200',
+                kpiFilter === 'EP' && 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
+              )}
+            >
+              <span className="size-2 rounded-full bg-current animate-pulse shrink-0" />
+              <span className="opacity-75">กรองเฉพาะกลุ่ม:</span>
+              <strong className="font-bold">
+                {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
+                {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
+                {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
+                {kpiFilter === 'KNEE' && 'ข้อเข่า < 40 ปี'}
+                {kpiFilter === 'POSTPARTUM' && 'บริบาลมารดาหลังคลอด'}
+                {kpiFilter === 'EP' && 'ติดรหัสปิดสิทธิ (EP)'}
+              </strong>
+              <span className="font-mono font-bold">({filteredRecords.length} รายการ)</span>
+              <button
+                type="button"
+                onClick={() => setKpiFilter('ALL')}
+                className="ml-1 p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/20 transition cursor-pointer"
+                title="ล้างตัวกรองและดูทั้งหมด"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="relative min-w-[260px]">
+          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="ค้นหา HN, ผู้ป่วย, แพทย์, รหัสโรค..."
+            className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 shadow-2xs"
+          />
+        </div>
+      </div>
+
+      {/* Main DataTable Container */}
+      <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-themed-card shadow-xs overflow-hidden">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-white/10">
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="hover:bg-transparent border-slate-200 dark:border-white/10">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="text-slate-600 dark:text-slate-300 font-bold text-xs py-3 px-3 whitespace-nowrap">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  ))}
+                </TableRow>
+              ))}
+            </TableHeader>
+            <TableBody className="divide-y divide-slate-100 dark:divide-white/5">
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="py-12 text-center text-slate-400">
+                    <Loader2 className="size-6 animate-spin mx-auto text-teal-500 mb-2" />
+                    <span>กำลังโหลดข้อมูลการให้บริการแพทย์แผนไทย…</span>
+                  </TableCell>
+                </TableRow>
+              ) : table.getRowModel().rows.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="py-12 text-center text-slate-400">
+                    ไม่พบรายการรับบริการตามเงื่อนไขที่เลือก
+                  </TableCell>
+                </TableRow>
+              ) : (
+                table.getRowModel().rows.map((row) => {
+                  const isFail = row.original.audit_result === 'FAIL'
+                  return (
+                    <TableRow
+                      key={row.id}
+                      className={cn(
+                        'hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors border-slate-100 dark:border-white/5',
+                        isFail && 'bg-rose-50/25 dark:bg-rose-950/[0.08]'
+                      )}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <TableCell key={cell.id} className="py-3 px-3 align-middle">
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  )
+                })
+              )}
+            </TableBody>
+          </Table>
+        </div>
+
+        {/* Enterprise Numbered Pagination */}
+        <DataTablePagination table={table} pageSizeOptions={[15, 25, 50, 100, 200]} />
+      </div>
+
+      {/* Detail Modal: แสดงข้อมูลการรับบริการเมื่อคลิกดูรายชื่อ */}
+      {selectedRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-2xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-teal-500/15 text-teal-500 grid place-items-center">
+                  <User className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {selectedRecord.patient_name}
+                  </h3>
+                  <div className="flex items-center gap-2 mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400">
+                    <span className="text-teal-600 dark:text-teal-400 font-bold">HN: {selectedRecord.hn}</span>
+                    <span>•</span>
+                    <span>VN: {selectedRecord.vn}</span>
+                    <span>•</span>
+                    <span>อายุ {selectedRecord.age_y} ปี</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedRecord(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer transition"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Status Alert Banner */}
+            <div
+              className={cn(
+                'p-3 rounded-xl border flex items-start gap-2.5 text-xs',
+                selectedRecord.audit_result === 'PASS'
+                  ? 'bg-emerald-50 dark:bg-emerald-950/20 border-emerald-300 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200'
+                  : 'bg-rose-50 dark:bg-rose-950/20 border-rose-300 dark:border-rose-500/30 text-rose-800 dark:text-rose-200'
+              )}
+            >
+              {selectedRecord.audit_result === 'PASS' ? (
+                <CheckCircle2 className="size-4 shrink-0 text-emerald-500 mt-0.5" />
+              ) : (
+                <AlertTriangle className="size-4 shrink-0 text-rose-500 mt-0.5" />
+              )}
+              <div className="space-y-0.5">
+                <p className="font-bold text-sm">
+                  ผลการตรวจสอบ: {selectedRecord.audit_result === 'PASS' ? 'ผ่านตามเกณฑ์มาตรฐาน' : 'ไม่ผ่านเกณฑ์การตรวจสอบ'}
+                </p>
+                <p className="text-[11.5px] leading-relaxed opacity-90">{selectedRecord.audit_reason}</p>
+              </div>
+            </div>
+
+            {/* Visit Metadata Grid */}
+            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-200/60 dark:border-white/5">
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">วันที่ / เวลาที่รับบริการ</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200 font-mono">
+                  {selectedRecord.visit_date} {selectedRecord.visit_time}
+                </span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">สิทธิการรักษา</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.pttype_name || '—'}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">แพทย์ / ผู้ตรวจวินิจฉัย</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.doctor_name || '—'}</span>
+              </div>
+              <div>
+                <span className="text-slate-400 block text-[10px] uppercase font-semibold">แผนกที่ให้บริการ</span>
+                <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.department_name || 'แผนกแพทย์แผนไทย'}</span>
+              </div>
+            </div>
+
+            {/* Diagnoses Section */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <FileText className="size-3.5 text-teal-500" /> รหัสการวินิจฉัยโรค (ICD-10 & ICD-10-TM)
+              </h4>
+              <div className="flex flex-wrap gap-1.5 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
+                {[
+                  selectedRecord.pdx,
+                  selectedRecord.dx0,
+                  selectedRecord.dx1,
+                  selectedRecord.dx2,
+                  selectedRecord.dx3,
+                  selectedRecord.dx4,
+                  selectedRecord.dx5,
+                ]
+                  .filter((dx): dx is string => Boolean(dx))
+                  .map((dx, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        'px-2 py-1 rounded-md text-xs font-mono font-bold border',
+                        dx.startsWith('U')
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300'
+                          : dx.startsWith('M')
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300'
+                          : 'bg-slate-200 text-slate-800 dark:bg-white/10 dark:text-slate-200 border-slate-300'
+                      )}
+                    >
+                      {idx === 0 ? `PDX: ${dx}` : `DX${idx}: ${dx}`}
+                    </span>
+                  ))}
+              </div>
+            </div>
+
+            {/* Service Items Section */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Stethoscope className="size-3.5 text-teal-500" /> รายการค่าบริการ / หัตถการที่คิดใน Visit นี้
+              </h4>
+              <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
+                {String(selectedRecord.service_items_raw || '')
+                  .split('||')
+                  .filter(Boolean)
+                  .map((s, idx) => {
+                    const [code, name, qty, price] = s.split(':')
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-center justify-between text-xs py-1 px-2 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5"
+                      >
+                        <span className="font-medium text-slate-800 dark:text-slate-200">
+                          <strong className="font-mono text-teal-600 dark:text-teal-400 mr-1.5">[{code}]</strong>
+                          {name}
+                        </span>
+                        <span className="font-mono text-slate-600 dark:text-slate-300">
+                          จำนวน {qty} ครั้ง • {Number(price || 0).toLocaleString()} บาท
+                        </span>
+                      </div>
+                    )
+                  })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="pt-2 flex justify-end border-t border-slate-200 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setSelectedRecord(null)}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 transition cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}

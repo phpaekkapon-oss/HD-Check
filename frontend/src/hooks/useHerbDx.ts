@@ -68,3 +68,13 @@ export function useSyncHerbDx() {
     onSettled: () => qc.invalidateQueries({ queryKey: herbDxKeys.all }),
   })
 }
+
+export function useHealthMedAudit(filters: AuditFilterParams) {
+  return useQuery({
+    queryKey: [...herbDxKeys.all, 'healthmed', filters] as const,
+    queryFn: () => herbDxApi.healthMedAudit(filters),
+    placeholderData: keepPreviousData,
+    refetchInterval: 15_000,
+  })
+}
+

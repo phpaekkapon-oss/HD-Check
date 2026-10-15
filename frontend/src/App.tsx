@@ -1,4 +1,4 @@
-import { useState, useMemo, type FC } from 'react'
+import { useState, useMemo, useEffect, type FC } from 'react'
 import { AppLayout } from '@/layouts/AppLayout'
 import { AuditKpiSummary } from '@/components/AuditKpiSummary'
 import { AuditFilterBar } from '@/components/AuditFilterBar'
@@ -9,12 +9,13 @@ import { DxMapSettingsModal } from '@/components/DxMapSettingsModal'
 import { CodeReviewQueue } from '@/components/CodeReviewQueue'
 import { DxWritebackView } from '@/components/DxWritebackView'
 import { SqlInspectorView } from '@/components/SqlInspectorView'
+import { HealthMedAuditView } from '@/components/HealthMedAuditView'
 import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
 import { ExecutiveDashboardView } from '@/components/ExecutiveDashboardView'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
 import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useSyncHerbDx } from '@/hooks/useHerbDx'
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange } from '@/types/herbdx.types'
-import { currentMonthRange, downloadExcel, toThaiDate } from '@/lib/format'
+import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
 import { canManageHerbDx } from '@/types/auth.types'
 import { PinLockProvider } from '@/context/PinLockContext'
@@ -22,10 +23,54 @@ import { LoginPage } from '@/components/LoginPage'
 import { LockScreenOverlay } from '@/components/LockScreenOverlay'
 import { PinSetupRequiredOverlay } from '@/components/PinSetupRequiredOverlay'
 
+const VALID_PAGES: readonly ActivePage[] = [
+  'dashboard',
+  'audit',
+  'healthmed',
+  'drugs',
+  'mapping',
+  'dxwriteback',
+  'dxmap',
+  'sql',
+]
+
+function getInitialPage(): ActivePage {
+  if (typeof window === 'undefined') return 'dashboard'
+  // 1. ตรวจสอบจาก URL Hash (เช่น #healthmed)
+  const hash = window.location.hash.replace(/^#\/?/, '').trim() as ActivePage
+  if (VALID_PAGES.includes(hash)) {
+    return hash
+  }
+  // 2. ตรวจสอบจาก LocalStorage ที่จำไว้ล่าสุด
+  const saved = localStorage.getItem('hd_check_active_page') as ActivePage
+  if (VALID_PAGES.includes(saved)) {
+    return saved
+  }
+  return 'dashboard'
+}
+
 const DashboardView: FC = () => {
   const { user } = useAuth()
-  const [activePage, setActivePage] = useState<ActivePage>('dashboard')
+  const [activePage, setActivePage] = useState<ActivePage>(getInitialPage)
   const [configureIcode, setConfigureIcode] = useState<string | undefined>()
+
+  // Sync hash กับ activePage เมื่อกดปุ่ม Back/Forward หรือ URL เปลี่ยน
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.replace(/^#\/?/, '').trim() as ActivePage
+      if (VALID_PAGES.includes(hash)) {
+        setActivePage(hash)
+      }
+    }
+
+    // ตั้งค่า Hash เริ่มต้นถ้ายังไม่มี
+    if (!window.location.hash) {
+      window.location.hash = activePage
+    }
+
+    window.addEventListener('hashchange', handleHashChange)
+    return () => window.removeEventListener('hashchange', handleHashChange)
+  }, [activePage])
 
   const [range, setRange] = useState<DateRange>(currentMonthRange)
 
@@ -49,10 +94,16 @@ const DashboardView: FC = () => {
   }
   const handleConfigureDrug = (record: AuditRecord) => {
     setConfigureIcode(record.drug_icode)
-    setActivePage('dxmap')
+    handlePageChange('dxmap')
   }
   const handlePageChange = (page: ActivePage) => {
     setActivePage(page)
+    try {
+      window.location.hash = page
+      localStorage.setItem('hd_check_active_page', page)
+    } catch {
+      // Ignore storage errors in restricted contexts
+    }
     if (page !== 'dxmap') setConfigureIcode(undefined)
   }
   const {
@@ -120,29 +171,29 @@ const DashboardView: FC = () => {
 
   const handleExportAudit = () => {
     if (!filteredAuditData || filteredAuditData.length === 0) return
-    const headers = [
-      'ลำดับ',
-      'วันที่รับบริการ',
-      'เวลา',
-      'HN',
-      'ชื่อผู้รับบริการ',
-      'สิทธิการรักษา',
-      'รายการยา',
-      'จำนวน',
-      'หน่วยนับ',
-      'แผนกที่รับบริการ',
-      'main_pdx',
-      'pdx',
-      'dx0',
-      'dx1',
-      'dx2',
-      'dx3',
-      'dx4',
-      'dx5',
-      'รหัสแพทย์',
-      'แพทย์ผู้สั่ง',
-      'สถานะผลตรวจ',
-      'เหตุผลการตรวจ',
+    const columns: ExcelColumn[] = [
+      { header: 'ลำดับ', type: 'center', width: 7 },
+      { header: 'วันที่รับบริการ', type: 'center' },
+      { header: 'เวลา', type: 'center' },
+      { header: 'HN', type: 'center' },
+      { header: 'ชื่อผู้รับบริการ' },
+      { header: 'สิทธิการรักษา', width: 28 },
+      { header: 'รายการยา', width: 36 },
+      { header: 'จำนวน', type: 'int', total: true },
+      { header: 'หน่วยนับ', type: 'center' },
+      { header: 'แผนกที่รับบริการ', width: 24 },
+      { header: 'main_pdx', type: 'center' },
+      { header: 'pdx', type: 'center' },
+      { header: 'dx0', type: 'center' },
+      { header: 'dx1', type: 'center' },
+      { header: 'dx2', type: 'center' },
+      { header: 'dx3', type: 'center' },
+      { header: 'dx4', type: 'center' },
+      { header: 'dx5', type: 'center' },
+      { header: 'รหัสแพทย์', type: 'center' },
+      { header: 'แพทย์ผู้สั่ง', width: 26 },
+      { header: 'สถานะผลตรวจ', type: 'center', width: 14 },
+      { header: 'เหตุผลการตรวจ', width: 46 },
     ]
     const rows = filteredAuditData.map((r, i) => [
       i + 1,
@@ -165,10 +216,30 @@ const DashboardView: FC = () => {
       r.dx5,
       r.doctor_code,
       r.doctor_name,
-      r.audit_result === 'PASS' ? 'ผ่าน' : 'ไม่ผ่าน',
+      r.audit_result === 'PASS' ? 'ผ่าน' : AUDIT_RESULT_META[r.audit_result].short,
       r.audit_reason,
     ])
-    downloadExcel(`ตรวจสอบการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`, headers, rows, 'ผลตรวจการจ่ายยาสมุนไพร')
+    const count = (k: AuditRecord['audit_result']) => filteredAuditData.filter((r) => r.audit_result === k).length
+    const pass = count('PASS')
+    void downloadExcel({
+      filename: `ตรวจสอบการจ่ายยาสมุนไพร_${range.startDate}_${range.endDate}.xlsx`,
+      sheetName: 'ผลตรวจการจ่ายยาสมุนไพร',
+      title: 'รายงานผลตรวจสอบการจ่ายยาสมุนไพรตามข้อบ่งใช้ (ICD-10)',
+      range,
+      reporter: toReporter(user),
+      columns,
+      rows,
+      summary: [
+        { label: 'ใบสั่งยาทั้งหมด', value: filteredAuditData.length },
+        { label: 'ผ่าน', value: pass, tone: 'good' },
+        { label: 'DX ไม่ตรง', value: count('FAIL'), tone: 'bad' },
+        { label: 'ไม่มี DX', value: count('NO_DX'), tone: 'bad' },
+        { label: 'รอตั้งค่า', value: count('NO_MAP'), tone: 'warn' },
+        { label: 'อัตราผ่าน', value: `${fmtNum((pass / filteredAuditData.length) * 100, 1)}%`, tone: 'good' },
+      ],
+      statusColumn: 20,
+      rowTones: filteredAuditData.map((r) => (r.audit_result === 'PASS' ? 'good' : r.audit_result === 'NO_MAP' ? 'warn' : 'bad')),
+    })
   }
 
   return (
@@ -347,6 +418,9 @@ const DashboardView: FC = () => {
           loading={isMismatchLoading}
         />
       )}
+
+      {/* Page: ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย */}
+      {activePage === 'healthmed' && <HealthMedAuditView range={range} />}
 
       {/* Page 4: ตั้งค่ายาสมุนไพร ↔ ICD-10 */}
       {activePage === 'dxmap' && (

@@ -519,9 +519,17 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   const handleUpdateAutoLockTime = async (minutes: number) => {
     setSelectedMinutes(minutes)
     if (hasPin) {
-      await updatePinSettings(pinEnabled, minutes)
-      setPinSuccess(`ปรับระยะเวลาล็อกอัตโนมัติเป็น ${minutes} นาทีแล้ว`)
-      setTimeout(() => setPinSuccess(null), 3000)
+      const res = await updatePinSettings(pinEnabled, minutes)
+      if (res.success) {
+        setPinSuccess(`ปรับระยะเวลาล็อกอัตโนมัติเป็น ${minutes} นาทีแล้ว`)
+        if (isAdmin) fetchUsers()
+      } else {
+        setPinError(res.error || 'ไม่สามารถบันทึกการตั้งค่าได้')
+      }
+      setTimeout(() => {
+        setPinSuccess(null)
+        setPinError(null)
+      }, 3000)
     }
   }
 

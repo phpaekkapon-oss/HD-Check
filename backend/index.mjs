@@ -3,9 +3,10 @@ import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED, MIN_QTY_EXEMPT_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U } from './config.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
 import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
 import { HEALTH_MED_AUDIT_SQL, evaluateHealthMedAudit } from './healthmed.mjs'
+import { evaluate } from './audit-rules.mjs'
 import {
   initAuthTables,
   authenticateHosUser,
@@ -76,8 +77,11 @@ try {
   // ignore
 }
 
+// After an uncaught exception the process state is undefined; exit so PM2 (autorestart) starts
+// a clean one instead of serving from a half-broken process. Unhandled rejections are only logged.
 process.on('uncaughtException', (err) => {
-  console.error('[CRITICAL] Uncaught exception:', err?.message || err)
+  console.error('[CRITICAL] Uncaught exception:', err?.stack || err?.message || err)
+  setTimeout(() => process.exit(1), 200).unref()
 })
 process.on('unhandledRejection', (reason) => {
   console.error('[CRITICAL] Unhandled rejection:', reason)
@@ -100,7 +104,11 @@ let latestHerbVisitCache = null
 let latestHerbVisitCacheAt = 0
 async function getActiveHerbalDrugs() {
   if (Date.now() - activeHerbCacheAt < 30_000) return activeHerbCache
-  const [mapRows] = await dwPool.query('SELECT icode FROM dw_hd_check_drug_dx_map').catch(() => [[]])
+  const [mapRows] = await dwPool.query('SELECT icode FROM dw_hd_check_drug_dx_map').catch((err) => {
+    // Falls back to the built-in drug filter, but say so: custom drugs would silently vanish otherwise
+    console.error('[HERB CACHE] Could not read dw_hd_check_drug_dx_map, using built-in filter only:', err?.message)
+    return [[]]
+  })
   const customIcodes = mapRows.map((r) => String(r.icode)).filter(Boolean)
   const filter = buildHerbFilter(customIcodes)
   const [rows] = await hosPool.query(
@@ -132,6 +140,12 @@ const SESSION_COOKIE = 'hd_check_session'
 const SESSION_MAX_AGE = 8 * 60 * 60
 
 app.disable('x-powered-by')
+// Behind IIS/nginx every request arrives from the proxy's IP; set TRUST_PROXY (e.g. "1" or
+// "loopback") so req.ip is the real client, otherwise one user's failed logins lock out everyone.
+if (process.env.TRUST_PROXY) {
+  const tp = process.env.TRUST_PROXY
+  app.set('trust proxy', /^\d+$/.test(tp) ? Number(tp) : tp === 'true' ? true : tp)
+}
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff')
   res.setHeader('X-Frame-Options', 'DENY')
@@ -146,7 +160,10 @@ app.use((req, res, next) => {
   if (req.path.startsWith('/api') && !req.path.startsWith('/api/auth/avatar')) res.setHeader('Cache-Control', 'no-store')
   next()
 })
-app.use(express.json({ limit: '10mb' }))
+// Only the avatar upload carries a large (base64) body; keep every other route small.
+const jsonAvatar = express.json({ limit: '3mb' })
+const jsonDefault = express.json({ limit: '100kb' })
+app.use((req, res, next) => (req.path === '/api/auth/avatar' ? jsonAvatar : jsonDefault)(req, res, next))
 
 function readCookie(req, name) {
   const cookies = String(req.headers.cookie ?? '').split(';')
@@ -275,7 +292,7 @@ function canManageLogin(user, loginname) {
   return String(user?.loginname ?? '').toLowerCase() === String(loginname ?? '').trim().toLowerCase() || isAdminUser(user)
 }
 
-const fail = (res, err, code = 500) => {
+const fail = (res, err, code = err?.status ?? 500) => {
   console.error('[API]', err?.message ?? err)
   return res.status(code).json({ success: false, error: code >= 500 ? 'ระบบขัดข้อง กรุณาลองใหม่หรือติดต่อผู้ดูแลระบบ' : err?.message ?? 'คำขอไม่ถูกต้อง' })
 }
@@ -291,10 +308,22 @@ const currentMonthRange = () => {
 
 const readRange = (q) => {
   const def = currentMonthRange()
-  const startDate = typeof q.startDate === 'string' && DATE_RE.test(q.startDate) ? q.startDate : def.startDate
-  const endDate = typeof q.endDate === 'string' && DATE_RE.test(q.endDate) ? q.endDate : def.endDate
+  const startDate = isValidDate(q.startDate) ? q.startDate : def.startDate
+  const endDate = isValidDate(q.endDate) ? q.endDate : def.endDate
+  const days = (Date.parse(endDate) - Date.parse(startDate)) / 86_400_000
+  if (days < 0) throw badRequest('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด')
+  if (days >= MAX_RANGE_DAYS) throw badRequest(`ช่วงวันที่ต้องไม่เกิน ${MAX_RANGE_DAYS} วัน (1 ปีงบประมาณ)`)
   return { startDate, endDate }
 }
+// One fiscal year (incl. leap years). Longer ranges pull every row into memory and the browser.
+const MAX_RANGE_DAYS = 366
+// DATE_RE alone accepts '2026-13-45'; round-trip through Date to reject impossible dates
+const isValidDate = (v) => {
+  if (typeof v !== 'string' || !DATE_RE.test(v)) return false
+  const d = new Date(`${v}T00:00:00Z`)
+  return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
+}
+const badRequest = (message) => Object.assign(new Error(message), { status: 400 })
 
 /* ---------------- Audit rule ---------------- */
 async function loadDxMap() {
@@ -306,7 +335,7 @@ async function loadDxMap() {
       r.icode,
       String(r.dx_prefixes ?? '')
         .split(',')
-        .map((s) => s.trim().toUpperCase().replace('.', ''))
+        .map(normalizeIcdCode)
         .filter(Boolean)
     )
     minQtyMap.set(r.icode, Number(r.min_qty ?? 0))
@@ -314,108 +343,6 @@ async function loadDxMap() {
   return { dxMap: map, minQtyMap }
 }
 
-// ICD codes may be stored with or without the decimal separator (for example K30 / K30.0).
-// Strip separators on both sides so the configured rule and HOSxP value use the same form.
-const normalizeIcdCode = (value) => String(value ?? '').trim().toUpperCase().replace(/\./g, '')
-
-function evaluate(row, dxMap, minQtyMap) {
-  const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
-  const qty = Number(row.drug_qty ?? 0)
-
-  // 1. ตรวจสอบสิทธิที่ได้รับการยกเว้นเกณฑ์การจ่ายขั้นต่ำ
-  const pttype = String(row.pttype_name ?? '').trim()
-  const isPttypeExempt = MIN_QTY_EXEMPT_PTTYPES.some((kw) => pttype.includes(kw))
-  const isQtyFail = !isPttypeExempt && minQty > 0 && qty < minQty
-  const units = row.drug_units ? ` ${row.drug_units}` : ''
-
-  const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
-    .map(normalizeIcdCode)
-    .filter(Boolean)
-  const unique = [...new Set(dxList)]
-
-  // 2. ตรวจสอบแพทย์แผนไทย 5 ท่านที่ต้องมีรหัสการวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U)
-  const doctorName = String(row.doctor_name ?? '').trim()
-  const isTargetThaiMedDoctor = THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
-  const hasUDx = unique.some((dx) => dx.startsWith('U'))
-
-  if (unique.length === 0) {
-    return {
-      audit_result: 'NO_DX',
-      matched_dx: [],
-      allowed_dx: [],
-      min_qty: minQty,
-      is_qty_fail: isQtyFail,
-      audit_reason: isQtyFail
-        ? `ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง) และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
-        : 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)',
-    }
-  }
-
-  const allowed = dxMap.get(row.drug_icode) ?? []
-  const matched = unique.filter((dx) => allowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
-
-  if (allowed.length === 0) {
-    return {
-      audit_result: 'NO_MAP',
-      matched_dx: [],
-      allowed_dx: [],
-      min_qty: minQty,
-      is_qty_fail: isQtyFail,
-      audit_reason: isQtyFail
-        ? `ยังไม่ได้กำหนด ICD และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
-        : 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้',
-    }
-  }
-
-  // หากเป็นแพทย์แผนไทย 5 ท่านนี้ ต้องมีรหัสวินิจฉัยแผนไทย (รหัส U เช่น U57.., U66..) ร่วมด้วยเสมอ
-  if (isTargetThaiMedDoctor && !hasUDx) {
-    return {
-      audit_result: 'FAIL',
-      matched_dx: matched,
-      allowed_dx: allowed,
-      min_qty: minQty,
-      is_qty_fail: isQtyFail,
-      audit_reason: `แพทย์แผนไทย (${doctorName}) สั่งจ่ายยา ต้องระบุรหัสวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U เช่น U57, U66) ร่วมด้วย`,
-    }
-  }
-
-  // หากมียาที่มีการกำหนดจ่ายขั้นต่ำ และจ่ายน้อยกว่าเกณฑ์ (เฉพาะสิทธิที่ไม่ได้รับการยกเว้น)
-  if (isQtyFail) {
-    return {
-      audit_result: 'FAIL',
-      matched_dx: matched,
-      allowed_dx: allowed,
-      min_qty: minQty,
-      is_qty_fail: true,
-      audit_reason: matched.length > 0
-        ? `จ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์กำหนดขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`
-        : `ไม่พบ DX ที่ตรงกับเกณฑ์ และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์ขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`,
-    }
-  }
-
-  if (matched.length > 0) {
-    const exemptNotice = isPttypeExempt && minQty > 0 && qty < minQty
-      ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`
-      : ''
-    return {
-      audit_result: 'PASS',
-      matched_dx: matched,
-      allowed_dx: allowed,
-      min_qty: minQty,
-      is_qty_fail: false,
-      audit_reason: `พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้${exemptNotice}`,
-    }
-  }
-
-  return {
-    audit_result: 'FAIL',
-    matched_dx: [],
-    allowed_dx: allowed,
-    min_qty: minQty,
-    is_qty_fail: false,
-    audit_reason: `ไม่พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (พบ ${unique.join(', ')}; เกณฑ์ ${allowed.join(', ')})`,
-  }
-}
 
 /* ---------------- Sync state ---------------- */
 let syncInFlight = null
@@ -708,7 +635,7 @@ app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) =>
     const icode = String(req.params.icode ?? '').trim()
     const prefixes = String(req.body?.dx_prefixes ?? '')
       .split(/[ ,\s]+/)
-      .map((s) => s.trim().toUpperCase().replace('.', ''))
+      .map(normalizeIcdCode)
       .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
     const periodDays = Number(req.body?.periodDays ?? 90)
     if (!icode) return res.status(400).json({ success: false, error: 'ไม่พบรหัสยา' })
@@ -784,7 +711,7 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
     }
     const prefixes = String(req.body?.dx_prefixes ?? '')
       .split(/[,\s]+/)
-      .map((s) => s.trim().toUpperCase().replace('.', ''))
+      .map(normalizeIcdCode)
       .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
     const min_qty = Math.max(0, parseInt(req.body?.min_qty ?? 0, 10) || 0)
     const indication = String(req.body?.indication ?? '').slice(0, 255)
@@ -978,31 +905,44 @@ app.delete('/api/admin/sso/identities/:id', requireAdmin, async (req, res) => {
 })
 
 /* ---------------- Auth & 2FA Management Endpoints ---------------- */
+// Failed logins are counted per client IP and per account: the IP limit slows one machine
+// guessing many accounts, the account limit slows many machines guessing one account.
+const LOGIN_WINDOW_MS = 15 * 60 * 1000
+const LOGIN_MAX_PER_IP = 20
+const LOGIN_MAX_PER_ACCOUNT = 8
 const loginAttempts = new Map()
+const loginKeys = (req) => {
+  const keys = [`ip:${req.ip ?? req.socket.remoteAddress ?? 'unknown'}`]
+  const login = String(req.body?.loginname ?? '').trim().toLowerCase()
+  if (login) keys.push(`user:${login}`)
+  return keys
+}
+const loginLimitOf = (key) => (key.startsWith('ip:') ? LOGIN_MAX_PER_IP : LOGIN_MAX_PER_ACCOUNT)
 app.post('/api/auth/login', async (req, res) => {
-  const ip = req.socket.remoteAddress ?? 'unknown'
   const now = Date.now()
-  for (const [address, entry] of loginAttempts) {
-    if (now - entry.startedAt >= 15 * 60 * 1000) loginAttempts.delete(address)
+  for (const [key, entry] of loginAttempts) {
+    if (now - entry.startedAt >= LOGIN_WINDOW_MS) loginAttempts.delete(key)
   }
-  if (loginAttempts.size >= 5000 && !loginAttempts.has(ip)) {
+  const keys = loginKeys(req)
+  if (loginAttempts.size >= 10000 && !keys.every((k) => loginAttempts.has(k))) {
     return res.status(503).json({ success: false, error: 'ระบบเข้าสู่ระบบไม่พร้อมใช้งานชั่วคราว' })
   }
-  const recent = loginAttempts.get(ip)
-  if (recent && now - recent.startedAt < 15 * 60 * 1000 && recent.count >= 8) {
+  if (keys.some((k) => (loginAttempts.get(k)?.count ?? 0) >= loginLimitOf(k))) {
     return res.status(429).json({ success: false, error: 'พยายามเข้าสู่ระบบหลายครั้งเกินไป กรุณารอ 15 นาทีแล้วลองใหม่' })
   }
-  if (!recent || now - recent.startedAt >= 15 * 60 * 1000) loginAttempts.set(ip, { startedAt: now, count: 0 })
-  const attempts = loginAttempts.get(ip)
-  attempts.count += 1
+  for (const k of keys) {
+    if (!loginAttempts.has(k)) loginAttempts.set(k, { startedAt: now, count: 0 })
+    loginAttempts.get(k).count += 1
+  }
   try {
     const { loginname, password } = req.body ?? {}
     const result = await authenticateHosUser(hosPool, dwPool, loginname, password)
     if (result.token) {
       setSessionCookie(res, result.token)
       delete result.token
-      loginAttempts.delete(ip)
     }
+    // Wrong credentials throw; reaching here means the password was right (even if 2FA is pending)
+    for (const k of keys) loginAttempts.delete(k)
     res.json(result)
   } catch (err) {
     console.error('[AUTH] Login request failed:', err.code || err.name)
@@ -1038,7 +978,7 @@ app.post('/api/auth/verify-2fa', async (req, res) => {
     delete result.token
     res.json(result)
   } catch (err) {
-    res.status(200).json({ success: false, error: err.message || 'รหัส 2FA ไม่ถูกต้องหรือเซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' })
+    res.status(401).json({ success: false, error: err.message || 'รหัส 2FA ไม่ถูกต้องหรือเซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่' })
   }
 })
 
@@ -1252,16 +1192,31 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
 })
 
 /* ---------------- User Avatar Management (BLOB) ---------------- */
+// Only formats the cropper produces; checked by file signature, never by the client's claim,
+// because the stored mime type is served back as Content-Type (text/html or SVG would be XSS).
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+const sniffImageMime = (buf) => {
+  if (buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8 && buf[2] === 0xff) return 'image/jpeg'
+  if (buf.length > 8 && buf.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))) return 'image/png'
+  if (buf.length > 12 && buf.toString('ascii', 0, 4) === 'RIFF' && buf.toString('ascii', 8, 12) === 'WEBP') return 'image/webp'
+  return null
+}
+
 app.get('/api/auth/avatar/:loginname', async (req, res) => {
   try {
+    // Any signed-in session may load avatars (also while screen-locked); anonymous visitors may not
+    if (!(await getSession(req))) return res.status(401).send('Unauthorized')
     const loginname = String(req.params.loginname ?? '').trim()
     if (!loginname) return res.status(400).send('Missing loginname')
     const avatar = await getUserAvatar(dwPool, loginname)
     if (!avatar || !avatar.image_blob) {
       return res.status(404).send('Avatar not found')
     }
-    res.setHeader('Content-Type', avatar.mime_type || 'image/jpeg')
-    res.setHeader('Cache-Control', 'public, max-age=86400, stale-while-revalidate=43200')
+    // Re-sniff on the way out too, so avatars stored before this check can't be served as HTML/SVG
+    const mime = sniffImageMime(avatar.image_blob)
+    if (!mime) return res.status(404).send('Avatar not found')
+    res.setHeader('Content-Type', mime)
+    res.setHeader('Cache-Control', 'private, max-age=86400')
     res.setHeader('Content-Length', avatar.image_blob.length)
     res.send(avatar.image_blob)
   } catch (err) {
@@ -1272,7 +1227,7 @@ app.get('/api/auth/avatar/:loginname', async (req, res) => {
 
 app.post('/api/auth/avatar', requireSession, async (req, res) => {
   try {
-    const { image, mimeType = 'image/jpeg', targetLogin } = req.body ?? {}
+    const { image, targetLogin } = req.body ?? {}
     if (!image) {
       return res.status(400).json({ success: false, error: 'กรุณาเลือกไฟล์รูปภาพ' })
     }
@@ -1281,18 +1236,15 @@ app.post('/api/auth/avatar', requireSession, async (req, res) => {
       ? String(targetLogin).trim()
       : req.authUser.loginname
 
-    // Parse base64 string
-    let cleanBase64 = String(image).trim()
-    let detectedMime = mimeType
-    const matches = cleanBase64.match(/^data:([a-zA-Z0-9]+\/[a-zA-Z0-9-.+]+);base64,(.+)$/)
-    if (matches) {
-      detectedMime = matches[1]
-      cleanBase64 = matches[2]
-    }
-
+    // Strip an optional data-URL prefix; its declared type is ignored
+    const cleanBase64 = String(image).trim().replace(/^data:[^,]*;base64,/, '')
     const buffer = Buffer.from(cleanBase64, 'base64')
-    if (buffer.length > 8 * 1024 * 1024) {
-      return res.status(400).json({ success: false, error: 'ขนาดรูปภาพเกิน 8 MB กรุณาเลือกรูปขนาดเล็กลง' })
+    if (buffer.length > AVATAR_MAX_BYTES) {
+      return res.status(400).json({ success: false, error: 'ขนาดรูปภาพเกิน 2 MB กรุณาเลือกรูปขนาดเล็กลง' })
+    }
+    const detectedMime = sniffImageMime(buffer)
+    if (!detectedMime) {
+      return res.status(400).json({ success: false, error: 'รองรับเฉพาะไฟล์รูปภาพ JPEG, PNG หรือ WebP' })
     }
 
     await saveUserAvatar(dwPool, loginname, buffer, detectedMime)

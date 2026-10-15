@@ -15,6 +15,16 @@ import {
   Layers,
   Calendar,
   Box,
+  Search,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  Eye,
+  ExternalLink,
+  FileSpreadsheet,
+  User,
+  Clock,
+  XCircle,
 } from 'lucide-react'
 import type {
   ActivePage,
@@ -24,7 +34,8 @@ import type {
   DbStatus,
   DrugSummaryRecord,
 } from '@/types/herbdx.types'
-import { fmtNum, toThaiDate } from '@/lib/format'
+import { fmtNum, toThaiDate, downloadExcel, AUDIT_RESULT_META, type ExcelColumn, toReporter } from '@/lib/format'
+import { useAuth } from '@/context/AuthContext'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { cn } from '@/lib/utils'
 
@@ -64,6 +75,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   onSync,
   isSyncing,
 }) => {
+  const { user } = useAuth()
   // Chart filter mode
   const [chartScope, setChartScope] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
   const [is3DMode, setIs3DMode] = useState<boolean>(true)
@@ -132,6 +144,238 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
     const d2 = new Date(range.endDate).getTime()
     return (d2 - d1) > 35 * 24 * 60 * 60 * 1000
   }, [range.startDate, range.endDate])
+
+  // =========================================================================
+  // Drill-down Modal State & Memoized Aggregations
+  // =========================================================================
+  type DrillDownType = 'PASS' | 'TOTAL' | 'PATIENTS' | 'PROBLEMS' | null
+  const [activeDrillDown, setActiveDrillDown] = useState<DrillDownType>(null)
+  const [drillDownSearch, setDrillDownSearch] = useState('')
+  const [drillDownPage, setDrillDownPage] = useState(0)
+  const drillDownPageSize = 15
+  const [drillDownScope, setDrillDownScope] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
+  const [selectedPatientRecord, setSelectedPatientRecord] = useState<AuditRecord | null>(null)
+
+  const openDrillDown = (type: DrillDownType) => {
+    setActiveDrillDown(type)
+    setDrillDownSearch('')
+    setDrillDownPage(0)
+    setDrillDownScope('ALL')
+  }
+
+  // Drill-down Prescriptions List (for PASS, TOTAL, PROBLEMS)
+  const drillDownPrescriptions = useMemo(() => {
+    if (!activeDrillDown || activeDrillDown === 'PATIENTS') return []
+    let list = records
+    if (activeDrillDown === 'PASS') {
+      list = list.filter((r) => r.audit_result === 'PASS')
+    } else if (activeDrillDown === 'PROBLEMS') {
+      list = list.filter((r) => r.audit_result !== 'PASS')
+    }
+
+    if (drillDownScope === 'OPD') {
+      list = list.filter((r) => !r.vn.startsWith('AN:'))
+    } else if (drillDownScope === 'IPD') {
+      list = list.filter((r) => r.vn.startsWith('AN:'))
+    }
+
+    if (drillDownSearch.trim()) {
+      const q = drillDownSearch.toLowerCase().trim()
+      list = list.filter((r) =>
+        r.hn.toLowerCase().includes(q) ||
+        r.patient_name.toLowerCase().includes(q) ||
+        r.drug_name.toLowerCase().includes(q) ||
+        (r.department_name && r.department_name.toLowerCase().includes(q)) ||
+        (r.doctor_name && r.doctor_name.toLowerCase().includes(q)) ||
+        (r.pdx && r.pdx.toLowerCase().includes(q)) ||
+        (r.audit_reason && r.audit_reason.toLowerCase().includes(q))
+      )
+    }
+
+    return list
+  }, [records, activeDrillDown, drillDownScope, drillDownSearch])
+
+  // Drill-down Patients List (Grouped by HN)
+  interface PatientRow {
+    hn: string
+    patientName: string
+    visitCount: number
+    prescriptionsCount: number
+    drugs: string[]
+    departments: string[]
+    latestDate: string
+    hasProblem: boolean
+    records: AuditRecord[]
+  }
+
+  const drillDownPatients = useMemo<PatientRow[]>(() => {
+    if (activeDrillDown !== 'PATIENTS') return []
+    const map = new Map<string, {
+      hn: string
+      patientName: string
+      vns: Set<string>
+      drugSet: Set<string>
+      deptSet: Set<string>
+      latestDate: string
+      hasProblem: boolean
+      records: AuditRecord[]
+    }>()
+
+    for (const r of records) {
+      let p = map.get(r.hn)
+      if (!p) {
+        p = {
+          hn: r.hn,
+          patientName: r.patient_name,
+          vns: new Set(),
+          drugSet: new Set(),
+          deptSet: new Set(),
+          latestDate: r.visit_date,
+          hasProblem: false,
+          records: [],
+        }
+        map.set(r.hn, p)
+      }
+      p.vns.add(r.vn)
+      p.drugSet.add(r.drug_name)
+      if (r.department_name) p.deptSet.add(r.department_name)
+      if (r.visit_date > p.latestDate) p.latestDate = r.visit_date
+      if (r.audit_result !== 'PASS') p.hasProblem = true
+      p.records.push(r)
+    }
+
+    let list: PatientRow[] = Array.from(map.values()).map((p) => ({
+      hn: p.hn,
+      patientName: p.patientName,
+      visitCount: p.vns.size,
+      prescriptionsCount: p.records.length,
+      drugs: Array.from(p.drugSet),
+      departments: Array.from(p.deptSet),
+      latestDate: p.latestDate,
+      hasProblem: p.hasProblem,
+      records: p.records,
+    }))
+
+    if (drillDownSearch.trim()) {
+      const q = drillDownSearch.toLowerCase().trim()
+      list = list.filter((p) =>
+        p.hn.toLowerCase().includes(q) ||
+        p.patientName.toLowerCase().includes(q) ||
+        p.departments.some((d) => d.toLowerCase().includes(q)) ||
+        p.drugs.some((d) => d.toLowerCase().includes(q))
+      )
+    }
+
+    return list
+  }, [records, activeDrillDown, drillDownSearch])
+
+  // Pagination for drill-down
+  const totalDrillDownItems = activeDrillDown === 'PATIENTS' ? drillDownPatients.length : drillDownPrescriptions.length
+  const totalDrillDownPages = Math.max(1, Math.ceil(totalDrillDownItems / drillDownPageSize))
+  const paginatedPrescriptions = useMemo(() => {
+    return drillDownPrescriptions.slice(drillDownPage * drillDownPageSize, (drillDownPage + 1) * drillDownPageSize)
+  }, [drillDownPrescriptions, drillDownPage, drillDownPageSize])
+
+  const paginatedPatients = useMemo(() => {
+    return drillDownPatients.slice(drillDownPage * drillDownPageSize, (drillDownPage + 1) * drillDownPageSize)
+  }, [drillDownPatients, drillDownPage, drillDownPageSize])
+
+  // Export Excel handler
+  const handleExportDrillDownExcel = () => {
+    if (!activeDrillDown) return
+    if (activeDrillDown === 'PATIENTS') {
+      const columns: ExcelColumn[] = [
+        { header: 'ลำดับ', type: 'center', width: 7 },
+        { header: 'HN', type: 'center' },
+        { header: 'ชื่อ-สกุล ผู้รับบริการ', width: 28 },
+        { header: 'จำนวนครั้งรับบริการ (VN)', type: 'int', width: 14, total: true },
+        { header: 'จำนวนใบสั่งยา', type: 'int', width: 12, total: true },
+        { header: 'รายการยาที่ได้รับ', width: 48 },
+        { header: 'แผนกที่รับบริการ', width: 30 },
+        { header: 'วันที่รับบริการล่าสุด', type: 'center', width: 14 },
+        { header: 'ผลการตรวจสอบ', type: 'center', width: 18 },
+      ]
+      const problemPatients = drillDownPatients.filter((p) => p.hasProblem).length
+      const rows = drillDownPatients.map((p, idx) => [
+        idx + 1,
+        p.hn,
+        p.patientName,
+        p.visitCount,
+        p.prescriptionsCount,
+        p.drugs.join(', '),
+        p.departments.join(', '),
+        toThaiDate(p.latestDate),
+        p.hasProblem ? 'มีรายการต้องทบทวน' : 'ผ่านเกณฑ์ทั้งหมด',
+      ])
+      void downloadExcel({
+        filename: `รายชื่อผู้รับบริการสั่งใช้สมุนไพร_${range.startDate}_${range.endDate}.xlsx`,
+        sheetName: 'ผู้รับบริการ',
+        title: 'รายชื่อผู้รับบริการที่ได้รับการสั่งใช้ยาสมุนไพร',
+        range,
+        reporter: toReporter(user),
+        columns,
+        rows,
+        summary: [
+          { label: 'ผู้รับบริการ', value: `${fmtNum(drillDownPatients.length)} ราย` },
+          { label: 'ผ่านเกณฑ์ทั้งหมด', value: drillDownPatients.length - problemPatients, tone: 'good' },
+          { label: 'มีรายการต้องทบทวน', value: problemPatients, tone: 'bad' },
+        ],
+        statusColumn: 8,
+        rowTones: drillDownPatients.map((p) => (p.hasProblem ? 'bad' : 'good')),
+      })
+    } else {
+      const columns: ExcelColumn[] = [
+        { header: 'ลำดับ', type: 'center', width: 7 },
+        { header: 'วันที่', type: 'center' },
+        { header: 'เวลา', type: 'center' },
+        { header: 'HN', type: 'center' },
+        { header: 'VN', type: 'center' },
+        { header: 'ชื่อ-สกุล ผู้รับบริการ', width: 28 },
+        { header: 'แผนก', width: 24 },
+        { header: 'รายการยา', width: 36 },
+        { header: 'จำนวน', type: 'int', total: true },
+        { header: 'หน่วย', type: 'center' },
+        { header: 'แพทย์ผู้สั่ง', width: 26 },
+        { header: 'รหัสวินิจฉัย (PDX)', type: 'center', width: 13 },
+        { header: 'ผลการตรวจสอบ', type: 'center', width: 15 },
+        { header: 'เหตุผลประกอบ', width: 46 },
+      ]
+      const passRows = drillDownPrescriptions.filter((r) => r.audit_result === 'PASS').length
+      const rows = drillDownPrescriptions.map((r, idx) => [
+        idx + 1,
+        toThaiDate(r.visit_date),
+        r.visit_time ? `${r.visit_time.substring(0, 5)} น.` : '-',
+        r.hn,
+        r.vn,
+        r.patient_name,
+        r.department_name || '-',
+        r.drug_name,
+        r.drug_qty,
+        r.drug_units || '-',
+        r.doctor_name || '-',
+        r.pdx || '-',
+        r.audit_result === 'PASS' ? 'ผ่านเกณฑ์' : AUDIT_RESULT_META[r.audit_result].short,
+        r.audit_reason || '-',
+      ])
+      const title = activeDrillDown === 'PASS' ? 'รายการผ่านเกณฑ์' : activeDrillDown === 'PROBLEMS' ? 'รายการต้องทบทวนแก้ไข' : 'รายการสั่งยาทั้งหมด'
+      void downloadExcel({
+        filename: `${title}_${range.startDate}_${range.endDate}.xlsx`,
+        sheetName: title,
+        title: `รายงานการสั่งใช้ยาสมุนไพร — ${title}`,
+        range,
+        reporter: toReporter(user),
+        columns,
+        rows,
+        summary: [
+          { label: 'ใบสั่งยา', value: `${fmtNum(drillDownPrescriptions.length)} รายการ` },
+          { label: 'ผ่านเกณฑ์', value: passRows, tone: 'good' },
+          { label: 'ไม่ผ่าน / ต้องทบทวน', value: drillDownPrescriptions.length - passRows, tone: 'bad' },
+        ],
+        statusColumn: 12,
+        rowTones: drillDownPrescriptions.map((r) => (r.audit_result === 'PASS' ? 'good' : r.audit_result === 'NO_MAP' ? 'warn' : 'bad')),
+      })
+    }
+  }
 
   // 1. Daily/Monthly Trend Aggregation for SVG Chart
   const dailyTrends = useMemo<DailyTrendItem[]>(() => {
@@ -395,105 +639,168 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       {/* ========================================================================= */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
         {/* KPI 1: Pass Rate */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-themed-card border border-themed shadow-xs transition hover:border-emerald-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">อัตราผ่านเกณฑ์</span>
-            <div className="size-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 grid place-items-center">
-              <CheckCircle2 className="size-3.5" />
+        <button
+          type="button"
+          onClick={() => openDrillDown('PASS')}
+          className="rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-1 active:scale-[0.99]"
+          title="คลิกเพื่อดูรายชื่อผู้รับบริการและรายการสั่งยาที่ผ่านเกณฑ์"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                อัตราผ่านเกณฑ์
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/20 dark:text-emerald-300 border-emerald-500/30">
+                <CheckCircle2 className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-emerald-600 dark:text-emerald-400">
+                {passRate.toFixed(1)}%
+              </span>
+              <span className={cn(
+                'text-[11px] font-semibold px-2 py-0.5 rounded-full border',
+                passRate >= 50
+                  ? 'text-emerald-600 dark:text-emerald-300 bg-emerald-500/10 border-emerald-500/25'
+                  : 'text-amber-600 dark:text-amber-300 bg-amber-500/10 border-amber-500/25'
+              )}>
+                {passRate >= 50 ? '✓ บรรลุเป้าหมาย' : '⚠️ ต่ำกว่าเป้า'}
+              </span>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-              {passRate.toFixed(1)}%
-            </span>
-            <span className={cn('text-[11px] font-semibold', passRate >= 50 ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-              {passRate >= 50 ? '✓ บรรลุเป้าหมาย' : '⚠️ ต่ำกว่าเป้า'}
-            </span>
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 space-y-1.5">
+            <div className="flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+              <span className="font-medium text-emerald-700/80 dark:text-emerald-400/80">
+                ผ่าน {fmtNum(passCount)} / {fmtNum(totalPrescriptions)}
+              </span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:underline flex items-center gap-0.5">
+                ดูรายชื่อ &gt;
+              </span>
+            </div>
+            <div className="w-full bg-slate-100 dark:bg-white/5 rounded-full h-1 overflow-hidden">
+              <div
+                className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-500"
+                style={{ width: `${Math.min(100, Math.max(0, passRate))}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span>ผ่าน {fmtNum(passCount)} / {fmtNum(totalPrescriptions)}</span>
-            <span className="text-slate-400">เป้า &ge; 50%</span>
-          </div>
-          <div className="mt-1.5 w-full bg-slate-100 dark:bg-white/5 rounded-full h-1.5 overflow-hidden">
-            <div
-              className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
-              style={{ width: `${Math.min(100, Math.max(0, passRate))}%` }}
-            />
-          </div>
-        </div>
+        </button>
 
         {/* KPI 2: Total Volume */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-themed-card border border-themed shadow-xs transition hover:border-cyan-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">ยอดสั่งจ่ายสมุนไพร</span>
-            <div className="size-7 rounded-lg bg-cyan-500/15 text-cyan-600 dark:text-cyan-400 grid place-items-center">
-              <Pill className="size-3.5" />
+        <button
+          type="button"
+          onClick={() => openDrillDown('TOTAL')}
+          className="rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 hover:-translate-y-1 active:scale-[0.99]"
+          title="คลิกเพื่อดูประวัติการสั่งใช้ยาสมุนไพรทั้งหมด"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                ยอดสั่งจ่ายสมุนไพร
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-indigo-500/15 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-500/30">
+                <Pill className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-slate-900 dark:text-white">
+                <AnimatedNumber value={totalPrescriptions} />
+              </span>
+              <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25">
+                ใบ
+              </span>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
-              <AnimatedNumber value={totalPrescriptions} />
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+            <div className="flex items-center gap-1 font-mono text-[9.5px]">
+              <span className="px-1.5 py-0.2 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+                OPD {fmtNum(opdCount)}
+              </span>
+              <span className="px-1.5 py-0.2 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+                IPD {fmtNum(ipdCount)}
+              </span>
+            </div>
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold group-hover:underline flex items-center gap-0.5">
+              ดูรายการ &gt;
             </span>
-            <span className="text-xs text-slate-500">ใบ</span>
           </div>
-          <div className="mt-2 flex items-center gap-1.5 text-[11px]">
-            <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-600 dark:text-sky-400 font-mono">
-              OPD: {fmtNum(opdCount)}
-            </span>
-            <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-mono">
-              IPD: {fmtNum(ipdCount)}
-            </span>
-          </div>
-        </div>
+        </button>
 
         {/* KPI 3: Unique Patients */}
-        <div className="p-3.5 sm:p-4 rounded-2xl bg-themed-card border border-themed shadow-xs transition hover:border-teal-500/30">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">จำนวนผู้รับบริการ</span>
-            <div className="size-7 rounded-lg bg-teal-500/15 text-teal-600 dark:text-teal-400 grid place-items-center">
-              <Users className="size-3.5" />
+        <button
+          type="button"
+          onClick={() => openDrillDown('PATIENTS')}
+          className="rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 active:scale-[0.99]"
+          title="คลิกเพื่อดูรายชื่อผู้รับบริการสั่งใช้สมุนไพรทุกคน"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                จำนวนผู้รับบริการ
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-teal-500/15 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/30">
+                <Users className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-teal-600 dark:text-teal-400">
+                <AnimatedNumber value={uniquePatients} />
+              </span>
+              <span className="text-[11px] font-semibold text-teal-600 dark:text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25">
+                ราย
+              </span>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight font-mono">
-              <AnimatedNumber value={uniquePatients} />
+
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+            <span>เฉลี่ย {(totalPrescriptions / (uniquePatients || 1)).toFixed(1)} ใบ/คน</span>
+            <span className="text-teal-600 dark:text-teal-400 font-bold group-hover:underline flex items-center gap-0.5">
+              ดูรายชื่อคนไข้ &gt;
             </span>
-            <span className="text-xs text-slate-500">ราย</span>
           </div>
-          <div className="mt-2 text-[11px] text-slate-500 dark:text-slate-400">
-            เฉลี่ยการรับยา{' '}
-            <strong className="text-teal-600 dark:text-teal-400 font-mono">
-              {uniquePatients > 0 ? (totalPrescriptions / uniquePatients).toFixed(1) : 0}
-            </strong>{' '}
-            ใบ/คน
-          </div>
-        </div>
+        </button>
 
         {/* KPI 4: Action Required */}
-        <div
-          onClick={() => onNavigate('dxwriteback')}
-          className="p-3.5 sm:p-4 rounded-2xl bg-themed-card border border-rose-500/20 shadow-xs transition hover:border-rose-500/40 cursor-pointer group"
-          title="คลิกเพื่อเข้าหน้าตรวจสอบเคสที่ไม่ตรงเกณฑ์"
+        <button
+          type="button"
+          onClick={() => openDrillDown('PROBLEMS')}
+          className="rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-rose-500/[0.04] dark:bg-rose-950/20 border-rose-500/30 dark:border-rose-500/30 shadow-2xs hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:border-rose-500 dark:hover:border-rose-400 hover:-translate-y-1 active:scale-[0.99]"
+          title="คลิกเพื่อดูรายการที่ต้องทบทวนหรือแก้ไขรหัสโรค"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-rose-600 dark:text-rose-400">ต้องทบทวน / แก้ไข</span>
-            <div className="size-7 rounded-lg bg-rose-500/15 text-rose-600 dark:text-rose-400 grid place-items-center group-hover:scale-105 transition-transform">
-              <AlertTriangle className="size-3.5" />
+          <div>
+            <div className="flex items-center justify-between gap-1 mb-2">
+              <span className="text-[11px] font-bold text-rose-700 dark:text-rose-300 uppercase tracking-wider truncate">
+                ต้องทบทวน / แก้ไข
+              </span>
+              <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-rose-500/15 text-rose-600 dark:bg-rose-500/20 dark:text-rose-300 border-rose-500/30">
+                <AlertTriangle className="size-3.5" />
+              </div>
+            </div>
+
+            <div className="flex items-baseline gap-2 flex-wrap">
+              <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-rose-600 dark:text-rose-400">
+                <AnimatedNumber value={problemCount} />
+              </span>
+              <span className="text-[11px] font-semibold text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30">
+                {totalPrescriptions > 0 ? ((problemCount / totalPrescriptions) * 100).toFixed(0) : 0}%
+              </span>
             </div>
           </div>
-          <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl sm:text-3xl font-extrabold text-rose-600 dark:text-rose-400 tracking-tight font-mono">
-              <AnimatedNumber value={problemCount} />
+
+          <div className="mt-2 pt-1.5 border-t border-rose-200/50 dark:border-white/5 flex items-center justify-between text-[10px]">
+            <span className="text-rose-700/80 dark:text-rose-400/80 font-medium truncate">
+              ไม่ตรง {fmtNum(failCount)} · ไม่มี DX {fmtNum(noDxCount)}
             </span>
-            <span className="text-xs text-rose-500">
-              ({totalPrescriptions > 0 ? ((problemCount / totalPrescriptions) * 100).toFixed(0) : 0}%)
+            <span className="text-rose-600 dark:text-rose-400 font-bold group-hover:underline flex items-center gap-0.5">
+              เปิดดู &gt;
             </span>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-            <span>ไม่ตรง {fmtNum(failCount)} · ไม่มี DX {fmtNum(noDxCount)}</span>
-            <span className="text-rose-600 dark:text-rose-400 font-semibold group-hover:underline">เปิดดู &gt;</span>
-          </div>
-        </div>
+        </button>
       </div>
 
       {/* ========================================================================= */}
@@ -1126,6 +1433,525 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </button>
         </div>
       </div>
+
+      {/* ========================================================================= */}
+      {/* 4. EXECUTIVE DRILL-DOWN MODAL (รายชื่อผู้ป่วย & ประวัติสั่งยาตาม BOX)         */}
+      {/* ========================================================================= */}
+      {activeDrillDown && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-5xl rounded-2xl bg-white dark:bg-[#0c1424] border border-slate-200/90 dark:border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+            {/* Modal Header */}
+            <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-white/[0.02]">
+              <div className="flex items-center gap-3 min-w-0">
+                <div
+                  className={cn(
+                    'size-10 rounded-xl grid place-items-center shrink-0 border',
+                    activeDrillDown === 'PASS'
+                      ? 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
+                      : activeDrillDown === 'TOTAL'
+                      ? 'bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 border-indigo-500/30'
+                      : activeDrillDown === 'PATIENTS'
+                      ? 'bg-teal-500/15 text-teal-600 dark:text-teal-400 border-teal-500/30'
+                      : 'bg-rose-500/15 text-rose-600 dark:text-rose-400 border-rose-500/30'
+                  )}
+                >
+                  {activeDrillDown === 'PASS' && <CheckCircle2 className="size-5" />}
+                  {activeDrillDown === 'TOTAL' && <Pill className="size-5" />}
+                  {activeDrillDown === 'PATIENTS' && <Users className="size-5" />}
+                  {activeDrillDown === 'PROBLEMS' && <AlertTriangle className="size-5" />}
+                </div>
+
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white truncate">
+                      {activeDrillDown === 'PASS' && 'รายการสั่งจ่ายยาสมุนไพรที่ผ่านเกณฑ์ (PASS)'}
+                      {activeDrillDown === 'TOTAL' && 'ประวัติการสั่งจ่ายยาสมุนไพรทั้งหมด'}
+                      {activeDrillDown === 'PATIENTS' && 'รายชื่อผู้รับบริการสั่งใช้ยาสมุนไพร'}
+                      {activeDrillDown === 'PROBLEMS' && 'รายการสั่งจ่ายยาที่ต้องทบทวน / แก้ไข'}
+                    </h3>
+                    <span
+                      className={cn(
+                        'px-2 py-0.5 rounded-full text-xs font-bold font-mono border',
+                        activeDrillDown === 'PASS'
+                          ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25'
+                          : activeDrillDown === 'TOTAL'
+                          ? 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-500/25'
+                          : activeDrillDown === 'PATIENTS'
+                          ? 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-500/25'
+                          : 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-500/25'
+                      )}
+                    >
+                      {activeDrillDown === 'PATIENTS'
+                        ? `${fmtNum(drillDownPatients.length)} ราย`
+                        : `${fmtNum(drillDownPrescriptions.length)} รายการ`}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    ช่วงวันที่ {toThaiDate(range.startDate)} ถึง {toThaiDate(range.endDate)} • โรงพยาบาลพังโคน
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  type="button"
+                  onClick={handleExportDrillDownExcel}
+                  className="px-3 py-1.5 rounded-xl text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 transition cursor-pointer flex items-center gap-1.5"
+                  title="ดาวน์โหลดข้อมูลเป็นไฟล์ Excel"
+                >
+                  <FileSpreadsheet className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="hidden sm:inline">ส่งออก Excel</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setActiveDrillDown(null)}
+                  className="p-1.5 rounded-xl text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/60 dark:hover:bg-white/10 transition cursor-pointer"
+                  title="ปิดหน้าต่าง (ESC)"
+                >
+                  <X className="size-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Toolbar: Search & Scope Filter */}
+            <div className="p-3 sm:px-5 border-b border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#0c1424]">
+              {/* Search */}
+              <div className="relative flex-1 min-w-[240px] max-w-md">
+                <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  value={drillDownSearch}
+                  onChange={(e) => {
+                    setDrillDownSearch(e.target.value)
+                    setDrillDownPage(0)
+                  }}
+                  placeholder={
+                    activeDrillDown === 'PATIENTS'
+                      ? 'ค้นหา HN, ชื่อผู้ป่วย, รายการยา หรือแผนก…'
+                      : 'ค้นหา HN, ผู้ป่วย, รายการยา, แพทย์, PDX…'
+                  }
+                  className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-900/90 border border-slate-200 dark:border-white/10 text-xs text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/40"
+                />
+                {drillDownSearch && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDrillDownSearch('')
+                      setDrillDownPage(0)
+                    }}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              {/* Scope filter (for prescriptions) */}
+              {activeDrillDown !== 'PATIENTS' && (
+                <div className="flex items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs">
+                  {(['ALL', 'OPD', 'IPD'] as const).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      onClick={() => {
+                        setDrillDownScope(s)
+                        setDrillDownPage(0)
+                      }}
+                      className={cn(
+                        'px-2.5 py-1 rounded-lg font-medium transition cursor-pointer',
+                        drillDownScope === s
+                          ? 'bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 font-bold shadow-2xs'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+                      )}
+                    >
+                      {s === 'ALL' ? 'ทั้งหมด' : s}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Table Body */}
+            <div className="flex-1 overflow-auto divide-y divide-slate-100 dark:divide-white/5">
+              {activeDrillDown === 'PATIENTS' ? (
+                // PATIENTS VIEW
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className="py-2.5 px-3 w-12 text-center">#</th>
+                      <th className="py-2.5 px-3 min-w-[170px]">ผู้รับบริการ / HN</th>
+                      <th className="py-2.5 px-3 text-center">ครั้งรับบริการ (VN)</th>
+                      <th className="py-2.5 px-3 text-center">ใบสั่งยา</th>
+                      <th className="py-2.5 px-3 min-w-[200px]">ยาสมุนไพรที่ได้รับ</th>
+                      <th className="py-2.5 px-3 min-w-[130px]">แผนกที่รับบริการ</th>
+                      <th className="py-2.5 px-3 text-center min-w-[100px]">วันที่ล่าสุด</th>
+                      <th className="py-2.5 px-3 text-center">ผลตรวจ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-sans">
+                    {paginatedPatients.length === 0 ? (
+                      <tr>
+                        <td colSpan={8} className="py-12 text-center text-slate-400">
+                          ไม่พบข้อมูลผู้รับบริการที่ตรงกับเงื่อนไข
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedPatients.map((p, idx) => (
+                        <tr
+                          key={p.hn}
+                          className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors"
+                        >
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                            {drillDownPage * drillDownPageSize + idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="font-bold text-slate-900 dark:text-white">
+                              {p.patientName}
+                            </div>
+                            <div className="text-[10.5px] font-mono text-teal-600 dark:text-teal-400 font-semibold mt-0.5">
+                              HN: {p.hn}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-700 dark:text-slate-200">
+                            {p.visitCount} ครั้ง
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
+                            {p.prescriptionsCount} ใบ
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex flex-wrap gap-1 max-w-[260px]">
+                              {p.drugs.map((d, i) => (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-[10.5px] border border-slate-200/80 dark:border-white/10"
+                                >
+                                  {d}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px]">
+                            {p.departments.join(', ') || '-'}
+                          </td>
+                          <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                            {toThaiDate(p.latestDate)}
+                          </td>
+                          <td className="py-2.5 px-3 text-center">
+                            {p.hasProblem ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                <AlertTriangle className="size-3 text-rose-500" /> มีรายการไม่ตรง
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              ) : (
+                // PRESCRIPTIONS VIEW (PASS, TOTAL, PROBLEMS)
+                <table className="w-full text-left text-xs border-collapse">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                    <tr>
+                      <th className="py-2.5 px-3 w-12 text-center">#</th>
+                      <th className="py-2.5 px-3 min-w-[90px]">วันที่ / เวลา</th>
+                      <th className="py-2.5 px-3 min-w-[150px]">ผู้รับบริการ / HN</th>
+                      <th className="py-2.5 px-3 min-w-[180px]">รายการยาสมุนไพร</th>
+                      <th className="py-2.5 px-3 min-w-[110px]">แผนก</th>
+                      <th className="py-2.5 px-3 min-w-[120px]">แพทย์ผู้สั่ง</th>
+                      <th className="py-2.5 px-3 min-w-[80px]">รหัสโรค (PDX)</th>
+                      <th className="py-2.5 px-3 text-center min-w-[120px]">ผลการตรวจสอบ</th>
+                      <th className="py-2.5 px-3 w-12 text-center"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-sans">
+                    {paginatedPrescriptions.length === 0 ? (
+                      <tr>
+                        <td colSpan={9} className="py-12 text-center text-slate-400">
+                          ไม่พบรายการสั่งจ่ายยาที่ตรงกับเงื่อนไข
+                        </td>
+                      </tr>
+                    ) : (
+                      paginatedPrescriptions.map((r, idx) => {
+                        const isFail = r.audit_result !== 'PASS'
+                        return (
+                          <tr
+                            key={r.id || idx}
+                            className={cn(
+                              'hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors',
+                              isFail && 'bg-rose-50/20 dark:bg-rose-950/[0.08]'
+                            )}
+                          >
+                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                              {drillDownPage * drillDownPageSize + idx + 1}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono whitespace-nowrap text-[11px]">
+                              <div className="text-slate-900 dark:text-slate-100 font-semibold">{toThaiDate(r.visit_date)}</div>
+                              <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                                <Clock className="size-3" />
+                                <span>{r.visit_time ? `${r.visit_time.substring(0, 5)} น.` : '-'}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-bold text-slate-900 dark:text-white truncate max-w-[170px]">
+                                {r.patient_name}
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5 text-[10px] font-mono">
+                                <span className="px-1.5 py-0.2 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-semibold">
+                                  HN {r.hn}
+                                </span>
+                                <span className="text-slate-400">VN {r.vn}</span>
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3">
+                              <div className="font-semibold text-slate-900 dark:text-white">
+                                {r.drug_name}
+                              </div>
+                              <div className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+                                จำนวน {fmtNum(r.drug_qty)} {r.drug_units || 'หน่วย'}
+                              </div>
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[110px]">
+                              {r.department_name || '-'}
+                            </td>
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[120px]">
+                              {r.doctor_name || '-'}
+                            </td>
+                            <td className="py-2.5 px-3 font-mono font-bold text-xs">
+                              {r.pdx ? (
+                                <span className="px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-white/10">
+                                  {r.pdx}
+                                </span>
+                              ) : (
+                                <span className="text-rose-500 text-[11px] italic">ไม่มี DX</span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              {isFail ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                    <XCircle className="size-3 text-rose-500" /> ไม่ผ่าน
+                                  </span>
+                                  {r.audit_reason && (
+                                    <span className="text-[9.5px] text-rose-600 dark:text-rose-400 max-w-[130px] truncate">
+                                      {r.audit_reason}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                  <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
+                                </span>
+                              )}
+                            </td>
+                            <td className="py-2.5 px-3 text-center">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedPatientRecord(r)}
+                                className="p-1 rounded-lg text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 hover:bg-teal-500/10 transition cursor-pointer"
+                                title="ดูรายละเอียดเคสนี้"
+                              >
+                                <Eye className="size-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        )
+                      })
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Modal Footer: Pagination & Direct Actions */}
+            <div className="p-3 sm:px-5 border-t border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-white/[0.02]">
+              {/* Pagination */}
+              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                <span>
+                  หน้า <strong className="font-mono text-slate-900 dark:text-white">{drillDownPage + 1}</strong> จาก{' '}
+                  <strong className="font-mono text-slate-900 dark:text-white">{totalDrillDownPages}</strong>
+                </span>
+                <div className="flex items-center gap-1 ml-2">
+                  <button
+                    type="button"
+                    disabled={drillDownPage === 0}
+                    onClick={() => setDrillDownPage((p) => Math.max(0, p - 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 disabled:opacity-40 transition cursor-pointer"
+                  >
+                    <ChevronLeft className="size-4" />
+                  </button>
+                  <button
+                    type="button"
+                    disabled={drillDownPage >= totalDrillDownPages - 1}
+                    onClick={() => setDrillDownPage((p) => Math.min(totalDrillDownPages - 1, p + 1))}
+                    className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 disabled:opacity-40 transition cursor-pointer"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Direct Jump Buttons */}
+              <div className="flex items-center gap-2">
+                {activeDrillDown === 'PROBLEMS' && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveDrillDown(null)
+                      onNavigate('dxwriteback')
+                    }}
+                    className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-rose-500 hover:bg-rose-450 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                  >
+                    <Send className="size-3.5" />
+                    <span>เปิดหน้าทบทวน DX (DxWriteback)</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveDrillDown(null)
+                    onNavigate('audit')
+                  }}
+                  className="px-3.5 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white transition shadow-sm cursor-pointer flex items-center gap-1.5"
+                >
+                  <ExternalLink className="size-3.5" />
+                  <span>เปิดดูในหน้าตรวจสอบการจ่ายยาเต็มรูปแบบ</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* 5. SINGLE RECORD DETAIL OVERLAY (เมื่อคลิกดูรายละเอียดของรายการใดรายการหนึ่ง)   */}
+      {/* ========================================================================= */}
+      {selectedPatientRecord && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="w-full max-w-xl rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 shadow-2xl p-5 space-y-4 max-h-[85vh] overflow-y-auto">
+            <div className="flex items-start justify-between pb-3 border-b border-slate-200 dark:border-white/10">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-400 grid place-items-center">
+                  <User className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                    {selectedPatientRecord.patient_name}
+                  </h3>
+                  <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
+                    <span>HN: {selectedPatientRecord.hn}</span>
+                    <span>•</span>
+                    <span>VN: {selectedPatientRecord.vn}</span>
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedPatientRecord(null)}
+                className="p-1.5 rounded-xl text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5">
+                <div>
+                  <span className="text-slate-400 block text-[11px]">วันที่รับบริการ</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {toThaiDate(selectedPatientRecord.visit_date)} {selectedPatientRecord.visit_time?.substring(0, 5)} น.
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">สิทธิการรักษา</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {selectedPatientRecord.pttype_name || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">แผนกที่รับบริการ</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {selectedPatientRecord.department_name || '-'}
+                  </span>
+                </div>
+                <div>
+                  <span className="text-slate-400 block text-[11px]">แพทย์ผู้สั่งใช้ยา</span>
+                  <span className="font-semibold text-slate-900 dark:text-white">
+                    {selectedPatientRecord.doctor_name || '-'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 space-y-1.5">
+                <span className="text-slate-400 block text-[11px]">รายการยาสมุนไพร</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm text-slate-900 dark:text-white">{selectedPatientRecord.drug_name}</span>
+                  <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
+                    {selectedPatientRecord.drug_qty} {selectedPatientRecord.drug_units || 'หน่วย'}
+                  </span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 space-y-2">
+                <span className="text-slate-400 block text-[11px]">รหัสวินิจฉัยโรค (ICD-10)</span>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    selectedPatientRecord.pdx ? { label: 'PDX', code: selectedPatientRecord.pdx } : null,
+                    selectedPatientRecord.dx0 ? { label: 'DX0', code: selectedPatientRecord.dx0 } : null,
+                    selectedPatientRecord.dx1 ? { label: 'DX1', code: selectedPatientRecord.dx1 } : null,
+                    selectedPatientRecord.dx2 ? { label: 'DX2', code: selectedPatientRecord.dx2 } : null,
+                    selectedPatientRecord.dx3 ? { label: 'DX3', code: selectedPatientRecord.dx3 } : null,
+                    selectedPatientRecord.dx4 ? { label: 'DX4', code: selectedPatientRecord.dx4 } : null,
+                    selectedPatientRecord.dx5 ? { label: 'DX5', code: selectedPatientRecord.dx5 } : null,
+                  ]
+                    .filter(Boolean)
+                    .map((d, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded-md font-mono font-bold text-xs bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20"
+                      >
+                        {d?.label}: {d?.code}
+                      </span>
+                    ))}
+                </div>
+              </div>
+
+              <div
+                className={cn(
+                  'p-3.5 rounded-xl border space-y-1',
+                  selectedPatientRecord.audit_result === 'PASS'
+                    ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-800 dark:text-emerald-200'
+                    : 'bg-rose-500/10 border-rose-500/25 text-rose-800 dark:text-rose-200'
+                )}
+              >
+                <div className="flex items-center gap-2 font-bold text-xs">
+                  {selectedPatientRecord.audit_result === 'PASS' ? (
+                    <>
+                      <CheckCircle2 className="size-4 text-emerald-500" />
+                      <span>ผ่านเกณฑ์ — รหัสโรคตรงตามข้อบ่งใช้ยา</span>
+                    </>
+                  ) : (
+                    <>
+                      <XCircle className="size-4 text-rose-500" />
+                      <span>ไม่ผ่านเกณฑ์ — {selectedPatientRecord.audit_reason || 'รหัสโรคไม่ตรงข้อบ่งใช้'}</span>
+                    </>
+                  )}
+                </div>
+                {selectedPatientRecord.allowed_dx && selectedPatientRecord.allowed_dx.length > 0 && (
+                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                    รหัสที่ตรงเกณฑ์ของยานี้:{' '}
+                    <span className="font-mono">{selectedPatientRecord.allowed_dx.join(', ')}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

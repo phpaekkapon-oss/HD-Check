@@ -23,7 +23,7 @@ export function cleanDrugUnit(unit?: string): string {
 }
 
 export interface AuditFilterParams extends DateRange {
-  readonly hn: string
+  readonly hn?: string
   readonly search: string
   readonly result: AuditResultFilter
 }
@@ -161,4 +161,48 @@ export interface SyncResult extends DateRange {
   readonly timestamp: string
 }
 
-export type ActivePage = 'dashboard' | 'audit' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
+export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
+
+export interface HealthMedRecord {
+  readonly vn: string
+  readonly hn: string
+  readonly visit_date: string
+  readonly visit_time: string
+  readonly patient_name: string
+  readonly age_y: number
+  readonly pttype_name: string
+  readonly pttype: string
+  readonly doctor_code: string
+  readonly doctor_name: string
+  readonly department_name: string
+  readonly pdx: string
+  readonly dx0?: string
+  readonly dx1?: string
+  readonly dx2?: string
+  readonly dx3?: string
+  readonly dx4?: string
+  readonly dx5?: string
+  readonly service_items_raw?: string
+  readonly service_codes?: string
+  readonly count_58130: number
+  readonly count_58101: number
+  readonly count_58301: number
+  readonly count_58220: number
+  readonly count_58131: number
+  readonly audit_result: 'PASS' | 'FAIL'
+  readonly audit_reason: string
+  readonly failures: readonly string[]
+  readonly passes: readonly string[]
+}
+
+export interface HealthMedKpi {
+  readonly total: number
+  readonly pass: number
+  readonly fail: number
+  readonly passRate: number
+  readonly duplicateFail: number
+  readonly kneeFail: number
+  readonly postpartumFail: number
+  readonly epFail: number
+}
+
