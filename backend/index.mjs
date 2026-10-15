@@ -3,8 +3,9 @@ import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED } from './config.mjs'
-import { syncHerbalData, fetchDrugSummary } from './sync.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED, MIN_QTY_EXEMPT_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U } from './config.mjs'
+import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
+import { HEALTH_MED_AUDIT_SQL, evaluateHealthMedAudit } from './healthmed.mjs'
 import {
   initAuthTables,
   authenticateHosUser,
@@ -99,8 +100,11 @@ let latestHerbVisitCache = null
 let latestHerbVisitCacheAt = 0
 async function getActiveHerbalDrugs() {
   if (Date.now() - activeHerbCacheAt < 30_000) return activeHerbCache
+  const [mapRows] = await dwPool.query('SELECT icode FROM dw_hd_check_drug_dx_map').catch(() => [[]])
+  const customIcodes = mapRows.map((r) => String(r.icode)).filter(Boolean)
+  const filter = buildHerbFilter(customIcodes)
   const [rows] = await hosPool.query(
-    `SELECT d.icode, d.name FROM drugitems d WHERE ${HERB_DRUG_FILTER} ORDER BY d.name, d.icode`
+    `SELECT d.icode, d.name FROM drugitems d WHERE ${filter} ORDER BY d.name, d.icode`
   )
   activeHerbCache = rows.map((row) => ({ icode: String(row.icode), drug_name: row.name ?? String(row.icode) }))
   activeHerbCacheAt = Date.now()
@@ -317,13 +321,23 @@ const normalizeIcdCode = (value) => String(value ?? '').trim().toUpperCase().rep
 function evaluate(row, dxMap, minQtyMap) {
   const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
   const qty = Number(row.drug_qty ?? 0)
-  const isQtyFail = minQty > 0 && qty < minQty
+
+  // 1. ตรวจสอบสิทธิที่ได้รับการยกเว้นเกณฑ์การจ่ายขั้นต่ำ
+  const pttype = String(row.pttype_name ?? '').trim()
+  const isPttypeExempt = MIN_QTY_EXEMPT_PTTYPES.some((kw) => pttype.includes(kw))
+  const isQtyFail = !isPttypeExempt && minQty > 0 && qty < minQty
   const units = row.drug_units ? ` ${row.drug_units}` : ''
 
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
     .map(normalizeIcdCode)
     .filter(Boolean)
   const unique = [...new Set(dxList)]
+
+  // 2. ตรวจสอบแพทย์แผนไทย 5 ท่านที่ต้องมีรหัสการวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U)
+  const doctorName = String(row.doctor_name ?? '').trim()
+  const isTargetThaiMedDoctor = THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
+  const hasUDx = unique.some((dx) => dx.startsWith('U'))
+
   if (unique.length === 0) {
     return {
       audit_result: 'NO_DX',
@@ -336,6 +350,7 @@ function evaluate(row, dxMap, minQtyMap) {
         : 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)',
     }
   }
+
   const allowed = dxMap.get(row.drug_icode) ?? []
   const matched = unique.filter((dx) => allowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
 
@@ -352,7 +367,19 @@ function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
-  // หากมียาที่มีการกำหนดจ่ายขั้นต่ำ และจ่ายน้อยกว่าเกณฑ์ จะถือว่าไม่ผ่าน (FAIL) เพราะจะเบิกเคลมไม่ผ่าน
+  // หากเป็นแพทย์แผนไทย 5 ท่านนี้ ต้องมีรหัสวินิจฉัยแผนไทย (รหัส U เช่น U57.., U66..) ร่วมด้วยเสมอ
+  if (isTargetThaiMedDoctor && !hasUDx) {
+    return {
+      audit_result: 'FAIL',
+      matched_dx: matched,
+      allowed_dx: allowed,
+      min_qty: minQty,
+      is_qty_fail: isQtyFail,
+      audit_reason: `แพทย์แผนไทย (${doctorName}) สั่งจ่ายยา ต้องระบุรหัสวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U เช่น U57, U66) ร่วมด้วย`,
+    }
+  }
+
+  // หากมียาที่มีการกำหนดจ่ายขั้นต่ำ และจ่ายน้อยกว่าเกณฑ์ (เฉพาะสิทธิที่ไม่ได้รับการยกเว้น)
   if (isQtyFail) {
     return {
       audit_result: 'FAIL',
@@ -367,15 +394,19 @@ function evaluate(row, dxMap, minQtyMap) {
   }
 
   if (matched.length > 0) {
+    const exemptNotice = isPttypeExempt && minQty > 0 && qty < minQty
+      ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`
+      : ''
     return {
       audit_result: 'PASS',
       matched_dx: matched,
       allowed_dx: allowed,
       min_qty: minQty,
       is_qty_fail: false,
-      audit_reason: 'พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (เป็นผลตรวจของระบบ)',
+      audit_reason: `พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้${exemptNotice}`,
     }
   }
+
   return {
     audit_result: 'FAIL',
     matched_dx: [],
@@ -523,6 +554,46 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
   }
 })
 
+app.get('/api/healthmed/audit', requireSession, async (req, res) => {
+  try {
+    const { startDate, endDate } = readRange(req.query)
+    const resultFilter = String(req.query.result ?? 'ALL').toUpperCase()
+    const search = String(req.query.search ?? '').trim()
+
+    const [rows] = await hosPool.query(HEALTH_MED_AUDIT_SQL, [startDate, endDate])
+    const evaluated = rows.map((r) => ({
+      ...r,
+      ...evaluateHealthMedAudit(r),
+    }))
+
+    const filtered = evaluated.filter((r) => {
+      if (resultFilter === 'PROBLEM' && r.audit_result === 'PASS') return false
+      if (['PASS', 'FAIL'].includes(resultFilter) && r.audit_result !== resultFilter) return false
+      if (search) {
+        const s = search.toLowerCase()
+        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason}`.toLowerCase()
+        if (!text.includes(s)) return false
+      }
+      return true
+    })
+
+    const kpi = {
+      total: evaluated.length,
+      pass: evaluated.filter((r) => r.audit_result === 'PASS').length,
+      fail: evaluated.filter((r) => r.audit_result === 'FAIL').length,
+      duplicateFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('ซ้ำ'))).length,
+      kneeFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length,
+      postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด'))).length,
+      epFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('EP'))).length,
+    }
+    kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
+
+    res.json({ success: true, data: filtered, kpi, meta: { total: filtered.length, startDate, endDate } })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 app.get('/api/drugs', requireSession, async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
@@ -566,7 +637,7 @@ app.get('/api/drugs', requireSession, async (req, res) => {
       }
     }
 
-    const data = await fetchDrugSummary(hosPool, startDate, endDate)
+    const data = await fetchDrugSummary(hosPool, startDate, endDate, activeCodes)
     res.json({ success: true, data, meta: { total: data.length, startDate, endDate, source: 'hosxp' } })
   } catch (err) {
     fail(res, err)
@@ -722,6 +793,7 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
        ON DUPLICATE KEY UPDATE drug_name = COALESCE(VALUES(drug_name), drug_name), dx_prefixes = VALUES(dx_prefixes), min_qty = VALUES(min_qty), indication = VALUES(indication)`,
       [icode, drugName, [...new Set(prefixes)].join(','), min_qty, indication]
     )
+    activeHerbCacheAt = 0 // Invalidate herbal drugs cache so new drug shows up everywhere immediately
     res.json({ success: true, icode, drug_name: drugName, dx_prefixes: [...new Set(prefixes)].join(','), min_qty, indication })
   } catch (err) {
     fail(res, err)

@@ -1,8 +1,21 @@
 import mysql from 'mysql2/promise'
 import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED } from './config.mjs'
 
-/** SQL Query 2 — captures both OPD (Thai Med) and IPD herbal drug dispensing accurately */
-const DRUG_SUMMARY_SQL = `
+export function buildHerbFilter(customIcodes = []) {
+  const cleanIcodes = (customIcodes || [])
+    .map((c) => String(c).trim().replace(/[^a-zA-Z0-9]/g, ''))
+    .filter(Boolean)
+
+  if (cleanIcodes.length === 0) {
+    return HERB_DRUG_FILTER
+  }
+  const inList = cleanIcodes.map((c) => `'${c}'`).join(',')
+  return `((${HERB_DRUG_FILTER}) OR (d.istatus = 'Y' AND d.icode IN (${inList})))`
+}
+
+export function buildDrugSummarySql(customIcodes = []) {
+  const filter = buildHerbFilter(customIcodes)
+  return `
   SELECT
       d.icode,
       d.name,
@@ -26,13 +39,15 @@ const DRUG_SUMMARY_SQL = `
         (op.an IS NOT NULL AND op.an <> '')
       )
   ) op ON d.icode = op.icode
-  WHERE ${HERB_DRUG_FILTER}
+  WHERE ${filter}
   GROUP BY d.icode, d.name, d.units, d.unitcost, d.did, d.nhso_adp_code
   ORDER BY total_qty DESC, d.name ASC
 `
+}
 
-/** SQL Query 1 — combines OPD (Thai Med) and IPD herbal prescriptions */
-const PRESCRIPTION_SQL = `
+export function buildPrescriptionSql(customIcodes = []) {
+  const filter = buildHerbFilter(customIcodes)
+  return `
   (
     SELECT
         o.vn,
@@ -65,7 +80,7 @@ const PRESCRIPTION_SQL = `
     INNER JOIN spclty sp ON o.spclty = sp.spclty AND ${THAI_MED_FILTER}
     LEFT JOIN doctor doc ON o.doctor = doc.code
     WHERE o.vstdate BETWEEN ? AND ?
-      AND ${HERB_DRUG_FILTER}
+      AND ${filter}
   )
   UNION ALL
   (
@@ -111,11 +126,18 @@ const PRESCRIPTION_SQL = `
     LEFT JOIN iptdiag id6 ON op.an = id6.an AND id6.diagtype = '6'
     WHERE op.vstdate BETWEEN ? AND ?
       AND (op.an IS NOT NULL AND op.an <> '')
-      AND ${HERB_DRUG_FILTER}
+      AND ${filter}
     GROUP BY op.hos_guid
   )
   ORDER BY visit_date DESC, visit_time DESC
 `
+}
+
+/** SQL Query 2 — captures both OPD (Thai Med) and IPD herbal drug dispensing accurately */
+const DRUG_SUMMARY_SQL = buildDrugSummarySql()
+
+/** SQL Query 1 — combines OPD (Thai Med) and IPD herbal prescriptions */
+const PRESCRIPTION_SQL = buildPrescriptionSql()
 
 const toNum = (v) => Number(v ?? 0)
 
@@ -134,8 +156,9 @@ export function normalizeDrugRow(r) {
 }
 
 /** Live drug summary straight from HOSxP for any period */
-export async function fetchDrugSummary(hosPoolOrConn, startDate, endDate) {
-  const [rows] = await hosPoolOrConn.query(DRUG_SUMMARY_SQL, [startDate, endDate])
+export async function fetchDrugSummary(hosPoolOrConn, startDate, endDate, customIcodes = []) {
+  const sql = customIcodes && customIcodes.length > 0 ? buildDrugSummarySql(customIcodes) : DRUG_SUMMARY_SQL
+  const [rows] = await hosPoolOrConn.query(sql, [startDate, endDate])
   return rows.map(normalizeDrugRow)
 }
 
@@ -174,8 +197,13 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
       }
     }
 
-    const drugs = await fetchDrugSummary(hos, startDate, endDate)
-    const [presc] = await hos.query(PRESCRIPTION_SQL, [startDate, endDate, startDate, endDate])
+    // Automatically incorporate custom icodes from the dx map settings
+    const [mappedHerbs] = await dw.query('SELECT icode FROM dw_hd_check_drug_dx_map').catch(() => [[]])
+    const customIcodes = mappedHerbs.map((r) => String(r.icode)).filter(Boolean)
+
+    const drugs = await fetchDrugSummary(hos, startDate, endDate, customIcodes)
+    const prescSql = customIcodes.length > 0 ? buildPrescriptionSql(customIcodes) : PRESCRIPTION_SQL
+    const [presc] = await hos.query(prescSql, [startDate, endDate, startDate, endDate])
 
     // A stale/limited HOSxP source can return no rows for a period that already
     // has data in the warehouse. Never interpret that as an instruction to erase

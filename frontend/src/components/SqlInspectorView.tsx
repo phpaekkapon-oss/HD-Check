@@ -78,6 +78,44 @@ WHERE d.istatus = 'Y' -- กรองเฉพาะยาที่มีสถ�
 GROUP BY d.icode, d.name, d.unitcost, d.did, d.nhso_adp_code
 ORDER BY \`จำนวน\` DESC, d.name ASC;`
 
+const QUERY_3 = `SELECT 
+    o.vn,
+    o.hn,
+    o.vstdate AS visit_date,
+    o.vsttime AS visit_time,
+    CONCAT(pt.pname, pt.fname, ' ', pt.lname) AS patient_name,
+    TIMESTAMPDIFF(YEAR, pt.birthday, o.vstdate) AS age_y,
+    ps.name AS pttype_name,
+    doc.name AS doctor_name,
+    ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
+    d.icode, d.name AS service_name, op.qty, op.unitprice,
+    CASE 
+        -- กฎข้อ 1: ค่านวดและประคบ ซ้ำกัน >= 2 ครั้งใน visit เดียวกัน
+        WHEN op.qty > 1 AND (d.name LIKE '%ค่านวดและประคบ%' OR d.icode IN ('58130', '58131')) THEN 'FAIL: ค่านวดและประคบซ้ำกัน'
+        -- กฎข้อ 2: พอกเข่า (M179 + U5753 และอายุ 40 ปีขึ้นไป)
+        WHEN (ov.pdx = 'M179' OR ov.dx0 = 'M179') AND NOT (ov.pdx = 'U5753' OR ov.dx0 = 'U5753' OR ov.dx1 = 'U5753') THEN 'FAIL: ขาดรหัส U5753 คู่ M179'
+        WHEN (ov.pdx = 'M179' OR ov.dx0 = 'M179') AND TIMESTAMPDIFF(YEAR, pt.birthday, o.vstdate) < 40 THEN 'FAIL: พอกเข่า/ข้อเข่าเสื่อมอายุต่ำกว่า 40 ปี'
+        -- กฎข้อ 5: มารดาหลังคลอด (M6260 + U506)
+        WHEN (d.name LIKE '%ทับหม้อเกลือ%' OR d.icode = '58220') AND NOT (ov.pdx = 'U506' OR ov.dx0 = 'U506' OR ov.dx1 = 'U506') THEN 'FAIL: มารดาหลังคลอดขาดรหัส U506'
+        ELSE 'PASS'
+    END AS audit_healthmed_status
+FROM opitemrece op
+INNER JOIN ovst o ON op.vn = o.vn
+INNER JOIN vn_stat ov ON o.vn = ov.vn
+INNER JOIN patient pt ON o.hn = pt.hn
+INNER JOIN drugitems d ON op.icode = d.icode
+LEFT JOIN pttype ps ON o.pttype = ps.pttype
+LEFT JOIN doctor doc ON o.doctor = doc.code
+WHERE o.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+  AND (
+    d.name LIKE '%ค่านวด%'
+    OR d.name LIKE '%ค่าประคบ%'
+    OR d.name LIKE '%ค่าทับหม้อเกลือ%'
+    OR d.name LIKE '%ค่าอบไอน้ำ%'
+    OR d.icode IN ('58101', '58130', '58131', '58220', '58301')
+  )
+ORDER BY o.vstdate DESC, o.vsttime DESC;`
+
 const SQL_KEYWORDS = new Set([
   'SELECT', 'FROM', 'INNER', 'LEFT', 'RIGHT', 'JOIN', 'ON', 'WHERE',
   'AND', 'OR', 'NOT', 'CASE', 'WHEN', 'THEN', 'ELSE', 'END',
@@ -183,9 +221,9 @@ const SqlCodeBlock: FC<{ readonly code: string }> = ({ code }) => {
 }
 
 export const SqlInspectorView: FC = () => {
-  const [copied, setCopied] = useState<'q1' | 'q2' | null>(null)
+  const [copied, setCopied] = useState<'q1' | 'q2' | 'q3' | null>(null)
 
-  const copy = (text: string, id: 'q1' | 'q2') => {
+  const copy = (text: string, id: 'q1' | 'q2' | 'q3') => {
     navigator.clipboard.writeText(text)
     setCopied(id)
     setTimeout(() => setCopied(null), 2000)
@@ -316,6 +354,61 @@ export const SqlInspectorView: FC = () => {
             <span>Group By icode • Aggregation</span>
           </div>
           <SqlCodeBlock code={QUERY_2} />
+        </div>
+      </div>
+
+      {/* Query 3: ตรวจสอบหัตถการ ค่าบริการแพทย์แผนไทย และการคิดค่าบริการซ้ำซ้อน */}
+      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
+        <div className="p-3.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440] flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5">
+            <div className="grid place-items-center size-7 rounded-lg bg-teal-100 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300">
+              <Database className="size-4" />
+            </div>
+            <div>
+              <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white tracking-tight">
+                QUERY 3 : ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย (งานที่ 1–5 & ตรวจค่าบริการซ้ำ)
+              </h4>
+              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+                ตรวจค่านวด/ประคบซ้ำ (58130, 58101), โรคข้อเข่า (M179+U5753 อายุ &ge; 40), มารดาหลังคลอด (M6260+U506)
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => copy(QUERY_3, 'q3')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] hover:border-teal-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
+            >
+              {copied === 'q3' ? (
+                <>
+                  <Check className="size-3.5 text-emerald-600" />
+                  <span className="text-emerald-600 font-bold">คัดลอกสำเร็จ!</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="size-3.5 text-slate-400" />
+                  <span>คัดลอก SQL</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* IDE-Grade Code Editor Container */}
+        <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-teal-300/70">
+            <div className="flex items-center gap-1.5">
+              <span className="size-2 rounded-full bg-rose-500/80" />
+              <span className="size-2 rounded-full bg-amber-500/80" />
+              <span className="size-2 rounded-full bg-emerald-500/80" />
+              <span className="ml-2 text-slate-300 font-bold flex items-center gap-1">
+                <Terminal className="size-3 text-teal-400" /> query_healthmed_procedure_audit.sql
+              </span>
+            </div>
+            <span>Thai Med Procedures • Audit Rules 1–5</span>
+          </div>
+          <SqlCodeBlock code={QUERY_3} />
         </div>
       </div>
     </div>

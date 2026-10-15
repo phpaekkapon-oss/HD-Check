@@ -57,6 +57,10 @@ export const HERB_DRUG_FILTER = `
       OR d.name LIKE '%มะขามแขก%'
       OR d.name LIKE '%เถาวัลย์เปรียง%'
       OR d.name LIKE '%ทองพันชั่ง%'
+      OR d.name LIKE '%รางจืด%'
+      OR d.name LIKE '%ฟ้าทะลายโจร%'
+      OR d.name LIKE '%ขมิ้นชัน%'
+      OR d.name LIKE '%ไพล%'
       OR d.icode IN ('1550003', '1540013', '1560028', '1560031')
   )
   AND d.name NOT LIKE '%(ยายืม)%'
@@ -67,5 +71,40 @@ export const HERB_DRUG_FILTER = `
 
 export const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
+/** Normalize ICD code by stripping dots and converting to uppercase */
+export const normalizeIcdCode = (value) => String(value ?? '').trim().toUpperCase().replace(/\./g, '')
+
 /** Filter for Thai Traditional Medicine Department (แผนกแพทย์แผนไทย) */
 export const THAI_MED_FILTER = `(sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')`
+
+/** สิทธิการรักษาที่ยกเว้นการบังคับจ่ายขั้นต่ำ (Min Qty Exemption) */
+export const MIN_QTY_EXEMPT_PTTYPES = [
+  'เบิกกรมบัญชีกลาง',
+  'สิทธิเบิกกรมบัญชีกลาง',
+  'จ่ายตรงกรมบัญชีกลาง',
+  'ประกันสังคมในเครือข่าย จ.สกลนคร',
+  'ประกันสังคมในเครือข่าย รพ. สว่างแดนดิน',
+  'ประกันสังคมในเครือข่าย รพ.สว่างแดนดิน',
+  'ประกันสังคม',
+  'ชำระเงินเอง',
+  'ข้าราชการ กทม.',
+  'ข้าราชการ กทม',
+  'กทม.',
+  'กทม',
+  'สิทธิจ่ายตรง (อปท.)',
+  'สิทธิจ่ายตรง (อปท)',
+  'อปท.',
+  'อปท',
+  'ประกันภัย',
+  'พรบ',
+  'พ.ร.บ.',
+]
+
+/** รายชื่อแพทย์แผนไทย 5 ท่านที่ต้องมีรหัสการวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U) ควบคู่เสมอ */
+export const THAI_MED_DOCTORS_REQUIRE_U = [
+  'นภัสกร มวลชัยภูมิ',
+  'ศาสตรา คำมูลตรี',
+  'แคทริยา แสนหูม',
+  'ศุภาวรรณ ลูกเงาะ',
+  'กชวรรณ ดวงแก้ว',
+]

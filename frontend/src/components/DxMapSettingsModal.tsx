@@ -770,26 +770,43 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     <p className="px-2 py-1 text-[10px] font-semibold text-slate-400">
                       พบ {searchResults.length} รายการ (คลิกเพื่อเลือก)
                     </p>
-                    {searchResults.map((d) => (
-                      <button
-                        key={d.icode}
-                        type="button"
-                        onClick={() => handleSelectDrugToAdd(d)}
-                        className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 flex items-center justify-between text-xs cursor-pointer transition-colors group"
-                      >
-                        <div>
-                          <p className="font-semibold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-300">
-                            {d.name}
-                          </p>
-                          <p className="text-[10px] font-mono text-slate-400">
-                            รหัส: {d.icode} {d.units ? `• หน่วย: ${d.units}` : ''}
-                          </p>
-                        </div>
-                        <span className="text-[10px] px-2 py-0.5 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 group-hover:bg-violet-600 group-hover:text-white transition-colors">
-                          เลือก
-                        </span>
-                      </button>
-                    ))}
+                    {searchResults.map((d) => {
+                      const isExisting = dxMap.some((item) => item.icode === d.icode)
+                      return (
+                        <button
+                          key={d.icode}
+                          type="button"
+                          onClick={() => handleSelectDrugToAdd(d)}
+                          className="w-full text-left px-2.5 py-2 rounded-lg hover:bg-violet-50 dark:hover:bg-violet-950/30 flex items-center justify-between text-xs cursor-pointer transition-colors group"
+                        >
+                          <div>
+                            <div className="flex items-center gap-1.5">
+                              <p className="font-semibold text-slate-900 dark:text-white group-hover:text-violet-600 dark:group-hover:text-violet-300">
+                                {d.name}
+                              </p>
+                              {isExisting && (
+                                <span className="text-[9px] px-1.5 py-0.2 rounded font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-300/50 dark:border-emerald-500/30">
+                                  มีในระบบแล้ว
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] font-mono text-slate-400">
+                              รหัส: {d.icode} {d.units ? `• หน่วย: ${d.units}` : ''}
+                            </p>
+                          </div>
+                          <span
+                            className={cn(
+                              'text-[10px] px-2 py-0.5 rounded transition-colors',
+                              isExisting
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 group-hover:bg-amber-600 group-hover:text-white'
+                                : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 group-hover:bg-violet-600 group-hover:text-white'
+                            )}
+                          >
+                            {isExisting ? 'แก้ไขเกณฑ์' : 'เลือก'}
+                          </span>
+                        </button>
+                      )
+                    })}
                   </div>
                 )}
 
@@ -822,6 +839,33 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     เปลี่ยนยา
                   </button>
                 </div>
+
+                {/* Duplicate Notification Banner */}
+                {dxMap.some((item) => item.icode === selectedDrug.icode) ? (
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-800 dark:text-amber-200 text-xs">
+                    <Info className="size-4 shrink-0 mt-0.5 text-amber-500" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-amber-900 dark:text-amber-100">
+                        ยานี้มีอยู่ในรายการเกณฑ์แล้ว (จะไม่เกิดรายการซ้ำ)
+                      </p>
+                      <p className="text-[11px] text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
+                        ระบบได้ดึงเกณฑ์เดิมมาให้เรียบร้อยแล้ว การกดบันทึกจะเป็นการ <strong>"อัปเดตแก้ไขเกณฑ์เดิม"</strong> ของยานี้ จะไม่มีรายการซ้ำซ้อนในตารางอย่างแน่นอน
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-2.5 p-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-200 text-xs">
+                    <BadgeCheck className="size-4 shrink-0 mt-0.5 text-emerald-500" />
+                    <div className="space-y-0.5">
+                      <p className="font-semibold text-emerald-900 dark:text-emerald-100">
+                        รายการยาใหม่จาก HOSxP
+                      </p>
+                      <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+                        ยังไม่เคยตั้งค่าในระบบ เมื่อบันทึกแล้วระบบจะเพิ่มเข้าสู่ตารางเกณฑ์ตรวจและดึงมาประมวลผลทันที
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 <label className="block space-y-1">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
@@ -888,7 +932,13 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     className="btn-pill-action inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white cursor-pointer disabled:opacity-50"
                   >
                     <Check className="size-3.5" />
-                    <span>{isPending ? 'กำลังบันทึก…' : 'บันทึกเกณฑ์ยา'}</span>
+                    <span>
+                      {isPending
+                        ? 'กำลังบันทึก…'
+                        : dxMap.some((item) => item.icode === selectedDrug.icode)
+                          ? 'บันทึกแก้ไขเกณฑ์เดิม'
+                          : 'บันทึกเพิ่มรายการยา'}
+                    </span>
                   </button>
                 </div>
               </div>
