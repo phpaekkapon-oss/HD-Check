@@ -29,18 +29,20 @@ export const HEALTH_MED_AUDIT_SQL = `
       ov.pdx,
       ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
       -- รวบรวมรายการค่าบริการแพทย์แผนไทยใน visit นี้
-      GROUP_CONCAT(DISTINCT CONCAT(IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)), ':', d.name, ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
-      GROUP_CONCAT(DISTINCT IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode))) AS service_codes,
-      COUNT(CASE WHEN IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) = '58130' THEN 1 END) AS count_58130,
-      COUNT(CASE WHEN IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) = '58101' THEN 1 END) AS count_58101,
-      COUNT(CASE WHEN IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) = '58301' THEN 1 END) AS count_58301,
-      COUNT(CASE WHEN IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) = '58220' THEN 1 END) AS count_58220,
-      COUNT(CASE WHEN IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) = '58131' THEN 1 END) AS count_58131
+      GROUP_CONCAT(DISTINCT CONCAT(COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode), ':', COALESCE(d.name, nd.name, ''), ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
+      GROUP_CONCAT(DISTINCT COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode)) AS service_codes,
+      -- รวมจำนวนครั้ง (ทั้งกรณีคีย์แยกแถว หรือระบุ qty >= 2)
+      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58130' OR COALESCE(d.name, nd.name) LIKE '%ค่านวดและประคบ%บำบัด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
+      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58101' OR (COALESCE(d.name, nd.name) LIKE '%ค่านวด%' AND COALESCE(d.name, nd.name) NOT LIKE '%ประคบ%') THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
+      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58301' OR COALESCE(d.name, nd.name) LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
+      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58220' OR COALESCE(d.name, nd.name) LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
+      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58131' OR COALESCE(d.name, nd.name) LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
   FROM ovst o
   INNER JOIN vn_stat ov ON o.vn = ov.vn
   INNER JOIN patient pt ON o.hn = pt.hn
   INNER JOIN opitemrece op ON o.vn = op.vn
-  INNER JOIN drugitems d ON op.icode = d.icode
+  LEFT JOIN drugitems d ON op.icode = d.icode
+  LEFT JOIN nondrugitems nd ON op.icode = nd.icode
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
@@ -48,11 +50,11 @@ export const HEALTH_MED_AUDIT_SQL = `
     AND (
       -- เฉพาะ visit ที่มีรายการค่าบริการแพทย์แผนไทย หรือแผนกแพทย์แผนไทย
       (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')
-      OR IFNULL(d.did, IFNULL(d.nhso_adp_code, d.icode)) IN ('58101', '58130', '58131', '58220', '58301')
-      OR d.name LIKE '%ค่านวด%'
-      OR d.name LIKE '%ค่าประคบ%'
-      OR d.name LIKE '%ค่าทับหม้อเกลือ%'
-      OR d.name LIKE '%ค่าอบไอน้ำ%'
+      OR COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) IN ('58101', '58130', '58131', '58220', '58301')
+      OR COALESCE(d.name, nd.name) LIKE '%ค่านวด%'
+      OR COALESCE(d.name, nd.name) LIKE '%ค่าประคบ%'
+      OR COALESCE(d.name, nd.name) LIKE '%ค่าทับหม้อเกลือ%'
+      OR COALESCE(d.name, nd.name) LIKE '%ค่าอบไอน้ำ%'
     )
   GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
            ps.name, ps.pttype, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
