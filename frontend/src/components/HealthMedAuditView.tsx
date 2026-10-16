@@ -248,7 +248,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'pttype_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="สิทธิการรักษา" />,
         cell: ({ row }) => (
-          <div className="max-w-[160px]">
+          <div className="min-w-[170px] max-w-[220px]">
             <span
               className="text-xs sm:text-[12.5px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
               title={row.original.pttype_name || undefined}
@@ -262,7 +262,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'doctor_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="แพทย์ / ผู้ให้บริการ" />,
         cell: ({ row }) => (
-          <div className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[130px] flex items-center gap-1.5">
+          <div className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[140px] max-w-[180px] flex items-center gap-1.5">
             <div className="size-6 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0">
               <User className="size-3.5" />
             </div>
@@ -308,7 +308,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const thaiMedItems = parsed.filter((p) => p.isThaiMed)
 
           return (
-            <div className="space-y-1.5 min-w-[190px] max-w-[270px]">
+            <div className="space-y-1 min-w-[240px] max-w-[340px]">
               {/* รายการค่าบริการ 58xxx */}
               {thaiMedItems.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -326,7 +326,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
                         [{p.code}]
                       </strong>
-                      <span className="truncate max-w-[100px]">{p.name}</span>
+                      <span className="truncate max-w-[145px]">{p.name}</span>
                       <span className="font-mono text-[10.5px] opacity-80 shrink-0 font-bold">x{p.qty}</span>
                     </span>
                   ))}
@@ -339,7 +339,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   {operations.map((op, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 rounded text-[11px] sm:text-xs font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[130px]"
+                      className="px-2 py-0.5 rounded text-[11px] sm:text-xs font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap"
                       title={`${op.code}: ${op.name}`}
                     >
                       {op.code}
@@ -415,7 +415,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           }
 
           return (
-            <div className="flex flex-wrap gap-1.5 max-w-[190px]">
+            <div className="flex flex-wrap gap-1.5 min-w-[200px] max-w-[270px]">
               {thaiMedDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
@@ -424,7 +424,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span
                     key={idx}
                     className={cn(
-                      'px-2 py-0.5 rounded-md text-xs font-mono font-bold border transition shadow-2xs',
+                      'px-2 py-0.5 rounded-md text-xs font-mono font-bold border transition shadow-2xs whitespace-nowrap',
                       isM
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-1 ring-blue-400/50'
                         : isU
@@ -455,7 +455,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row }) => {
           const isFail = row.original.audit_result === 'FAIL'
           return (
-            <div className="flex flex-col items-center justify-center gap-1 min-w-[140px] max-w-[220px] mx-auto text-center">
+            <div className="flex flex-col items-center justify-center gap-1 min-w-[150px] max-w-[240px] mx-auto text-center">
               {isFail ? (
                 <>
                   <div className="flex items-center justify-center gap-1.5 flex-wrap">
