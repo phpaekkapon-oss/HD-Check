@@ -149,11 +149,11 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     () => [
       {
         id: 'index',
-        header: () => <span className="text-center block w-full">#</span>,
+        header: () => <span className="text-center block w-full text-xs font-bold">#</span>,
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.getState().pagination
           return (
-            <span className="font-mono text-slate-400 dark:text-slate-500 font-semibold text-center block w-8 mx-auto text-xs">
+            <span className="font-mono text-slate-400 dark:text-slate-500 font-bold text-center block w-8 mx-auto text-xs sm:text-[13px]">
               {pageIndex * pageSize + row.index + 1}
             </span>
           )
@@ -164,9 +164,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'visit_date',
         header: ({ column }) => <DataTableColumnHeader column={column} title="วันที่ / เวลา" />,
         cell: ({ row }) => (
-          <div className="font-mono text-xs whitespace-nowrap min-w-[85px]">
-            <div className="text-slate-900 dark:text-slate-100 font-semibold">{row.original.visit_date}</div>
-            <div className="text-[10.5px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5">
+          <div className="font-mono whitespace-nowrap min-w-[90px]">
+            <div className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px]">{row.original.visit_date}</div>
+            <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
               <Clock className="size-3 text-slate-400 shrink-0" />
               <span>{row.original.visit_time ? `${row.original.visit_time.substring(0, 5)} น.` : '—'}</span>
             </div>
@@ -177,36 +177,36 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'patient_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้รับบริการ / HN" />,
         cell: ({ row }) => (
-          <div className="whitespace-nowrap min-w-[155px] max-w-[215px]">
+          <div className="whitespace-nowrap min-w-[160px] max-w-[225px]">
             <div className="flex items-center gap-1 group">
               <button
                 type="button"
                 onClick={() => setSelectedRecord(row.original)}
-                className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 truncate"
+                className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 truncate text-xs sm:text-[13.5px]"
                 title="คลิกเพื่อดูรายละเอียดเวชระเบียน"
               >
                 <span className="truncate">{row.original.patient_name}</span>
-                <Eye className="size-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
+                <Eye className="size-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
               </button>
               <CopyButton
                 text={row.original.patient_name}
                 title="คัดลอกชื่อผู้รับบริการ"
-                iconSize="size-3"
+                iconSize="size-3.5"
                 className="opacity-50 hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
               />
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-[10.5px]">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
+            <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
                 <span>HN: {row.original.hn}</span>
                 <CopyButton
                   text={row.original.hn}
                   title="คัดลอก HN"
-                  iconSize="size-2.5"
+                  iconSize="size-3"
                   className="p-0.5 hover:bg-teal-500/25 text-teal-600 dark:text-teal-300 rounded cursor-pointer transition"
                 />
               </span>
               {row.original.vn && (
-                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-500 text-[10px]">
+                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-500 text-[11px] font-medium">
                   <span>VN: {row.original.vn}</span>
                   <CopyButton
                     text={row.original.vn}
@@ -230,13 +230,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             <div className="flex justify-center whitespace-nowrap min-w-[65px]">
               <span
                 className={cn(
-                  'px-2.5 py-0.5 rounded-full text-xs font-mono font-bold inline-flex items-center gap-1 border shrink-0',
+                  'px-2.5 py-0.5 rounded-full text-xs sm:text-[13px] font-mono font-bold inline-flex items-center gap-1 border shrink-0',
                   isKneeIssue
                     ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse'
                     : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10'
                 )}
               >
-                {isKneeIssue && <span className="text-[10px]">⚠️</span>}
+                {isKneeIssue && <span className="text-[11px]">⚠️</span>}
                 {age} ปี
               </span>
             </div>
@@ -248,9 +248,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'pttype_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="สิทธิการรักษา" />,
         cell: ({ row }) => (
-          <div className="max-w-[150px]">
+          <div className="max-w-[160px]">
             <span
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
+              className="text-xs sm:text-[12.5px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
               title={row.original.pttype_name || undefined}
             >
               {row.original.pttype_name || '—'}
@@ -262,11 +262,11 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'doctor_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="แพทย์ / ผู้ให้บริการ" />,
         cell: ({ row }) => (
-          <div className="text-xs text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[130px] flex items-center gap-1.5">
+          <div className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[130px] flex items-center gap-1.5">
             <div className="size-6 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0">
               <User className="size-3.5" />
             </div>
-            <span className="truncate max-w-[140px]" title={row.original.doctor_name || undefined}>
+            <span className="truncate max-w-[150px]" title={row.original.doctor_name || undefined}>
               {row.original.doctor_name || <span className="text-slate-400 italic">— ไม่ระบุ —</span>}
             </span>
           </div>
@@ -308,7 +308,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const thaiMedItems = parsed.filter((p) => p.isThaiMed)
 
           return (
-            <div className="space-y-1 min-w-[180px] max-w-[260px]">
+            <div className="space-y-1.5 min-w-[190px] max-w-[270px]">
               {/* รายการค่าบริการ 58xxx */}
               {thaiMedItems.length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -316,18 +316,18 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     <span
                       key={idx}
                       className={cn(
-                        'text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition shadow-2xs',
+                        'text-[11px] sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-md border transition shadow-2xs',
                         p.isDup
                           ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40 font-semibold'
-                          : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
+                          : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30 font-medium'
                       )}
                       title={`${p.name} (${p.code}) x${p.qty} ราคา ${Number(p.price || 0).toLocaleString()} บ.`}
                     >
                       <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
                         [{p.code}]
                       </strong>
-                      <span className="truncate max-w-[95px]">{p.name}</span>
-                      <span className="font-mono text-[9.5px] opacity-80 shrink-0">x{p.qty}</span>
+                      <span className="truncate max-w-[100px]">{p.name}</span>
+                      <span className="font-mono text-[10.5px] opacity-80 shrink-0 font-bold">x{p.qty}</span>
                     </span>
                   ))}
                 </div>
@@ -339,7 +339,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   {operations.map((op, idx) => (
                     <span
                       key={idx}
-                      className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[120px]"
+                      className="px-2 py-0.5 rounded text-[11px] sm:text-xs font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[130px]"
                       title={`${op.code}: ${op.name}`}
                     >
                       {op.code}
@@ -351,20 +351,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               {/* วันคลอดในระบบงานบัญชี 2 (แสดงเฉพาะกรณีบริบาลหญิงหลังคลอดเท่านั้น) */}
               {isPostpartum && (
                 laborDate ? (
-                  <div className="text-[9.5px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold">
-                    <Baby className="size-2.5 shrink-0" />
+                  <div className="text-[11px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-bold">
+                    <Baby className="size-3 shrink-0" />
                     <span>คลอด: {laborDate}</span>
                   </div>
                 ) : (
-                  <div className="text-[9.5px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold">
-                    <AlertTriangle className="size-2.5 shrink-0" />
+                  <div className="text-[11px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-bold">
+                    <AlertTriangle className="size-3 shrink-0" />
                     <span>ไม่มีวันคลอดในบัญชี 2</span>
                   </div>
                 )
               )}
 
               {thaiMedItems.length === 0 && operations.length === 0 && (
-                <div className="text-[10px] text-slate-400 italic">
+                <div className="text-xs text-slate-400 italic">
                   ไม่มีรหัสหัตถการ/ค่าบริการ
                 </div>
               )}
@@ -408,14 +408,14 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
           if (thaiMedDxs.length === 0) {
             return (
-              <span className="text-amber-500 font-medium text-[10.5px] italic">
+              <span className="text-amber-500 font-semibold text-xs italic">
                 ไม่มีรหัสแผนไทย (M/U)
               </span>
             )
           }
 
           return (
-            <div className="flex flex-wrap gap-1 max-w-[180px]">
+            <div className="flex flex-wrap gap-1.5 max-w-[190px]">
               {thaiMedDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
@@ -424,7 +424,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span
                     key={idx}
                     className={cn(
-                      'px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold border transition shadow-2xs',
+                      'px-2 py-0.5 rounded-md text-xs font-mono font-bold border transition shadow-2xs',
                       isM
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-1 ring-blue-400/50'
                         : isU
@@ -455,15 +455,15 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row }) => {
           const isFail = row.original.audit_result === 'FAIL'
           return (
-            <div className="flex flex-col items-center justify-center gap-0.5 min-w-[130px] max-w-[210px] mx-auto text-center">
+            <div className="flex flex-col items-center justify-center gap-1 min-w-[140px] max-w-[220px] mx-auto text-center">
               {isFail ? (
                 <>
-                  <div className="flex items-center justify-center gap-1 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
-                      <XCircle className="size-3 text-rose-500" /> ไม่ผ่าน
+                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
+                      <XCircle className="size-3.5 text-rose-500" /> ไม่ผ่าน
                     </span>
                     {Boolean(row.original.is_duplicate_fail || row.original.failures?.some((f) => f.includes('ซ้ำ'))) && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
                         ⚠️ ซ้ำ
                       </span>
                     )}
@@ -474,23 +474,23 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                         setSelectedRecord(row.original)
                         handleAskAi(row.original)
                       }}
-                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer group shrink-0"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer group shrink-0"
                       title="ถาม AI ช่วยวิเคราะห์สาเหตุและวิธีแก้ไขใน HOSxP"
                     >
-                      <Bot className="size-2.5 text-teal-500 group-hover:scale-110 transition-transform" />
+                      <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
                       <span>AI</span>
                     </button>
                   </div>
                   <p
-                    className="text-[10px] leading-tight text-rose-600 dark:text-rose-300/90 font-sans font-medium truncate max-w-[200px] cursor-help mt-0.5"
+                    className="text-[11px] sm:text-xs leading-tight text-rose-600 dark:text-rose-300/90 font-sans font-medium truncate max-w-[210px] cursor-help mt-0.5"
                     title={row.original.audit_reason}
                   >
                     {row.original.audit_reason}
                   </p>
                 </>
               ) : (
-                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
-                  <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                  <CheckCircle2 className="size-3.5 text-emerald-500" /> ผ่านเกณฑ์
                 </span>
               )}
             </div>
@@ -860,8 +860,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     <TableHead
                       key={header.id}
                       className={cn(
-                        'text-slate-600 dark:text-slate-300 font-bold text-xs whitespace-nowrap',
-                        density === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'
+                        'text-slate-600 dark:text-slate-300 font-bold whitespace-nowrap',
+                        density === 'compact' ? 'py-2.5 px-3 text-xs sm:text-[13px]' : 'py-3.5 px-3.5 text-xs sm:text-sm'
                       )}
                     >
                       {header.isPlaceholder
@@ -902,7 +902,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                           key={cell.id}
                           className={cn(
                             'align-middle',
-                            density === 'compact' ? 'py-1.5 px-2.5 text-xs' : 'py-3 px-3'
+                            density === 'compact' ? 'py-2 px-3 text-xs sm:text-[13px]' : 'py-3.5 px-3.5 text-xs sm:text-sm'
                           )}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
