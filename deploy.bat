@@ -14,7 +14,19 @@ if %errorlevel% neq 0 (
     exit /b 1
 )
 
-:: Run fully automated release (Zero manual input: Auto Changelog + Bump + Git Push + Deploy)
+echo [คำเตือน] คุณกำลังจะทำการสร้างเวอร์ชันใหม่และ Deploy ขึ้นสู่ระบบ
+set /p CONFIRM="ยืนยันการเริ่ม Release ^& Deploy หรือไม่? พิมพ์ Y เพื่อยืนยัน (Y/N): "
+if /i not "%CONFIRM%"=="Y" (
+    echo.
+    echo ====================================================================
+    echo   [*] ยกเลิกเรียบร้อย - ระบบจะไม่เปลี่ยนเวอร์ชันและไม่มีการแก้ไขใดๆ
+    echo ====================================================================
+    pause
+    exit /b 0
+)
+
+echo.
+:: Run automated release (with AI Changelog + Code Diff Guard)
 node scripts\release.mjs --auto
 
 if %errorlevel% neq 0 (
