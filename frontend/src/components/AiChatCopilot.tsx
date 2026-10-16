@@ -191,27 +191,34 @@ export const AiChatCopilot: FC = () => {
 
   return (
     <>
-      {/* Floating Action Button (Launcher) */}
-      <div className="fixed right-4 lg:right-6 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-16 z-40 select-none">
+      {/* Floating Action Button (Launcher): Compact Circular Design matching professional standards */}
+      <div className="fixed right-3.5 sm:right-5 lg:right-6 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-6 z-40 select-none">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          aria-label="เปิดผู้ช่วย AI Chat"
+          aria-label={isOpen ? 'ปิดผู้ช่วย AI Chat' : 'เปิดผู้ช่วย AI Chat'}
           className={cn(
-            'group relative flex items-center gap-2.5 px-4 py-3 rounded-full text-white shadow-xl shadow-violet-500/25 ring-2 ring-white/30 backdrop-blur-md transition-all duration-300 cursor-pointer active:scale-95',
-            'bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 hover:shadow-2xl hover:shadow-violet-500/40',
-            isOpen ? 'ring-violet-400 scale-95' : 'hover:scale-105'
+            'group relative flex items-center justify-center size-10 sm:size-11 lg:size-12 rounded-full text-white shadow-lg shadow-violet-500/25 ring-2 ring-white/30 backdrop-blur-md transition-all duration-300 cursor-pointer active:scale-95 touch-manipulation',
+            'bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 hover:shadow-xl hover:shadow-violet-500/40',
+            isOpen ? 'ring-violet-400 rotate-90 scale-95' : 'hover:scale-105'
           )}
         >
-          <div className="relative">
-            <Bot className="size-5 transition-transform group-hover:rotate-12" />
-            <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-emerald-400 ring-2 ring-violet-700 animate-pulse" />
-          </div>
-          <span className="font-semibold text-sm tracking-tight hidden sm:inline">ผู้ช่วย AI</span>
-          <span className="font-mono text-[10px] uppercase px-1.5 py-0.5 rounded-full bg-white/20 text-white font-medium hidden md:inline">
-            Copilot
-          </span>
-          <Sparkles className="size-3.5 text-amber-300 animate-bounce hidden sm:inline" />
+          {isOpen ? (
+            <X className="size-5 transition-transform" />
+          ) : (
+            <div className="relative flex items-center justify-center">
+              <Bot className="size-5 transition-transform group-hover:rotate-12" />
+              <span className="absolute -top-1 -right-1 size-2 rounded-full bg-emerald-400 ring-2 ring-violet-700 animate-pulse" />
+            </div>
+          )}
+
+          {/* Desktop Tooltip Tag (floats on the left, does not block clicks) */}
+          {!isOpen && (
+            <div className="absolute right-full mr-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 dark:bg-black/85 text-white text-xs font-semibold whitespace-nowrap shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 border border-white/10 backdrop-blur-xs">
+              <Sparkles className="size-3 text-amber-300" />
+              <span>ผู้ช่วย AI Copilot</span>
+            </div>
+          )}
         </button>
       </div>
 
@@ -220,7 +227,7 @@ export const AiChatCopilot: FC = () => {
         <div
           role="dialog"
           aria-label="หน้าต่างสนทนา AI Smart Copilot"
-          className="fixed bottom-[calc(9rem+env(safe-area-inset-bottom,0px))] lg:bottom-28 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-[420px] md:w-[450px] max-h-[calc(100vh-11rem)] sm:max-h-[640px] flex flex-col rounded-2xl bg-themed-card border border-themed shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200"
+          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-20 right-3 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-[420px] md:w-[450px] max-h-[calc(100vh-6rem)] sm:max-h-[640px] flex flex-col rounded-2xl bg-themed-card border border-themed shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-violet-700 via-indigo-700 to-purple-800 text-white px-4 py-3 flex items-center justify-between shrink-0 shadow-md">

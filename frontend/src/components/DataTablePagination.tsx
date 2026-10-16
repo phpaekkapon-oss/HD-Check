@@ -62,8 +62,8 @@ export function DataTablePagination<TData>({
         </div>
       </div>
 
-      {/* Right: Modern Numbered Pagination Controls */}
-      <div className="flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto justify-center sm:justify-end">
+      {/* Right: Modern Numbered Pagination Controls (with safe right clearance for corner FAB) */}
+      <div className="flex items-center gap-1 sm:gap-1.5 w-full sm:w-auto justify-center sm:justify-end sm:pr-14 lg:pr-16">
         {/* First Page (<<) */}
         <button
           type="button"
