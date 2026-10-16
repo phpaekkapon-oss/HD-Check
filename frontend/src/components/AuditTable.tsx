@@ -69,6 +69,42 @@ function DxCodeCell({ code, record }: { readonly code: string; readonly record: 
   )
 }
 
+function getAuditPrimarySecondaryDx(record: AuditRecord) {
+  const allDxCodes = [
+    record.pdx,
+    record.dx0,
+    record.dx1,
+    record.dx2,
+    record.dx3,
+    record.dx4,
+    record.dx5,
+    record.main_pdx,
+  ]
+    .filter(Boolean)
+    .map((c) => c.trim().toUpperCase().replace(/\./g, ''))
+
+  const matchedList = (record.matched_dx || []).map((c) => c.trim().toUpperCase().replace(/\./g, ''))
+
+  // 1. รหัสหลัก (อันที่ 1): รหัสแผนปัจจุบัน (ไม่ขึ้นต้นด้วย U) ที่ตรงเกณฑ์ของยา หรือรหัสหลักของเคส
+  const matchedModern = matchedList.find((c) => !c.startsWith('U'))
+  const candidateModern = allDxCodes.find((c) => !c.startsWith('U'))
+  const primaryCode = matchedModern || candidateModern || record.pdx || record.main_pdx || ''
+  const isPrimaryMatched = Boolean(matchedModern)
+
+  // 2. รหัสรอง (อันที่ 2): รหัสแพทย์แผนไทย (ขึ้นต้นด้วย U) ที่ตรงเกณฑ์ของยา หรือ U code ในเคส
+  const matchedU = matchedList.find((c) => c.startsWith('U'))
+  const candidateU = allDxCodes.find((c) => c.startsWith('U'))
+  const secondaryUCode = matchedU || candidateU || ''
+  const isSecondaryMatched = Boolean(matchedU)
+
+  return {
+    primaryCode,
+    isPrimaryMatched,
+    secondaryUCode,
+    isSecondaryMatched,
+  }
+}
+
 const COLUMN_LABELS: Record<string, string> = {
   index: 'ลำดับ',
   visit_date: 'วันที่รับบริการ',
@@ -79,6 +115,8 @@ const COLUMN_LABELS: Record<string, string> = {
   drug_name: 'รายการยา',
   drug_qty: 'จำนวน',
   department_name: 'แผนกที่รับบริการ',
+  primary_dx: 'รหัสหลัก (อันที่ 1)',
+  secondary_dx: 'รหัสรอง (อันที่ 2)',
   main_pdx: 'main_pdx',
   pdx: 'pdx',
   dx0: 'dx0',
@@ -272,6 +310,66 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             {row.original.department_name}
           </span>
         ),
+      },
+      {
+        id: 'primary_dx',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รหัสหลัก (อันที่ 1)" className="justify-center" />
+        ),
+        cell: ({ row }) => {
+          const { primaryCode, isPrimaryMatched } = getAuditPrimarySecondaryDx(row.original)
+          if (!primaryCode) {
+            return <span className="text-rose-500 font-mono font-bold text-center block text-xs">—</span>
+          }
+          return (
+            <div className="flex justify-center whitespace-nowrap min-w-[75px]">
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded text-[11px] font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
+                  isPrimaryMatched
+                    ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/60 dark:text-blue-200 dark:border-blue-700/60 ring-1 ring-blue-400/40'
+                    : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:border-white/10'
+                )}
+                title={isPrimaryMatched ? `รหัสหลักที่ตรงตามเกณฑ์ของยา: ${primaryCode}` : `รหัสหลัก: ${primaryCode}`}
+              >
+                {primaryCode}
+              </span>
+            </div>
+          )
+        },
+      },
+      {
+        id: 'secondary_dx',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รหัสรอง (อันที่ 2)" className="justify-center" />
+        ),
+        cell: ({ row }) => {
+          const { secondaryUCode, isSecondaryMatched } = getAuditPrimarySecondaryDx(row.original)
+          if (!secondaryUCode) {
+            return (
+              <div className="flex justify-center whitespace-nowrap min-w-[75px]">
+                <span className="text-amber-600 dark:text-amber-400 font-mono text-[10.5px] italic">
+                  ไม่มีรหัส U
+                </span>
+              </div>
+            )
+          }
+          return (
+            <div className="flex justify-center whitespace-nowrap min-w-[75px]">
+              <span
+                className={cn(
+                  'px-2 py-0.5 rounded text-[11px] font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
+                  isSecondaryMatched
+                    ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700/60 ring-1 ring-emerald-400/40'
+                    : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:border-white/10'
+                )}
+                title={isSecondaryMatched ? `รหัสรองแพทย์แผนไทยที่ตรงเกณฑ์: ${secondaryUCode}` : `รหัสรองแพทย์แผนไทย: ${secondaryUCode}`}
+              >
+                {secondaryUCode}
+              </span>
+            </div>
+          )
+        },
       },
       {
         accessorKey: 'main_pdx',
