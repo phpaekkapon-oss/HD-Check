@@ -88,4 +88,19 @@ export const herbDxApi = {
     }>(
       `/api/healthmed/audit?${qs({ startDate: f.startDate, endDate: f.endDate, search: f.search || '', result: f.result || 'ALL' })}`
     ),
+
+  healthMedAiAdvisor: (record: Partial<HealthMedRecord>) =>
+    request<{
+      success: true
+      advice: {
+        summary: string
+        hosxpAction: string
+        caution: string
+        aiModel?: string
+      }
+      source: string
+    }>('/api/healthmed/ai-advisor', {
+      method: 'POST',
+      body: JSON.stringify(record),
+    }),
 }

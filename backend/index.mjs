@@ -588,6 +588,172 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
   }
 })
 
+// AI Cache to avoid redundant external API calls
+const aiAdvisorCache = new Map()
+
+function generateRuleBasedAdvice({ failures, age_y, pdx, dxList, ops, labor_date }) {
+  const failList = failures || []
+  const hosxpActions = []
+  const cautions = []
+  let summary = 'พบรายการเวชระเบียนยังไม่เป็นไปตามเกณฑ์มาตรฐานการแพทย์แผนไทย'
+
+  if (failList.some((f) => f.includes('พอกเข่า') || f.includes('เข่า'))) {
+    summary = 'เคสข้อเข่าเสื่อม/พอกเข่า (M179 + U5753) ไม่ครบตามเงื่อนไข สปสช.'
+    if (Number(age_y || 0) < 40) {
+      cautions.push(`ผู้ป่วยอายุ ${age_y} ปี (ไม่ถึงเกณฑ์ขั้นต่ำ 40 ปีบริบูรณ์) ไม่สามารถเบิกชดเชยค่าบริการพอกเข่าได้`)
+    }
+    hosxpActions.push('เปิดระบบงานแพทย์แผนไทยใน HOSxP แล้วลงรหัสหัตถการ ICD-10-TM ให้ครบทั้ง 4 รหัส ได้แก่ 872-78-11, 873-78-11, 874-78-11, 873-78-35')
+  }
+
+  if (failList.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) {
+    summary = 'เคสบริบาลหญิงหลังคลอด (M6260 + U506) ข้อมูลหัตถการหรือวันคลอดยังไม่ครบถ้วน'
+    if (!labor_date) {
+      hosxpActions.push('บันทึกข้อมูลการคลอดบุตรในระบบงานบัญชี 2 (งานอนามัยแม่และเด็ก/หญิงตั้งครรภ์และหลังคลอด) เพื่อให้มีวันคลอดเชื่อมโยง')
+    }
+    hosxpActions.push('ลงรหัสหัตถการบริบาลหลังคลอดให้ครบ 5 รหัส (900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30)')
+    cautions.push('การเบิกชดเชยบริบาลหญิงหลังคลอดต้องอยู่ในช่วงระยะเวลาหลังคลอดตามเกณฑ์ สปสช. เท่านั้น')
+  }
+
+  if (failList.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))) {
+    summary = 'การวินิจฉัยโรคกล้ามเนื้อ (รหัส M...) ขาดรหัสแพทย์แผนไทย (รหัส U...) หรือขาดหัตถการ'
+    hosxpActions.push('ตรวจสอบการลงรหัสโรคหลัก/โรคร่วม ให้มีทั้งรหัสโรคกล้ามเนื้อ (M...) คู่กับรหัสแพทย์แผนไทย (U...)')
+    hosxpActions.push('บันทึกรหัสหัตถการบำบัดรักษา เช่น 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 หรือรายการค่านวด/ประคบ')
+  }
+
+  if (failList.some((f) => f.includes('ซ้ำ'))) {
+    summary = 'ตรวจพบการลงค่าบริการซ้ำซ้อนในวันเดียวกัน'
+    hosxpActions.push('เปิดใบสั่งค่าบริการใน HOSxP และยกเลิกรายการค่าบริการที่ซ้ำกัน (เช่น นวดและประคบ 58130 มากกว่า 1 ครั้ง)')
+  }
+
+  if (failList.some((f) => f.includes('EP'))) {
+    summary = 'พบรหัสปิดสิทธิ (EP...) ในผู้ป่วยสิทธิประกันสุขภาพ (UC)'
+    cautions.push('รหัส EP เป็นรหัสปิดสิทธิ จะส่งผลให้ สปสช. ปฏิเสธการจ่ายเงินชดเชย (Denial)')
+    hosxpActions.push('ตรวจสอบการเลือกสิทธิการรักษาและยกเลิกรหัสปิดสิทธิที่ไม่ถูกต้องใน HOSxP')
+  }
+
+  if (hosxpActions.length === 0) {
+    hosxpActions.push('ตรวจสอบความถูกต้องของการลงรหัสวินิจฉัยและรหัสหัตถการใน HOSxP ให้สอดคล้องกัน')
+  }
+  if (cautions.length === 0) {
+    cautions.push('ตรวจสอบให้แน่ใจว่าได้ทำการบันทึกข้อมูลและส่งออกข้อมูล e-Claim อย่างถูกต้องครบถ้วน')
+  }
+
+  return {
+    summary,
+    hosxpAction: hosxpActions.join('\n- '),
+    caution: cautions.join('\n- '),
+  }
+}
+
+app.post('/api/healthmed/ai-advisor', requireSession, async (req, res) => {
+  try {
+    const {
+      vn,
+      hn,
+      patient_name,
+      age_y,
+      pttype_name,
+      pdx,
+      dx0,
+      dx1,
+      dx2,
+      dx3,
+      dx4,
+      dx5,
+      service_items_raw,
+      operation_codes,
+      labor_date,
+      failures,
+      audit_reason,
+    } = req.body || {}
+
+    if (vn && aiAdvisorCache.has(vn)) {
+      return res.json({ success: true, advice: aiAdvisorCache.get(vn), source: 'cache' })
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY
+    const dxList = [pdx, dx0, dx1, dx2, dx3, dx4, dx5].filter(Boolean).join(', ')
+    const ops = (operation_codes || []).join(', ') || 'ไม่มี'
+    const failReasons = (failures && failures.length > 0) ? failures.join('\n- ') : (audit_reason || 'ไม่ระบุ')
+
+    let advice = null
+
+    if (geminiKey) {
+      const candidateModels = [
+        process.env.GEMINI_MODEL,
+        'gemini-flash-lite-latest',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
+        'gemini-3.5-flash-lite',
+      ].filter(Boolean)
+
+      const prompt = `คุณคือ AI ผู้เชี่ยวชาญการตรวจสอบเวชระเบียนและการเบิกจ่ายกองทุนการแพทย์แผนไทย (สปสช.) สำหรับโรงพยาบาล
+กรณีผู้ป่วย:
+- ชื่อ: ${patient_name || 'ผู้รับบริการ'} (HN: ${hn || '-'}, อายุ: ${age_y || '-'} ปี)
+- สิทธิการรักษา: ${pttype_name || 'ไม่ระบุ'}
+- รหัสการวินิจฉัย: PDX=${pdx || '-'}, รหัสร่วม=${dxList}
+- รายการค่าบริการ: ${service_items_raw || '-'}
+- รหัสหัตถการ (ICD-10-TM): ${ops}
+- วันคลอดบุตรในระบบงานบัญชี 2: ${labor_date || 'ไม่มี'}
+
+ผลการ Audit: ไม่ผ่านเกณฑ์ เนื่องจาก:
+- ${failReasons}
+
+จงให้คำแนะนำแก่เจ้าหน้าที่/แพทย์แผนไทยอย่างกระชับ ชัดเจน และตรงจุด ตอบเป็น JSON:
+{
+  "summary": "สรุปสาเหตุที่ไม่ผ่านสั้นๆ 1-2 ประโยค",
+  "hosxpAction": "ขั้นตอนสิ่งที่ต้องเข้าไปแก้ไขในระบบ HOSxP ระบุรหัสโรคหรือรหัสหัตถการ ICD-10-TM ที่ต้องลงให้ชัดเจน (เขียนเป็นข้อๆ)",
+  "caution": "ข้อควรระวังในการเบิกชดเชยค่าบริการ"
+}`
+
+      for (const model of candidateModels) {
+        try {
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 9000)
+          const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: prompt }] }],
+              generationConfig: { responseMimeType: 'application/json' },
+            }),
+          })
+          clearTimeout(timer)
+          if (apiRes.ok) {
+            const json = await apiRes.json()
+            const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+            if (text) {
+              advice = JSON.parse(text)
+              advice.aiModel = `Google Gemini (${model})`
+              break
+            }
+          }
+        } catch {
+          // try next model
+        }
+      }
+    }
+
+    if (!advice) {
+      advice = generateRuleBasedAdvice({ failures, age_y, pdx, dxList, ops, labor_date })
+      advice.aiModel = 'Smart Rule Engine (AI Offline Mode)'
+    }
+
+    if (vn && advice) {
+      aiAdvisorCache.set(vn, advice)
+      if (aiAdvisorCache.size > 500) {
+        const firstKey = aiAdvisorCache.keys().next().value
+        aiAdvisorCache.delete(firstKey)
+      }
+    }
+
+    res.json({ success: true, advice, source: geminiKey ? 'gemini-ai' : 'rule-engine' })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 app.get('/api/drugs', requireSession, async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)

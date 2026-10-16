@@ -27,8 +27,12 @@ import {
   Clock,
   User,
   FileText,
+  Bot,
+  Copy,
+  Check,
 } from 'lucide-react'
 import { useHealthMedAudit } from '@/hooks/useHerbDx'
+import { herbDxApi } from '@/api/herbdx.api'
 import type { DateRange, HealthMedRecord } from '@/types/herbdx.types'
 import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
@@ -54,6 +58,43 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
   const [search, setSearch] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
   const [selectedRecord, setSelectedRecord] = useState<HealthMedRecord | null>(null)
+
+  // AI Clinical Advisor State
+  const [aiAdvice, setAiAdvice] = useState<{
+    summary: string
+    hosxpAction: string
+    caution: string
+    aiModel?: string
+  } | null>(null)
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
+  const [copiedAdvice, setCopiedAdvice] = useState(false)
+
+  const handleAskAi = async (record: HealthMedRecord) => {
+    setAiLoading(true)
+    setAiError(null)
+    setAiAdvice(null)
+    try {
+      const res = await herbDxApi.healthMedAiAdvisor(record)
+      if (res?.advice) {
+        setAiAdvice(res.advice)
+      } else {
+        setAiError('ไม่สามารถรับคำแนะนำจาก AI ได้ในขณะนี้')
+      }
+    } catch (err) {
+      setAiError((err as Error).message || 'เกิดข้อผิดพลาดในการเชื่อมต่อ AI')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const handleCopyAdvice = () => {
+    if (!aiAdvice) return
+    const text = `[คำแนะนำจาก AI สำหรับเคส: ${selectedRecord?.patient_name} (HN: ${selectedRecord?.hn})]\n\n📌 สรุปสาเหตุ:\n${aiAdvice.summary}\n\n🛠️ สิ่งที่ต้องแก้ไขใน HOSxP:\n${aiAdvice.hosxpAction}\n\n⚠️ ข้อควรระวัง:\n${aiAdvice.caution}\n\nวิเคราะห์โดย: ${aiAdvice.aiModel || 'Google Gemini AI'}`
+    navigator.clipboard.writeText(text)
+    setCopiedAdvice(true)
+    setTimeout(() => setCopiedAdvice(false), 2000)
+  }
 
   const { data, isLoading } = useHealthMedAudit({
     startDate: range.startDate,
@@ -366,6 +407,19 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <p className="text-[10px] leading-snug text-rose-600 dark:text-rose-300/90 font-sans mt-0.5 font-medium">
                     {row.original.audit_reason}
                   </p>
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedRecord(row.original)
+                      handleAskAi(row.original)
+                    }}
+                    className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-teal-500/15 via-cyan-500/15 to-violet-500/15 hover:from-teal-500/25 hover:to-violet-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer shadow-2xs group"
+                    title="ให้ Google Gemini AI ช่วยวิเคราะห์สาเหตุและแนะนำวิธีแก้ไขใน HOSxP"
+                  >
+                    <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
+                    <span>ถาม AI แก้ไข</span>
+                  </button>
                 </>
               ) : (
                 <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
@@ -936,11 +990,129 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               )
             })()}
 
+            {/* AI Clinical Audit Advisor Section */}
+            <div className="space-y-2.5 pt-3 border-t border-slate-200 dark:border-white/10">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="size-6 rounded-lg bg-gradient-to-tr from-violet-600 via-teal-500 to-cyan-400 text-white grid place-items-center shadow-xs">
+                    <Bot className="size-3.5" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
+                      <span>AI Clinical Audit Advisor</span>
+                      <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 flex items-center gap-0.5">
+                        <Sparkles className="size-2.5" /> Google Gemini
+                      </span>
+                    </h4>
+                  </div>
+                </div>
+
+                {!aiAdvice && (
+                  <button
+                    type="button"
+                    disabled={aiLoading}
+                    onClick={() => handleAskAi(selectedRecord)}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 via-cyan-500 to-violet-500 hover:from-teal-600 hover:to-violet-600 text-white font-bold text-xs shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50"
+                  >
+                    {aiLoading ? (
+                      <>
+                        <Loader2 className="size-3.5 animate-spin" />
+                        <span>กำลังวิเคราะห์…</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="size-3.5" />
+                        <span>วิเคราะห์ & ขอคำแนะนำแก้ไข</span>
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {aiLoading && (
+                <div className="p-4 rounded-xl bg-teal-50/50 dark:bg-white/[0.02] border border-teal-500/20 flex flex-col items-center justify-center text-center gap-2 animate-pulse">
+                  <div className="size-8 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-400 grid place-items-center">
+                    <Loader2 className="size-5 animate-spin" />
+                  </div>
+                  <p className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    กำลังส่งข้อมูลให้ <strong>Google Gemini AI</strong> วิเคราะห์เวชระเบียนและจัดทำแนวทางแก้ไขใน HOSxP...
+                  </p>
+                </div>
+              )}
+
+              {aiError && (
+                <div className="p-3 rounded-xl bg-rose-50 dark:bg-rose-950/20 border border-rose-500/30 text-xs text-rose-600 dark:text-rose-400 flex items-center justify-between">
+                  <span>{aiError}</span>
+                  <button
+                    type="button"
+                    onClick={() => handleAskAi(selectedRecord)}
+                    className="underline font-bold cursor-pointer hover:text-rose-700"
+                  >
+                    ลองใหม่อีกครั้ง
+                  </button>
+                </div>
+              )}
+
+              {aiAdvice && (
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[#0d1627] dark:via-[#0c1424] dark:to-[#141226] border border-teal-500/30 dark:border-teal-500/40 shadow-sm space-y-2.5 animate-in fade-in duration-200">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 flex items-center gap-1">
+                        <Sparkles className="size-3" /> บทวิเคราะห์โดย {aiAdvice.aiModel || 'Google Gemini AI'}:
+                      </span>
+                      <p className="text-xs font-semibold text-slate-900 dark:text-white mt-1 leading-snug">
+                        {aiAdvice.summary}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyAdvice}
+                      className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1 text-[10.5px] font-medium"
+                      title="คัดลอกคำแนะนำไปใช้งาน"
+                    >
+                      {copiedAdvice ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
+                      <span>{copiedAdvice ? 'คัดลอกแล้ว' : 'คัดลอก'}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-2.5 rounded-lg bg-white/90 dark:bg-black/30 border border-teal-500/20 text-xs text-slate-800 dark:text-slate-200 space-y-1">
+                    <strong className="block font-bold text-teal-700 dark:text-teal-300 text-[11px] flex items-center gap-1">
+                      🛠️ สิ่งที่ต้องแก้ไขในระบบ HOSxP:
+                    </strong>
+                    <div className="whitespace-pre-line leading-relaxed pl-1 text-slate-700 dark:text-slate-200 text-xs font-medium">
+                      {aiAdvice.hosxpAction}
+                    </div>
+                  </div>
+
+                  {aiAdvice.caution && (
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+                      <strong>⚠️ ข้อควรระวัง:</strong> {aiAdvice.caution}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={() => handleAskAi(selectedRecord)}
+                      className="text-[10px] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1"
+                    >
+                      <Sparkles className="size-2.5" /> วิเคราะห์ใหม่อีกครั้ง
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Modal Footer */}
             <div className="pt-2 flex justify-end border-t border-slate-200 dark:border-white/10">
               <button
                 type="button"
-                onClick={() => setSelectedRecord(null)}
+                onClick={() => {
+                  setSelectedRecord(null)
+                  setAiAdvice(null)
+                  setAiError(null)
+                  setCopiedAdvice(false)
+                }}
                 className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-700 dark:text-slate-200 transition cursor-pointer"
               >
                 ปิดหน้าต่าง
