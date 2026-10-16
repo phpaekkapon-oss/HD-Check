@@ -508,8 +508,17 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       })
     }
 
-    // 3. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) เฉพาะผู้ป่วยที่เป็นเคสบริบาลหลังคลอด
-    const postpartumRows = rows.filter((r) => {
+    // 3. กรองเฉพาะเคสที่มีรหัสหัตถการ (health_med_service_operation) หรือมีรายการค่าบริการแพทย์แผนไทย (nondrugitems)
+    // ตัดเคสที่ไม่มีทั้งหัตถการและค่าบริการออก (เนื่องจากเป็นเคสรับยาสมุนไพรอย่างเดียว ซึ่งตรวจสอบในเมนูตรวจสอบการจ่ายยาสมุนไพร)
+    const validRows = rows.filter((r) => {
+      const ops = opsByVn.get(r.vn) || []
+      const hasOps = ops.length > 0
+      const hasServices = Boolean(r.service_items_raw && r.service_items_raw.trim())
+      return hasOps || hasServices
+    })
+
+    // 4. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) เฉพาะผู้ป่วยที่เป็นเคสบริบาลหลังคลอด
+    const postpartumRows = validRows.filter((r) => {
       const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]
       const ops = opsByVn.get(r.vn) || []
       const hasU506 = dxs.includes('U506')
@@ -534,8 +543,8 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       }
     }
 
-    // 4. ผูกข้อมูลหัตถการและวันคลอด และประเมินผลเกณฑ์แพทย์แผนไทย 5 ข้อ
-    const evaluated = rows.map((r) => {
+    // 5. ผูกข้อมูลหัตถการและวันคลอด และประเมินผลเกณฑ์แพทย์แผนไทย 5 ข้อ
+    const evaluated = validRows.map((r) => {
       const operations = opsByVn.get(r.vn) || []
       const operation_codes = operations.map((o) => o.code).filter(Boolean)
       const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]

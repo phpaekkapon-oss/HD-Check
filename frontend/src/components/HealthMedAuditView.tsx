@@ -104,7 +104,15 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     hn: '',
   })
 
-  const rawRecords = useMemo(() => data?.data ?? [], [data?.data])
+  // กรองเฉพาะเคสที่มีรหัสหัตถการหรือค่าบริการ (ตัดเคสไม่มีหัตถการ/ค่าบริการออก เพราะไปเช็คที่หน้าตรวจจ่ายยาสมุนไพร)
+  const rawRecords = useMemo(() => {
+    const list = data?.data ?? []
+    return list.filter((r) => {
+      const hasOps = (r.operation_codes?.length ?? 0) > 0 || (r.operations?.length ?? 0) > 0
+      const hasServices = Boolean(r.service_items_raw && r.service_items_raw.trim())
+      return hasOps || hasServices
+    })
+  }, [data?.data])
   const kpi = data?.kpi
 
   // Filter records based on active KPI filter & search input
