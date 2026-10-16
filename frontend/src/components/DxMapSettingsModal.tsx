@@ -419,21 +419,22 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   })
 
   return (
-    <div className="space-y-4">
-      {/* Tab Navigation */}
-      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#292440] pb-2">
+    <div className="space-y-4 pb-20 sm:pb-6">
+      {/* Tab Navigation with responsive touch scroll on mobile */}
+      <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-200 dark:border-[#292440] pb-2 overflow-x-auto no-scrollbar scroll-smooth -mx-3 px-3 sm:mx-0 sm:px-0">
         <button
           type="button"
           onClick={() => setActiveTab('dxmap')}
           className={cn(
-            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
             activeTab === 'dxmap'
               ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           )}
         >
-          <Info className="size-4" />
-          <span>เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
+          <Info className="size-3.5 sm:size-4 text-emerald-500 shrink-0" />
+          <span className="hidden sm:inline">เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
+          <span className="sm:hidden">จับคู่รหัส ICD-10</span>
           <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-white/10 font-mono font-bold">
             {dxMap.length}
           </span>
@@ -443,16 +444,18 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           type="button"
           onClick={() => setActiveTab('interval')}
           className={cn(
-            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
             activeTab === 'interval'
               ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           )}
         >
-          <Clock className="size-4 text-amber-500" />
-          <span>เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
-            สปสช. / สิทธิ UC 7 วัน
+          <Clock className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
+          <span className="hidden sm:inline">เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
+          <span className="sm:hidden">รอบการจ่าย & สิทธิ</span>
+          <span className="text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+            <span className="hidden sm:inline">สปสช. / สิทธิ UC 7 วัน</span>
+            <span className="sm:hidden">UC 7 วัน</span>
           </span>
         </button>
 
@@ -460,16 +463,18 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           type="button"
           onClick={() => setActiveTab('healthmed')}
           className={cn(
-            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
             activeTab === 'healthmed'
               ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shadow-xs'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
           )}
         >
-          <Layers className="size-4 text-amber-500" />
-          <span>เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
-            คิดค่าบริการซ้ำ
+          <Layers className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
+          <span className="hidden sm:inline">เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
+          <span className="sm:hidden">เกณฑ์ตรวจค่าบริการ</span>
+          <span className="text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+            <span className="hidden sm:inline">คิดค่าบริการซ้ำ</span>
+            <span className="sm:hidden">ตรวจซ้ำ</span>
           </span>
         </button>
       </div>
@@ -528,7 +533,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="flex items-center gap-3 self-end sm:self-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
           <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
             ตั้งค่าทั้งหมด {dxMap.length} รายการ
           </div>
