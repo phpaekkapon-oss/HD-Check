@@ -7,6 +7,8 @@ import {
   Trash2,
   User,
   Loader2,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { herbDxApi } from '@/api/herbdx.api'
 import { cn } from '@/lib/utils'
@@ -113,6 +115,14 @@ export const AiChatCopilot: FC = () => {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
+  const quickPromptsRef = useRef<HTMLDivElement>(null)
+
+  const scrollPrompts = (direction: 'left' | 'right') => {
+    if (quickPromptsRef.current) {
+      const scrollAmount = direction === 'left' ? -180 : 180
+      quickPromptsRef.current.scrollBy({ left: scrollAmount, behavior: 'smooth' })
+    }
+  }
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -269,8 +279,8 @@ export const AiChatCopilot: FC = () => {
             </div>
           </div>
 
-          {/* Chat Messages Body */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-slate-50/60 dark:bg-[#121624]/60 backdrop-blur-xs min-h-[260px]">
+          {/* Chat Messages Body with Visible Scrollbar */}
+          <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-slate-50/60 dark:bg-[#121624]/60 backdrop-blur-xs min-h-[260px] chat-scrollbar">
             {messages.map((m) => {
               const isUser = m.role === 'user'
               return (
@@ -338,19 +348,49 @@ export const AiChatCopilot: FC = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Quick Prompts Chips */}
-          <div className="px-3 py-2 bg-slate-100/90 dark:bg-[#15192b] border-t border-slate-200/60 dark:border-white/5 flex gap-1.5 overflow-x-auto no-scrollbar shrink-0">
-            {QUICK_PROMPTS.map((qp, idx) => (
-              <button
-                key={idx}
-                type="button"
-                disabled={loading}
-                onClick={() => handleSend(qp.query)}
-                className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition-colors whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50"
-              >
-                {qp.label}
-              </button>
-            ))}
+          {/* Quick Prompts Chips with Interactive Left/Right Controls and Wheel Scroll */}
+          <div className="px-2 py-1.5 bg-slate-100/90 dark:bg-[#15192b] border-t border-slate-200/60 dark:border-white/5 flex items-center gap-1 shrink-0">
+            <button
+              type="button"
+              onClick={() => scrollPrompts('left')}
+              className="size-6 rounded-md bg-white dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center shrink-0 transition shadow-2xs cursor-pointer border border-slate-200/80 dark:border-white/10"
+              title="เลื่อนหัวข้อไปทางซ้าย"
+              aria-label="เลื่อนหัวข้อไปทางซ้าย"
+            >
+              <ChevronLeft className="size-3.5" />
+            </button>
+
+            <div
+              ref={quickPromptsRef}
+              onWheel={(e) => {
+                if (e.deltaY !== 0) {
+                  e.currentTarget.scrollLeft += e.deltaY
+                }
+              }}
+              className="flex-1 flex gap-1.5 overflow-x-auto py-1 scroll-smooth chat-scrollbar shrink-0 select-none"
+            >
+              {QUICK_PROMPTS.map((qp, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleSend(qp.query)}
+                  className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition-colors whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
+                >
+                  {qp.label}
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => scrollPrompts('right')}
+              className="size-6 rounded-md bg-white dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-white flex items-center justify-center shrink-0 transition shadow-2xs cursor-pointer border border-slate-200/80 dark:border-white/10"
+              title="เลื่อนหัวข้อไปทางขวา"
+              aria-label="เลื่อนหัวข้อไปทางขวา"
+            >
+              <ChevronRight className="size-3.5" />
+            </button>
           </div>
 
           {/* Input Box */}
