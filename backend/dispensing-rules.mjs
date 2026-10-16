@@ -98,6 +98,7 @@ export async function saveDispensingRule(dwPool, rule) {
     id,
     drug_icode,
     drug_name,
+    selected_drugs,
     pttype_filter = 'UC',
     pttype_name_label = 'สิทธิ UC / บัตรทอง',
     min_interval_days = 7,
@@ -105,21 +106,27 @@ export async function saveDispensingRule(dwPool, rule) {
     is_active = 1,
   } = rule
 
-  if (!drug_icode || !drug_name) {
-    throw new Error('กรุณาระบุรหัสยาและชื่อยาให้ครบถ้วน')
-  }
-
   const days = Math.max(1, parseInt(min_interval_days, 10) || 7)
 
-  if (id) {
+  // Multiple drugs batch mode
+  const drugsToSave = Array.isArray(selected_drugs) && selected_drugs.length > 0
+    ? selected_drugs.map((d) => ({ icode: String(d.icode || d), drug_name: String(d.drug_name || d.name || '') }))
+    : (drug_icode && drug_name ? [{ icode: String(drug_icode), drug_name: String(drug_name) }] : [])
+
+  if (drugsToSave.length === 0) {
+    throw new Error('กรุณาเลือกรายการยาสมุนไพรอย่างน้อย 1 รายการ')
+  }
+
+  // If single rule with id being edited
+  if (id && drugsToSave.length === 1) {
     await dwPool.query(
       `UPDATE dw_hd_check_dispensing_rules
        SET drug_icode = ?, drug_name = ?, pttype_filter = ?, pttype_name_label = ?,
            min_interval_days = ?, rule_description = ?, is_active = ?
        WHERE id = ?`,
       [
-        drug_icode,
-        drug_name,
+        drugsToSave[0].icode,
+        drugsToSave[0].drug_name,
         pttype_filter,
         pttype_name_label,
         days,
@@ -128,24 +135,85 @@ export async function saveDispensingRule(dwPool, rule) {
         id,
       ]
     )
-    return { id, success: true }
-  } else {
-    const [result] = await dwPool.query(
-      `INSERT INTO dw_hd_check_dispensing_rules
-       (drug_icode, drug_name, pttype_filter, pttype_name_label, min_interval_days, rule_description, is_active)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [
-        drug_icode,
-        drug_name,
-        pttype_filter,
-        pttype_name_label,
-        days,
-        rule_description,
-        is_active ? 1 : 0,
-      ]
-    )
-    return { id: result.insertId, success: true }
+    return { id, success: true, count: 1 }
   }
+
+  // If multiple drugs selected
+  const savedIds = []
+  for (let i = 0; i < drugsToSave.length; i++) {
+    const d = drugsToSave[i]
+    if (id && i === 0) {
+      await dwPool.query(
+        `UPDATE dw_hd_check_dispensing_rules
+         SET drug_icode = ?, drug_name = ?, pttype_filter = ?, pttype_name_label = ?,
+             min_interval_days = ?, rule_description = ?, is_active = ?
+         WHERE id = ?`,
+        [
+          d.icode,
+          d.drug_name,
+          pttype_filter,
+          pttype_name_label,
+          days,
+          rule_description,
+          is_active ? 1 : 0,
+          id,
+        ]
+      )
+      savedIds.push(id)
+    } else {
+      const [existing] = await dwPool.query(
+        'SELECT id FROM dw_hd_check_dispensing_rules WHERE drug_icode = ? AND pttype_filter = ? LIMIT 1',
+        [d.icode, pttype_filter]
+      )
+      if (existing.length > 0) {
+        await dwPool.query(
+          `UPDATE dw_hd_check_dispensing_rules
+           SET drug_name = ?, pttype_name_label = ?, min_interval_days = ?, rule_description = ?, is_active = ?
+           WHERE id = ?`,
+          [
+            d.drug_name,
+            pttype_name_label,
+            days,
+            rule_description,
+            is_active ? 1 : 0,
+            existing[0].id,
+          ]
+        )
+        savedIds.push(existing[0].id)
+      } else {
+        const [result] = await dwPool.query(
+          `INSERT INTO dw_hd_check_dispensing_rules
+           (drug_icode, drug_name, pttype_filter, pttype_name_label, min_interval_days, rule_description, is_active)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+          [
+            d.icode,
+            d.drug_name,
+            pttype_filter,
+            pttype_name_label,
+            days,
+            rule_description,
+            is_active ? 1 : 0,
+          ]
+        )
+        savedIds.push(result.insertId)
+      }
+    }
+
+    // Ensure drug is also registered in dw_hd_check_drug_dx_map so both tabs stay perfectly synced
+    try {
+      const [exMap] = await dwPool.query('SELECT icode FROM dw_hd_check_drug_dx_map WHERE icode = ? LIMIT 1', [d.icode])
+      if (exMap.length === 0) {
+        await dwPool.query(
+          'INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name, dx_prefixes, min_qty, indication) VALUES (?, ?, ?, ?, ?)',
+          [d.icode, d.drug_name, '', 0, '']
+        )
+      }
+    } catch (err) {
+      console.warn('[SYNC HERB DX MAP] could not sync drug:', d.icode, err?.message)
+    }
+  }
+
+  return { success: true, count: savedIds.length, ids: savedIds }
 }
 
 export async function toggleDispensingRule(dwPool, id, isActive) {

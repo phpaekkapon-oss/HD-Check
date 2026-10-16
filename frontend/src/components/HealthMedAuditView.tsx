@@ -291,7 +291,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         header: ({ column }) => <DataTableColumnHeader column={column} title="อายุ" className="justify-center" />,
         cell: ({ row }) => {
           const age = row.original.age_y
-          const isKneeIssue = age < 40 && (row.original.pdx === 'M179' || row.original.dx0 === 'M179')
+          // เตือนอายุเฉพาะเคสที่ถูกตรวจด้วยเกณฑ์พอกเข่าจริง (เคสนวดอย่างเดียวไม่ต้องเตือน)
+          const isKneeIssue = Boolean(row.original.failures?.some((f) => f.includes('อายุ 40')))
           return (
             <div className="flex justify-center whitespace-nowrap">
               <span

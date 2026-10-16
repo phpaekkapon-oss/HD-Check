@@ -86,6 +86,8 @@ export interface PrescriptionResponse {
   readonly success: true
   readonly data: readonly AuditRecord[]
   readonly kpi: AuditKpiMetrics
+  /** KPI แยก OPD / IPD คิดจากข้อมูลก่อนกรองผลตรวจ (เวอร์ชันเก่าอาจไม่มี) */
+  readonly kpiByType?: { readonly OPD: AuditKpiMetrics; readonly IPD: AuditKpiMetrics }
   readonly meta: { readonly total: number } & DateRange
 }
 
@@ -114,6 +116,10 @@ export interface DxMapRecord {
   readonly min_qty?: number
   readonly indication: string
   readonly updated_at: string
+  readonly dispensing_interval_days?: number | null
+  readonly dispensing_pttype_label?: string | null
+  readonly dispensing_pttype_filter?: string | null
+  readonly dispensing_is_active?: boolean | null
 }
 
 export interface DxMapUpdate {
@@ -122,6 +128,10 @@ export interface DxMapUpdate {
   readonly dx_prefixes: string
   readonly min_qty?: number
   readonly indication: string
+  readonly min_interval_days?: number
+  readonly pttype_filter?: string
+  readonly pttype_name_label?: string
+  readonly rule_description?: string
 }
 
 export interface DxMapPreview {
@@ -233,6 +243,7 @@ export interface DispensingRule {
   readonly id?: number
   readonly drug_icode: string
   readonly drug_name: string
+  readonly selected_drugs?: readonly { icode: string; drug_name: string }[]
   readonly pttype_filter: string
   readonly pttype_name_label: string
   readonly min_interval_days: number

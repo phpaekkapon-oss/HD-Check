@@ -339,6 +339,15 @@ const isValidDate = (v) => {
 const badRequest = (message) => Object.assign(new Error(message), { status: 400 })
 
 /* ---------------- Audit rule ---------------- */
+// ICD-10 / ICD-10-TM prefix: one letter then digits only (e.g. M, K30, U6680). Rejects typos like U504O.
+const DX_PREFIX_RE = /^[A-Z]\d{0,6}$/
+function parseDxPrefixes(raw) {
+  const codes = String(raw ?? '').split(/[,\s]+/).map(normalizeIcdCode).filter(Boolean)
+  const valid = [...new Set(codes.filter((c) => DX_PREFIX_RE.test(c)))]
+  const invalid = [...new Set(codes.filter((c) => !DX_PREFIX_RE.test(c)))]
+  return { valid, invalid }
+}
+
 async function loadDxMap() {
   const [rows] = await dwPool.query('SELECT icode, dx_prefixes, min_qty FROM dw_hd_check_drug_dx_map')
   const map = new Map()
@@ -570,17 +579,27 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
       }
     })
 
-    const count = (k) => evaluated.filter((r) => r.audit_result === k).length
-    const kpi = {
-      total: evaluated.length,
-      pass: count('PASS'),
-      fail: count('FAIL'),
-      noDx: count('NO_DX'),
-      noMap: count('NO_MAP'),
-      totalQty: evaluated.reduce((s, r) => s + r.drug_qty, 0),
-      uniquePatients: new Set(evaluated.map((r) => r.hn)).size,
+    const buildKpi = (list) => {
+      const count = (k) => list.filter((r) => r.audit_result === k).length
+      const k = {
+        total: list.length,
+        pass: count('PASS'),
+        fail: count('FAIL'),
+        noDx: count('NO_DX'),
+        noMap: count('NO_MAP'),
+        totalQty: list.reduce((s, r) => s + r.drug_qty, 0),
+        uniquePatients: new Set(list.map((r) => r.hn)).size,
+      }
+      k.passRate = k.total ? Math.round((k.pass / k.total) * 1000) / 10 : 0
+      return k
     }
-    kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
+    // KPI คิดจากข้อมูลก่อนกรองผลตรวจ แยกตาม OPD / IPD เพื่อไม่ให้การ์ดเปลี่ยนตามปุ่มกรอง
+    const isIpd = (r) => String(r.vn).startsWith('AN:')
+    const kpi = buildKpi(evaluated)
+    const kpiByType = {
+      OPD: buildKpi(evaluated.filter((r) => !isIpd(r))),
+      IPD: buildKpi(evaluated.filter(isIpd)),
+    }
 
     const filtered =
       result === 'ALL'
@@ -589,7 +608,7 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
           ? evaluated.filter((r) => r.audit_result !== 'PASS')
           : evaluated.filter((r) => r.audit_result === result)
 
-    res.json({ success: true, data: filtered, kpi, meta: { total: filtered.length, startDate, endDate } })
+    res.json({ success: true, data: filtered, kpi, kpiByType, meta: { total: filtered.length, startDate, endDate } })
   } catch (err) {
     fail(res, err)
   }
@@ -1125,6 +1144,25 @@ app.get('/api/dx-map', requireSession, async (_req, res) => {
               COALESCE(DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s'), '') AS updated_at
        FROM dw_hd_check_drug_dx_map`
     )
+    let dispRules = []
+    try {
+      const [r] = await dwPool.query(
+        `SELECT drug_icode, min_interval_days, pttype_filter, pttype_name_label, is_active
+         FROM dw_hd_check_dispensing_rules
+         ORDER BY is_active DESC, id ASC`
+      )
+      dispRules = r
+    } catch {
+      dispRules = []
+    }
+    const dispRuleByCode = new Map()
+    for (const r of dispRules) {
+      const code = String(r.drug_icode)
+      if (!dispRuleByCode.has(code)) {
+        dispRuleByCode.set(code, r)
+      }
+    }
+
     const mapByCode = new Map(mappedRows.map((row) => [String(row.icode), row]))
     const allDrugsMap = new Map()
     for (const h of activeHerbs) {
@@ -1137,6 +1175,7 @@ app.get('/api/dx-map', requireSession, async (_req, res) => {
     }
     const rows = Array.from(allDrugsMap.values()).map((drug) => {
       const mapped = mapByCode.get(drug.icode)
+      const disp = dispRuleByCode.get(drug.icode)
       return {
         icode: drug.icode,
         drug_name: mapped?.drug_name || drug.drug_name,
@@ -1144,6 +1183,10 @@ app.get('/api/dx-map', requireSession, async (_req, res) => {
         min_qty: Number(mapped?.min_qty ?? 0),
         indication: mapped?.indication ?? '',
         updated_at: mapped?.updated_at ?? '',
+        dispensing_interval_days: disp ? Number(disp.min_interval_days) : null,
+        dispensing_pttype_label: disp ? disp.pttype_name_label : null,
+        dispensing_pttype_filter: disp ? disp.pttype_filter : null,
+        dispensing_is_active: disp ? Boolean(disp.is_active) : null,
       }
     }).sort((a, b) => a.drug_name.localeCompare(b.drug_name, 'th'))
     res.json({ success: true, data: rows })
@@ -1177,10 +1220,7 @@ app.get('/api/dx-map/search-drugs', requireHerbDxManager, async (req, res) => {
 app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) => {
   try {
     const icode = String(req.params.icode ?? '').trim()
-    const prefixes = String(req.body?.dx_prefixes ?? '')
-      .split(/[ ,\s]+/)
-      .map(normalizeIcdCode)
-      .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
+    const prefixes = parseDxPrefixes(req.body?.dx_prefixes).valid
     const periodDays = Number(req.body?.periodDays ?? 90)
     if (!icode) return res.status(400).json({ success: false, error: 'ไม่พบรหัสยา' })
     const activeHerbs = await getActiveHerbalDrugs()
@@ -1253,10 +1293,13 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
       if (!dwDrugs.length) return res.status(404).json({ success: false, error: 'ไม่พบรหัสยานี้ในฐานข้อมูล HOSxP (drugitems)' })
       drugName = drugName || dwDrugs[0].drug_name || String(icode)
     }
-    const prefixes = String(req.body?.dx_prefixes ?? '')
-      .split(/[,\s]+/)
-      .map(normalizeIcdCode)
-      .filter((s) => /^[A-Z][0-9A-Z]{0,5}$/.test(s))
+    const { valid: prefixes, invalid: invalidPrefixes } = parseDxPrefixes(req.body?.dx_prefixes)
+    if (invalidPrefixes.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `รหัส ICD ไม่ถูกต้อง: ${invalidPrefixes.join(', ')} (ต้องเป็นตัวอักษร 1 ตัวตามด้วยตัวเลขเท่านั้น เช่น K30, U6680 — ระวังพิมพ์ตัว O แทนเลข 0)`,
+      })
+    }
     const min_qty = Math.max(0, parseInt(req.body?.min_qty ?? 0, 10) || 0)
     const indication = String(req.body?.indication ?? '').slice(0, 255)
     await dwPool.query(
@@ -1264,8 +1307,54 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
        ON DUPLICATE KEY UPDATE drug_name = COALESCE(VALUES(drug_name), drug_name), dx_prefixes = VALUES(dx_prefixes), min_qty = VALUES(min_qty), indication = VALUES(indication)`,
       [icode, drugName, [...new Set(prefixes)].join(','), min_qty, indication]
     )
+
+    // Sync dispensing interval rule if provided
+    let updatedDispensingRule = null
+    if (req.body?.min_interval_days !== undefined) {
+      const intervalDays = Math.max(0, parseInt(req.body.min_interval_days, 10) || 0)
+      const pttypeFilter = String(req.body.pttype_filter || 'UC,บัตรทอง,ประกันสุขภาพ,UCS')
+      const pttypeLabel = String(req.body.pttype_name_label || 'สิทธิ UC / บัตรทอง')
+      const desc = String(req.body.rule_description || `เงื่อนไข${pttypeLabel} ตัดการจ่าย ${intervalDays} วัน ถ้าไม่ครบ ${intervalDays} วันไม่ผ่าน`)
+
+      if (intervalDays > 0) {
+        const [existing] = await dwPool.query(
+          'SELECT id FROM dw_hd_check_dispensing_rules WHERE drug_icode = ? LIMIT 1',
+          [icode]
+        )
+        if (existing.length > 0) {
+          await dwPool.query(
+            `UPDATE dw_hd_check_dispensing_rules
+             SET drug_name = ?, pttype_filter = ?, pttype_name_label = ?, min_interval_days = ?, rule_description = ?, is_active = 1
+             WHERE id = ?`,
+            [drugName, pttypeFilter, pttypeLabel, intervalDays, desc, existing[0].id]
+          )
+        } else {
+          await dwPool.query(
+            `INSERT INTO dw_hd_check_dispensing_rules
+             (drug_icode, drug_name, pttype_filter, pttype_name_label, min_interval_days, rule_description, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, 1)`,
+            [icode, drugName, pttypeFilter, pttypeLabel, intervalDays, desc]
+          )
+        }
+        updatedDispensingRule = { min_interval_days: intervalDays, pttype_filter: pttypeFilter, pttype_name_label: pttypeLabel }
+      } else if (intervalDays === 0) {
+        await dwPool.query(
+          'UPDATE dw_hd_check_dispensing_rules SET is_active = 0 WHERE drug_icode = ?',
+          [icode]
+        )
+      }
+    }
+
     activeHerbCacheAt = 0 // Invalidate herbal drugs cache so new drug shows up everywhere immediately
-    res.json({ success: true, icode, drug_name: drugName, dx_prefixes: [...new Set(prefixes)].join(','), min_qty, indication })
+    res.json({
+      success: true,
+      icode,
+      drug_name: drugName,
+      dx_prefixes: [...new Set(prefixes)].join(','),
+      min_qty,
+      indication,
+      dispensing_rule: updatedDispensingRule,
+    })
   } catch (err) {
     fail(res, err)
   }

@@ -139,6 +139,8 @@ const DashboardView: FC = () => {
   const dynamicKpi = useMemo(() => {
     if (!auditResponse?.kpi) return undefined
     if (patientTypeFilter === 'ALL') return auditResponse.kpi
+    // KPI จากเซิร์ฟเวอร์คิดก่อนกรองผลตรวจ จึงไม่กลายเป็น "ผ่าน 0" เมื่อกดกรอง "DX ไม่ตรง"
+    if (auditResponse.kpiByType) return auditResponse.kpiByType[patientTypeFilter]
     const list = filteredAuditData
     const pass = list.filter((r) => r.audit_result === 'PASS').length
     const fail = list.filter((r) => r.audit_result === 'FAIL').length

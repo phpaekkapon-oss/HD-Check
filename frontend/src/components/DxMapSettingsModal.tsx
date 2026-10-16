@@ -58,6 +58,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const [prefixes, setPrefixes] = useState('')
   const [minQty, setMinQty] = useState<number>(0)
   const [indication, setIndication] = useState('')
+  const [intervalDays, setIntervalDays] = useState<number>(0)
+  const [pttypeLabel, setPttypeLabel] = useState('สิทธิ UC / บัตรทอง')
   const [search, setSearch] = useState(initialIcode ?? '')
   const initializedIcode = useRef<string | undefined>(undefined)
   const [sorting, setSorting] = useState<SortingState>([])
@@ -77,6 +79,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const [newPrefixes, setNewPrefixes] = useState('')
   const [newMinQty, setNewMinQty] = useState<number>(0)
   const [newIndication, setNewIndication] = useState('')
+  const [newIntervalDays, setNewIntervalDays] = useState<number>(0)
   const [addError, setAddError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -107,10 +110,12 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
       setNewPrefixes(existing.dx_prefixes)
       setNewMinQty(existing.min_qty ?? 0)
       setNewIndication(existing.indication)
+      setNewIntervalDays(existing.dispensing_interval_days ?? 0)
     } else {
       setNewPrefixes('')
       setNewMinQty(0)
       setNewIndication('')
+      setNewIntervalDays(0)
     }
     setAddError(null)
   }
@@ -125,6 +130,9 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         dx_prefixes: newPrefixes,
         min_qty: newMinQty,
         indication: newIndication,
+        min_interval_days: newIntervalDays,
+        pttype_filter: 'UC,บัตรทอง,ประกันสุขภาพ,UCS',
+        pttype_name_label: 'สิทธิ UC / บัตรทอง',
       },
       {
         onSuccess: () => {
@@ -134,6 +142,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           setNewPrefixes('')
           setNewMinQty(0)
           setNewIndication('')
+          setNewIntervalDays(0)
         },
         onError: (err) => {
           setAddError(err instanceof Error ? err.message : 'บันทึกเกณฑ์ไม่สำเร็จ')
@@ -153,6 +162,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     setPrefixes(item.dx_prefixes)
     setMinQty(item.min_qty ?? 0)
     setIndication(item.indication)
+    setIntervalDays(item.dispensing_interval_days ?? 0)
+    setPttypeLabel(item.dispensing_pttype_label || 'สิทธิ UC / บัตรทอง')
     setPreview(null)
     setPreviewError(null)
   }, [dxMap, initialIcode, isLoading])
@@ -162,6 +173,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     setPrefixes(item.dx_prefixes)
     setMinQty(item.min_qty ?? 0)
     setIndication(item.indication)
+    setIntervalDays(item.dispensing_interval_days ?? 0)
+    setPttypeLabel(item.dispensing_pttype_label || 'สิทธิ UC / บัตรทอง')
     setPreview(null)
     setPreviewError(null)
     setPeriodDays(90)
@@ -183,7 +196,15 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     if (!editingIcode) return
     setSaveError(null)
     updateMap(
-      { icode: editingIcode, dx_prefixes: prefixes, min_qty: minQty, indication },
+      {
+        icode: editingIcode,
+        dx_prefixes: prefixes,
+        min_qty: minQty,
+        indication,
+        min_interval_days: intervalDays,
+        pttype_filter: 'UC,บัตรทอง,ประกันสุขภาพ,UCS',
+        pttype_name_label: pttypeLabel,
+      },
       {
         onSuccess: () => setEditingIcode(null),
         onError: (error) => setSaveError(error instanceof Error ? error.message : 'บันทึกเกณฑ์ไม่สำเร็จ'),
@@ -340,6 +361,62 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             <span className="text-slate-600 dark:text-slate-300">
               {item.indication || '-'}
             </span>
+          )
+        },
+      },
+      {
+        accessorKey: 'dispensing_interval_days',
+        header: ({ column }) => (
+          <DataTableColumnHeader column={column} title="รอบการจ่าย & สิทธิ" className="justify-center" />
+        ),
+        cell: ({ row }) => {
+          const item = row.original
+          const isEditing = editingIcode === item.icode
+          if (isEditing) {
+            return (
+              <div className="flex flex-col gap-1 items-center">
+                <div className="flex items-center gap-1">
+                  {[0, 7, 15].map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => setIntervalDays(d)}
+                      className={cn(
+                        'px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer transition-all',
+                        intervalDays === d
+                          ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 ring-1 ring-amber-500'
+                          : 'bg-white/5 text-slate-500 hover:text-slate-800 dark:hover:text-white border-slate-200 dark:border-white/10'
+                      )}
+                    >
+                      {d === 0 ? 'ไม่ระบุ' : `${d} วัน`}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex items-center gap-1">
+                  <input
+                    type="number"
+                    min="0"
+                    value={intervalDays}
+                    onChange={(e) => setIntervalDays(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                    placeholder="0"
+                    className="w-12 rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-1 py-0.5 font-mono text-center text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1"
+                  />
+                  <span className="text-[10px] text-slate-400">วัน</span>
+                </div>
+              </div>
+            )
+          }
+          return (
+            <div className="flex items-center justify-center">
+              {item.dispensing_interval_days && item.dispensing_interval_days > 0 ? (
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50 whitespace-nowrap">
+                  <Clock className="size-3 text-amber-500" />
+                  {item.dispensing_interval_days} วัน ({item.dispensing_pttype_label || 'UC'})
+                </span>
+              ) : (
+                <span className="text-slate-400 text-xs">-</span>
+              )}
+            </div>
           )
         },
       },
@@ -508,7 +585,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             )}
           </div>
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            ระบบจะตรวจสอบว่าการสั่งจ่ายยานั้น มีรหัส PDX หรือ DX0-DX5 ที่ขึ้นต้นด้วยคำนำหน้าที่กำหนดไว้หรือไม่ (เช่น ระบุ <code className="font-mono bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded font-bold border border-teal-500/30">M</code> จะครอบคลุมทุกรหัสโรคกล้ามเนื้อ M00-M99) หรือหากมีรหัสแพทย์แผนไทยที่ขึ้นต้นด้วย <code className="font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">U</code> ระบบจะให้ <strong className="text-emerald-700 dark:text-emerald-300 font-bold">ผ่านเกณฑ์อัตโนมัติ</strong>
+            ระบบจะตรวจสอบว่าการสั่งจ่ายยานั้น มีรหัส PDX หรือ DX0-DX5 ที่ขึ้นต้นด้วยคำนำหน้าที่กำหนดไว้หรือไม่ (เช่น ระบุ <code className="font-mono bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded font-bold border border-teal-500/30">M</code> จะครอบคลุมทุกรหัสโรคกล้ามเนื้อ M00-M99) แพทย์แผนปัจจุบันผ่านเมื่อมีรหัสแผนปัจจุบันตรงเกณฑ์ ส่วน<strong className="text-slate-800 dark:text-slate-100 font-bold">แผนกแพทย์แผนไทย</strong>ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ <strong className="text-emerald-700 dark:text-emerald-300 font-bold">ควบคู่กับ</strong>รหัสแพทย์แผนไทยที่ขึ้นต้นด้วย <code className="font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">U</code> ตัวใดก็ได้ (มีแต่รหัส U อย่างเดียวไม่ผ่าน)
           </p>
           <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
             สีในตารางผลตรวจ: <strong className="text-emerald-700 dark:text-emerald-300">เขียว = รหัสตรงเกณฑ์</strong>, <strong className="text-rose-700 dark:text-rose-300">แดง = รหัสไม่ตรง</strong>, <strong className="text-amber-700 dark:text-amber-300">เหลือง = ยังไม่มีเกณฑ์ให้ตรวจ</strong> ส่วนรหัส ICD สีเขียวในหน้านี้คือรหัสที่อนุญาต
@@ -988,6 +1065,53 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                 </label>
+
+                {/* Synced Dispensing Interval Setting */}
+                <div className="space-y-1.5 pt-1 border-t border-slate-100 dark:border-white/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      รอบการจ่ายยาสมุนไพร & สิทธิ (Dispensing Interval)
+                    </span>
+                    <span className="text-[11px] text-slate-400">
+                      (ซิ้งไปยังแท็บรอบการจ่ายอัตโนมัติ)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {[
+                      { days: 0, label: 'ไม่กำหนดรอบ' },
+                      { days: 7, label: '7 วัน (สิทธิ UC)' },
+                      { days: 15, label: '15 วัน (สิทธิ UC)' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.days}
+                        type="button"
+                        onClick={() => setNewIntervalDays(opt.days)}
+                        className={cn(
+                          'px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer',
+                          newIntervalDays === opt.days
+                            ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 ring-2 ring-amber-500 font-bold'
+                            : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        value={newIntervalDays}
+                        onChange={(e) => setNewIntervalDays(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                        placeholder="0"
+                        className="w-16 rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-2 py-1 text-center font-mono text-xs text-slate-900 dark:text-white"
+                      />
+                      <span className="text-xs text-slate-400">วัน</span>
+                    </div>
+                  </div>
+                  <p className="text-[10px] text-slate-400">
+                    หากระบุ เช่น 7 วัน หรือ 15 วัน ระบบจะผูกเงื่อนไขรอบการจ่ายในแท็บ "เงื่อนไขรอบการจ่าย & สิทธิการรักษา" ให้พร้อมกันทันที
+                  </p>
+                </div>
 
                 <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/10">
                   <button

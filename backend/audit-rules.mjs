@@ -67,10 +67,12 @@ export function evaluate(row, dxMap, minQtyMap) {
     effectiveModernAllowed.some((p) => dx.startsWith(normalizeIcdCode(p)))
   )
 
-  // รหัสแผนไทยที่ตรงกับเกณฑ์ (หากในเกณฑ์ระบุรหัส U เจาะจง เช่น U6680 หรือถ้าไม่ระบุ ก็ยอมรับรหัส U ทุกรหัส)
-  const matchedU = uAllowed.length > 0
+  // รหัสแผนไทยในเคส: ยอมรับรหัส U ทุกรหัส (ตามเกณฑ์ที่แจ้งในหน้าตั้งค่า)
+  // ถ้ามีรหัส U ที่ตรงกับที่ตั้งไว้ให้ยา (เช่น U6680) จะแสดงรหัสนั้นก่อน
+  const specificU = uAllowed.length > 0
     ? uDxList.filter((dx) => uAllowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
-    : uDxList
+    : []
+  const matchedU = specificU.length > 0 ? specificU : uDxList
 
   // 3. กฎเกณฑ์ตามประเภทผู้สั่งจ่าย:
   // - แพทย์แผนปัจจุบัน: เอาเฉพาะรหัสแผนปัจจุบันที่ตรงกับเกณฑ์ของยา (ไม่ต้องมีรหัส U เช่น U6680 ก็ผ่าน)
@@ -82,11 +84,11 @@ export function evaluate(row, dxMap, minQtyMap) {
   if (isThaiMed) {
     // แผนกแพทย์แผนไทย: ต้องมี (รหัสแผนปัจจุบัน + รหัสแผนไทย)
     const hasValidModern = matchedModern.length > 0
-    const hasValidU = (uAllowed.length > 0 ? matchedU.length > 0 : hasUDx)
+    const hasValidU = hasUDx
 
     if (hasValidModern && hasValidU) {
       isDxPass = true
-      matchedList = [...matchedModern, ...(matchedU.length > 0 ? matchedU : uDxList)]
+      matchedList = [...matchedModern, ...matchedU]
     } else if (hasValidModern && !hasValidU) {
       isDxPass = false
       matchedList = matchedModern
@@ -94,7 +96,7 @@ export function evaluate(row, dxMap, minQtyMap) {
       failDxReason = `แผนกแพทย์แผนไทยสั่งจ่ายยานี้ ต้องระบุรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (รหัสขึ้นต้นด้วย U เช่น ${expectedU})`
     } else if (!hasValidModern && hasValidU) {
       isDxPass = false
-      matchedList = matchedU.length > 0 ? matchedU : uDxList
+      matchedList = matchedU
       failDxReason = `แผนกแพทย์แผนไทยสั่งจ่ายยานี้ ต้องระบุรหัสแผนปัจจุบันที่ตรงกับเกณฑ์ยา (เกณฑ์: ${effectiveModernAllowed.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (พบ ${uDxList.join(', ')})`
     } else {
       isDxPass = false
@@ -163,7 +165,7 @@ export function evaluate(row, dxMap, minQtyMap) {
       ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`
       : ''
     const reasonText = isThaiMed
-      ? `ผ่านเกณฑ์แพทย์แผนไทย: พบรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (${(matchedU.length > 0 ? matchedU : uDxList).join(', ')})${exemptNotice}`
+      ? `ผ่านเกณฑ์แพทย์แผนไทย: พบรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (${matchedU.join(', ')})${exemptNotice}`
       : `พบ DX แผนปัจจุบันที่ตรงกับเกณฑ์ของยา (${matchedModern.join(', ')})${exemptNotice}`
 
     return {

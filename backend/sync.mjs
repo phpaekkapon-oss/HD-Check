@@ -45,6 +45,12 @@ export function buildDrugSummarySql(customIcodes = []) {
 `
 }
 
+/** รหัสวินิจฉัยรองลำดับที่ n (1-based) จาก dgx.codes ของผู้ป่วยใน, ว่างถ้ามีไม่ถึง n รหัส */
+const ipdDx = (n) =>
+  `IF(IFNULL(dgx.codes, '') <> '' AND LENGTH(dgx.codes) - LENGTH(REPLACE(dgx.codes, ',', '')) >= ${n - 1},
+     SUBSTRING_INDEX(SUBSTRING_INDEX(dgx.codes, ',', ${n}), ',', -1), '')`
+
+/** Placeholders: OPD (start, end), IPD diagnosis subquery (start, end), IPD (start, end) */
 export function buildPrescriptionSql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
   return `
@@ -98,17 +104,17 @@ export function buildPrescriptionSql(customIcodes = []) {
         CONCAT('IPD: ', IFNULL(w.name, 'หอผู้ป่วยใน')) AS department_name,
         IFNULL(id1.icd10, '') AS main_pdx,
         IFNULL(id1.icd10, '') AS pdx,
-        IFNULL(id2.icd10, '') AS dx0,
-        IFNULL(id3.icd10, '') AS dx1,
-        IFNULL(id4.icd10, '') AS dx2,
-        IFNULL(id5.icd10, '') AS dx3,
-        IFNULL(id6.icd10, '') AS dx4,
-        '' AS dx5,
+        ${ipdDx(1)} AS dx0,
+        ${ipdDx(2)} AS dx1,
+        ${ipdDx(3)} AS dx2,
+        ${ipdDx(4)} AS dx3,
+        ${ipdDx(5)} AS dx4,
+        ${ipdDx(6)} AS dx5,
         IFNULL(op.doctor, IFNULL(i.admdoctor, '')) AS doctor_code,
         IFNULL(doc.name, 'แพทย์ประจำหอผู้ป่วย') AS doctor_name,
         CASE
             WHEN id1.icd10 IS NULL OR TRIM(id1.icd10) = '' THEN 'INCOMPLETE'
-            WHEN (id1.icd10 LIKE 'U%' OR id2.icd10 LIKE 'U%' OR id3.icd10 LIKE 'U%') THEN 'COMPLETE'
+            WHEN (id1.icd10 LIKE 'U%' OR CONCAT(',', IFNULL(dgx.codes, '')) LIKE '%,U%') THEN 'COMPLETE'
             ELSE 'INCOMPLETE'
         END AS audit_status
     FROM opitemrece op
@@ -119,11 +125,14 @@ export function buildPrescriptionSql(customIcodes = []) {
     LEFT JOIN pttype ps ON i.pttype = ps.pttype
     LEFT JOIN doctor doc ON IFNULL(op.doctor, i.admdoctor) = doc.code
     LEFT JOIN iptdiag id1 ON op.an = id1.an AND id1.diagtype = '1'
-    LEFT JOIN iptdiag id2 ON op.an = id2.an AND id2.diagtype = '2'
-    LEFT JOIN iptdiag id3 ON op.an = id3.an AND id3.diagtype = '3'
-    LEFT JOIN iptdiag id4 ON op.an = id4.an AND id4.diagtype = '4'
-    LEFT JOIN iptdiag id5 ON op.an = id5.an AND id5.diagtype = '5'
-    LEFT JOIN iptdiag id6 ON op.an = id6.an AND id6.diagtype = '6'
+    -- รหัสวินิจฉัยรองทั้งหมดของ AN: diagtype 2 มีได้หลายแถว ต้องรวมทุกแถว (JOIN ทีละ diagtype เก็บได้แค่แถวเดียว)
+    LEFT JOIN (
+      SELECT dg.an, GROUP_CONCAT(DISTINCT dg.icd10 ORDER BY dg.diagtype, dg.icd10 SEPARATOR ',') AS codes
+      FROM iptdiag dg
+      WHERE dg.diagtype <> '1' AND dg.icd10 IS NOT NULL AND dg.icd10 <> ''
+        AND dg.an IN (SELECT o2.an FROM opitemrece o2 WHERE o2.vstdate BETWEEN ? AND ? AND o2.an IS NOT NULL AND o2.an <> '')
+      GROUP BY dg.an
+    ) dgx ON op.an = dgx.an
     WHERE op.vstdate BETWEEN ? AND ?
       AND (op.an IS NOT NULL AND op.an <> '')
       AND ${filter}
@@ -203,7 +212,7 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
 
     const drugs = await fetchDrugSummary(hos, startDate, endDate, customIcodes)
     const prescSql = customIcodes.length > 0 ? buildPrescriptionSql(customIcodes) : PRESCRIPTION_SQL
-    const [presc] = await hos.query(prescSql, [startDate, endDate, startDate, endDate])
+    const [presc] = await hos.query(prescSql, [startDate, endDate, startDate, endDate, startDate, endDate])
 
     // A stale/limited HOSxP source can return no rows for a period that already
     // has data in the warehouse. Never interpret that as an instruction to erase

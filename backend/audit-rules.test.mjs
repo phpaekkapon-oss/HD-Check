@@ -91,6 +91,11 @@ test('Department Thai-medicine requires both modern ICD (K30) and Thai med U-cod
   assert.equal(missingModernThaiMed.audit_result, 'FAIL')
   assert.match(missingModernThaiMed.audit_reason, /รหัสแผนปัจจุบัน/)
 
+  // แผนกแพทย์แผนไทย คีย์ K30 และรหัส U อื่น (เช่น U5753 ของโรคเข่า) -> ผ่าน (PASS) ยอมรับรหัส U ทุกรหัส
+  const otherUThaiMed = run({ pdx: 'M179', dx0: 'K30', dx1: 'U5753', department_name: 'แพทย์แผนไทย' })
+  assert.equal(otherUThaiMed.audit_result, 'PASS')
+  assert.deepEqual(otherUThaiMed.matched_dx, ['K30', 'U5753'])
+
   // แพทย์แผนปัจจุบัน (เช่น OPD) คีย์ K30 ไม่คีย์ U6680 -> ผ่าน (PASS)
   const passModernDoctor = run({ pdx: 'K30', department_name: 'ผู้ป่วยนอก (OPD)' })
   assert.equal(passModernDoctor.audit_result, 'PASS')
@@ -132,6 +137,24 @@ test('HealthMed - M179 + U5753 fails if age < 40', () => {
   })
   assert.equal(r.audit_result, 'FAIL')
   assert.match(r.audit_reason, /40 ปีขึ้นไป/)
+})
+
+test('HealthMed - M179 + U5753 massage only (no knee code) uses general M+U rule', () => {
+  // นวดอย่างเดียว ไม่มีรหัสพอกเข่า -> ไม่ใช้เกณฑ์พอกเข่า ตรวจด้วยเกณฑ์ M + U + หัตถการ (อายุไม่เกี่ยว)
+  const young = evaluateHealthMedAudit({
+    pdx: 'M179',
+    dx0: 'U5753',
+    age_y: 27,
+    operation_codes: ['900-78-11', '900-78-20'],
+    count_58130: 1,
+  })
+  assert.equal(young.audit_result, 'PASS')
+
+  // นวดอย่างเดียวแต่ไม่มีรหัส U -> ไม่ผ่านตามเกณฑ์ทั่วไป ไม่ใช่เกณฑ์พอกเข่า
+  const noU = evaluateHealthMedAudit({ pdx: 'M179', age_y: 64, operation_codes: ['900-78-11'], count_58130: 1 })
+  assert.equal(noU.audit_result, 'FAIL')
+  assert.doesNotMatch(noU.audit_reason, /เข่า/)
+  assert.match(noU.audit_reason, /รหัส U/)
 })
 
 test('HealthMed - M6260 + U506 postpartum passes with all 5 operations and labor_date', () => {

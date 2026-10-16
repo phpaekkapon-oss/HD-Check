@@ -56,7 +56,12 @@ const RIGHT_PRESETS: readonly RightPreset[] = [
   },
 ]
 
-const DAY_PRESETS = [3, 5, 7, 10, 14, 30]
+const DAY_PRESETS = [3, 5, 7, 10, 14, 15, 30]
+
+interface SelectedDrugItem {
+  icode: string
+  drug_name: string
+}
 
 export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit }) => {
   const { data: rules = [], isLoading } = useDispensingRules()
@@ -68,7 +73,8 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<DispensingRule | null>(null)
 
-  // Modal Form State
+  // Modal Form State (Multi-drug selection)
+  const [selectedDrugs, setSelectedDrugs] = useState<SelectedDrugItem[]>([])
   const [formIcode, setFormIcode] = useState('')
   const [formDrugName, setFormDrugName] = useState('')
   const [formPttypeLabel, setFormPttypeLabel] = useState('สิทธิ UC / บัตรทอง')
@@ -180,6 +186,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   // Open modal for creating new rule
   const handleOpenAddModal = () => {
     setEditingRule(null)
+    setSelectedDrugs([])
     setFormIcode('')
     setFormDrugName('')
     setFormPttypeLabel('สิทธิ UC / บัตรทอง')
@@ -195,6 +202,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   // Open modal for editing existing rule
   const handleOpenEditModal = (rule: DispensingRule) => {
     setEditingRule(rule)
+    setSelectedDrugs([{ icode: rule.drug_icode, drug_name: rule.drug_name }])
     setFormIcode(rule.drug_icode)
     setFormDrugName(rule.drug_name)
     setFormPttypeLabel(rule.pttype_name_label)
@@ -202,9 +210,79 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
     setFormIntervalDays(rule.min_interval_days)
     setFormDescription(rule.rule_description || '')
     setFormIsActive(rule.is_active)
-    setDrugSearchQuery(rule.drug_name)
+    setDrugSearchQuery('')
     setFormError(null)
     setIsModalOpen(true)
+  }
+
+  // Toggle drug selection
+  const handleToggleDrug = (drug: { icode: string; drug_name: string }) => {
+    setSelectedDrugs((prev) => {
+      const exists = prev.some((d) => d.icode === drug.icode)
+      const next = exists
+        ? prev.filter((d) => d.icode !== drug.icode)
+        : [...prev, { icode: drug.icode, drug_name: drug.drug_name }]
+
+      const firstItem = next[0]
+      if (next.length === 1 && firstItem) {
+        setFormDrugName(firstItem.drug_name)
+        setFormIcode(firstItem.icode)
+        setFormDescription(`เงื่อนไข${formPttypeLabel} ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
+      } else if (next.length > 1 && firstItem) {
+        setFormDrugName(`${firstItem.drug_name} และอีก ${next.length - 1} รายการ`)
+        setFormIcode(next.map((d) => d.icode).join(','))
+        setFormDescription(`เงื่อนไข${formPttypeLabel} (${next.length} รายการยา) ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
+      } else {
+        setFormDrugName('')
+        setFormIcode('')
+      }
+      return next
+    })
+  }
+
+  // Select all filtered drugs
+  const handleSelectAllFilteredDrugs = () => {
+    const newItems = filteredDrugs.map((d) => ({ icode: d.icode, drug_name: d.drug_name }))
+    setSelectedDrugs((prev) => {
+      const map = new Map(prev.map((d) => [d.icode, d]))
+      for (const item of newItems) {
+        map.set(item.icode, item)
+      }
+      const next = Array.from(map.values())
+      const firstItem = next[0]
+      if (next.length > 0 && firstItem) {
+        setFormDrugName(next.length === 1 ? firstItem.drug_name : `${firstItem.drug_name} และอีก ${next.length - 1} รายการ`)
+        setFormIcode(next.map((d) => d.icode).join(','))
+        setFormDescription(`เงื่อนไข${formPttypeLabel} (${next.length} รายการยา) ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
+      }
+      return next
+    })
+  }
+
+  // Clear all selected drugs
+  const handleClearAllSelectedDrugs = () => {
+    setSelectedDrugs([])
+    setFormIcode('')
+    setFormDrugName('')
+  }
+
+  // Remove single selected drug
+  const handleRemoveSelectedDrug = (icode: string) => {
+    setSelectedDrugs((prev) => {
+      const next = prev.filter((d) => d.icode !== icode)
+      const firstItem = next[0]
+      if (next.length === 1 && firstItem) {
+        setFormDrugName(firstItem.drug_name)
+        setFormIcode(firstItem.icode)
+      } else if (next.length > 1 && firstItem) {
+        setFormDrugName(`${firstItem.drug_name} และอีก ${next.length - 1} รายการ`)
+        setFormIcode(next.map((d) => d.icode).join(','))
+      } else {
+        setFormDrugName('')
+        setFormIcode('')
+      }
+      return next
+    })
   }
 
   // Apply a right preset
@@ -212,7 +290,8 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
     setFormPttypeLabel(preset.label)
     setFormPttypeFilter(preset.filter)
     if (!formDescription || formDescription.includes('ตัดการจ่าย')) {
-      setFormDescription(`เงื่อนไข${preset.label} ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
+      const drugLabel = selectedDrugs.length > 1 ? ` (${selectedDrugs.length} รายการยา)` : ''
+      setFormDescription(`เงื่อนไข${preset.label}${drugLabel} ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
     }
   }
 
@@ -220,15 +299,16 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const handleSelectDays = (days: number) => {
     setFormIntervalDays(days)
     if (!formDescription || formDescription.includes('ตัดการจ่าย')) {
-      setFormDescription(`เงื่อนไข${formPttypeLabel} ตัดการจ่าย ${days} วัน ถ้าไม่ครบ ${days} วันไม่ผ่าน`)
+      const drugLabel = selectedDrugs.length > 1 ? ` (${selectedDrugs.length} รายการยา)` : ''
+      setFormDescription(`เงื่อนไข${formPttypeLabel}${drugLabel} ตัดการจ่าย ${days} วัน ถ้าไม่ครบ ${days} วันไม่ผ่าน`)
     }
   }
 
   // Save form
   const handleSaveForm = (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formIcode.trim() || !formDrugName.trim()) {
-      setFormError('กรุณาเลือกรายการยาสมุนไพร')
+    if (selectedDrugs.length === 0) {
+      setFormError('กรุณาเลือกรายการยาสมุนไพรอย่างน้อย 1 รายการ')
       return
     }
     if (formIntervalDays <= 0) {
@@ -240,8 +320,9 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
     saveRule(
       {
         id: editingRule?.id,
-        drug_icode: formIcode.trim(),
-        drug_name: formDrugName.trim(),
+        drug_icode: selectedDrugs[0]?.icode ?? formIcode.trim(),
+        drug_name: selectedDrugs[0]?.drug_name ?? formDrugName.trim(),
+        selected_drugs: selectedDrugs,
         pttype_filter: formPttypeFilter.trim() || 'ALL',
         pttype_name_label: formPttypeLabel.trim() || 'ทุกสิทธิ',
         min_interval_days: formIntervalDays,
@@ -284,13 +365,13 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
     )
   }, [rules, search])
 
-  // Drugs available for autocomplete
+  // Drugs available for autocomplete/multiselect
   const filteredDrugs = useMemo(() => {
-    if (!drugSearchQuery.trim()) return dxMap.slice(0, 10)
+    if (!drugSearchQuery.trim()) return dxMap
     const q = drugSearchQuery.trim().toLowerCase()
     return dxMap.filter(
       (d) => d.icode.toLowerCase().includes(q) || d.drug_name.toLowerCase().includes(q)
-    ).slice(0, 15)
+    )
   }, [dxMap, drugSearchQuery])
 
   return (
@@ -420,8 +501,26 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       <td className="py-3 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
                         {rule.drug_icode}
                       </td>
-                      <td className="py-3 px-3 font-semibold text-slate-900 dark:text-white">
-                        {rule.drug_name}
+                      <td className="py-3 px-3">
+                        <div className="font-semibold text-slate-900 dark:text-white">
+                          {rule.drug_name}
+                        </div>
+                        {(() => {
+                          const matchedDx = dxMap.find((d) => d.icode === rule.drug_icode)
+                          if (!matchedDx) return null
+                          return (
+                            <div className="flex items-center gap-1 mt-0.5">
+                              <span className="text-[10px] text-slate-400">ผูกกับ ICD-10:</span>
+                              {matchedDx.dx_prefixes ? (
+                                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30 font-semibold">
+                                  {matchedDx.dx_prefixes}
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-amber-500 dark:text-amber-400 italic">ยังไม่กำหนด ICD</span>
+                              )}
+                            </div>
+                          )
+                        })()}
                       </td>
                       <td className="py-3 px-3">
                         <div className="space-y-0.5">
@@ -502,20 +601,25 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       {/* Add / Edit Rule Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-lg rounded-2xl border border-slate-200 dark:border-[#292440] bg-white dark:bg-[#121629] p-5 shadow-2xl space-y-4 max-h-[90vh] overflow-y-auto">
+          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 dark:border-[#292440] bg-white dark:bg-[#121629] p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#292440] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="grid place-items-center size-8 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
-                  <Clock className="size-4" />
+              <div className="flex items-center gap-2.5">
+                <div className="grid place-items-center size-9 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
+                  <Clock className="size-5" />
                 </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-white">
-                  {editingRule ? 'แก้ไขเงื่อนไขรอบการจ่าย' : 'เพิ่มเงื่อนไขรอบการจ่ายยาสมุนไพร'}
-                </h3>
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                    {editingRule ? 'แก้ไขเงื่อนไขรอบการจ่าย' : 'เพิ่มเงื่อนไขรอบการจ่ายยาสมุนไพร'}
+                  </h3>
+                  <p className="text-[11px] text-slate-400">
+                    กำหนดรอบการสั่งจ่ายขั้นต่ำตามสิทธิการรักษา และเลือกยาสมุนไพรได้หลายรายการพร้อมกัน
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsModalOpen(false)}
-                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10"
+                className="p-1.5 rounded-lg text-slate-400 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
               >
                 <X className="size-4" />
               </button>
@@ -529,300 +633,389 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                 </div>
               )}
 
-              {/* Drug Selection */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                  1. เลือกรายการยาสมุนไพร <span className="text-rose-500">*</span>
-                </label>
-                <div className="space-y-2">
-                  <div className="relative">
-                    <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="text"
-                      value={drugSearchQuery}
-                      onChange={(e) => setDrugSearchQuery(e.target.value)}
-                      placeholder="พิมพ์เพื่อค้นหายาสมุนไพรในระบบ (เช่น อบเชย, ขมิ้นชัน)…"
-                      className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2"
-                    />
+              {/* 2-Column Responsive Layout */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+                {/* Column 1: Drug Selection */}
+                <div className="space-y-2.5 flex flex-col">
+                  <div className="flex items-center justify-between flex-wrap gap-1">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                      1. เลือกรายการยาสมุนไพร <span className="text-rose-500">*</span>
+                    </label>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      (เลือกได้หลายรายการพร้อมกัน)
+                    </span>
                   </div>
 
-                  {/* Drug options dropdown list */}
-                  <div className="max-h-36 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#34304a] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[#101326]">
-                    {filteredDrugs.map((d) => {
-                      const isSelected = formIcode === d.icode
-                      return (
+                  {/* Selected Drugs Preview Chips */}
+                  {selectedDrugs.length > 0 && (
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-50/60 dark:bg-emerald-950/20 p-2.5 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-semibold text-emerald-800 dark:text-emerald-300">
+                        <span className="flex items-center gap-1.5">
+                          <Check className="size-3.5" />
+                          เลือกแล้ว: <strong>{selectedDrugs.length}</strong> รายการ
+                        </span>
                         <button
-                          key={d.icode}
                           type="button"
-                          onClick={() => {
-                            setFormIcode(d.icode)
-                            setFormDrugName(d.drug_name)
-                            setDrugSearchQuery(d.drug_name)
-                            if (!formDescription || formDescription.includes('ตัดการจ่าย')) {
-                              setFormDescription(`เงื่อนไข${formPttypeLabel} ตัดการจ่าย ${formIntervalDays} วัน ถ้าไม่ครบ ${formIntervalDays} วันไม่ผ่าน`)
-                            }
-                          }}
-                          className={cn(
-                            'w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-emerald-500/10 cursor-pointer transition-colors',
-                            isSelected && 'bg-emerald-500/20 text-emerald-800 dark:text-emerald-300 font-bold'
-                          )}
+                          onClick={handleClearAllSelectedDrugs}
+                          className="text-[11px] text-rose-500 hover:underline cursor-pointer"
                         >
-                          <div>
-                            <span className="font-semibold">{d.drug_name}</span>
-                            <span className="ml-2 font-mono text-[10px] text-slate-400">({d.icode})</span>
-                          </div>
-                          {isSelected && <Check className="size-3 text-emerald-600" />}
+                          ล้างที่เลือกทั้งหมด
                         </button>
-                      )
-                    })}
-                  </div>
-                  {formIcode && (
-                    <div className="text-[11px] text-emerald-700 dark:text-emerald-400 font-medium">
-                      ✓ เลือกยา: <strong className="font-bold">{formDrugName}</strong> (รหัส: <code className="font-mono">{formIcode}</code>)
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                        {selectedDrugs.map((d) => (
+                          <span
+                            key={d.icode}
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1a2035] text-slate-800 dark:text-slate-200 border border-emerald-500/30 shadow-2xs"
+                          >
+                            <span>{d.drug_name}</span>
+                            <code className="text-[10px] font-mono text-slate-400">({d.icode})</code>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSelectedDrug(d.icode)}
+                              className="hover:text-rose-500 p-0.5 rounded transition-colors cursor-pointer"
+                              title="นำออก"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
 
-              {/* Rights / Benefits Preset Chips & Multi-select */}
-              <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                    2. เลือกสิทธิการรักษา <span className="text-rose-500">*</span>
-                  </label>
-                  <span className="text-[11px] text-slate-400 font-medium">
-                    (ค้นหาและเลือกได้หลายสิทธิ พร้อมแสดงรหัสสิทธิ)
-                  </span>
-                </div>
-
-                {/* Preset Chips */}
-                <div className="flex flex-wrap gap-1.5">
-                  {RIGHT_PRESETS.map((p) => {
-                    const isSelected = formPttypeLabel === p.label || formPttypeFilter === p.filter
-                    return (
-                      <button
-                        key={p.label}
-                        type="button"
-                        onClick={() => handleSelectPreset(p)}
-                        className={cn(
-                          'px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer',
-                          isSelected
-                            ? `${p.color} ring-2 ring-emerald-500 font-bold shadow-xs`
-                            : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                        )}
-                      >
-                        {p.label}
-                      </button>
-                    )
-                  })}
-                </div>
-
-                {/* HOSxP Pttype Search & Multi-select Box */}
-                <div className="rounded-xl border border-slate-200 dark:border-[#34304a] bg-slate-50/50 dark:bg-[#101326] p-2.5 space-y-2">
+                  {/* Search and Action Buttons */}
                   <div className="flex items-center gap-2">
                     <div className="relative flex-1">
-                      <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                       <input
                         type="text"
-                        value={pttypeSearchQuery}
-                        onChange={(e) => setPttypeSearchQuery(e.target.value)}
-                        placeholder="ค้นหารหัสสิทธิ หรือชื่อสิทธิการรักษา (เช่น 89, 10, 23, บัตรทอง, จ่ายตรง)..."
-                        className="w-full rounded-lg bg-white dark:bg-[#181c30] ring-1 border-0 ring-slate-200 dark:ring-[#34304a] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        value={drugSearchQuery}
+                        onChange={(e) => setDrugSearchQuery(e.target.value)}
+                        placeholder="ค้นหายาสมุนไพร (ชื่อยา หรือ รหัสยา)…"
+                        className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
-                    {filteredPttypes.length > 0 && (
+                    {filteredDrugs.length > 0 && (
                       <button
                         type="button"
-                        onClick={handleSelectAllFiltered}
+                        onClick={handleSelectAllFilteredDrugs}
                         className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
                       >
-                        เลือกที่ค้นพบ ({filteredPttypes.length})
+                        เลือกที่ค้นพบ ({filteredDrugs.length})
                       </button>
                     )}
-                    {selectedPttypeTokens.length > 0 && (
+                    {selectedDrugs.length > 0 && (
                       <button
                         type="button"
-                        onClick={handleClearAllSelected}
+                        onClick={handleClearAllSelectedDrugs}
                         className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
                       >
-                        ล้างที่เลือก
+                        ล้าง
                       </button>
                     )}
                   </div>
 
-                  {/* Scrollable list of pttypes with code and name */}
-                  <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
-                    {isLoadingPttypes ? (
-                      <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
-                        <Loader2 className="size-4 animate-spin text-emerald-500" />
-                        <span>กำลังโหลดรหัสสิทธิการรักษาจาก HOSxP…</span>
-                      </div>
-                    ) : filteredPttypes.length === 0 ? (
-                      <div className="py-6 text-center text-xs text-slate-400">
-                        ไม่พบรหัสสิทธิที่ตรงกับ "{pttypeSearchQuery}"
+                  {/* Drug Checkbox List with Synced ICD-10 Badges */}
+                  <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#34304a] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[#101326] flex-1">
+                    {filteredDrugs.length === 0 ? (
+                      <div className="p-4 text-center text-xs text-slate-400">
+                        ไม่พบยาสมุนไพรที่ตรงกับคำค้นหา
                       </div>
                     ) : (
-                      filteredPttypes.map((p) => {
-                        const checked = isPttypeSelected(p)
+                      filteredDrugs.map((d) => {
+                        const isSelected = selectedDrugs.some((item) => item.icode === d.icode)
                         return (
-                          <div
-                            key={p.pttype}
-                            onClick={() => handleTogglePttype(p)}
+                          <label
+                            key={d.icode}
                             className={cn(
-                              'px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors select-none',
-                              checked
-                                ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-medium'
-                                : 'hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                              'w-full text-left px-3 py-2 text-xs flex items-center justify-between hover:bg-emerald-500/10 cursor-pointer transition-colors select-none',
+                              isSelected && 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-semibold'
                             )}
                           >
-                            <div className="flex items-center gap-2 min-w-0">
+                            <div className="flex items-center gap-2.5 flex-1 min-w-0">
                               <input
                                 type="checkbox"
-                                checked={checked}
-                                onChange={() => {}}
-                                onClick={(e) => e.stopPropagation()}
-                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 size-3.5 cursor-pointer shrink-0"
+                                checked={isSelected}
+                                onChange={() => handleToggleDrug(d)}
+                                className="size-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 dark:border-slate-600 cursor-pointer accent-emerald-600 shrink-0"
                               />
-                              <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-white/10 shrink-0">
-                                [{p.pttype}]
-                              </span>
-                              <span className="truncate text-xs">{p.name}</span>
+                              <div className="flex flex-col min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="truncate">{d.drug_name}</span>
+                                  <span className="font-mono text-[10px] text-slate-400 shrink-0">({d.icode})</span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  {d.dx_prefixes ? (
+                                    <span className="font-mono text-[10px] px-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30">
+                                      ICD: {d.dx_prefixes}
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] text-slate-400 italic">ยังไม่กำหนด ICD</span>
+                                  )}
+                                  {d.dispensing_interval_days && (
+                                    <span className="text-[10px] px-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/40">
+                                      รอบ {d.dispensing_interval_days} วัน
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            {p.pcode && (
-                              <span className="text-[10px] font-mono text-slate-400 shrink-0">
-                                กลุ่ม {p.pcode}
+                            {isSelected && (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
+                                เลือกแล้ว
                               </span>
                             )}
-                          </div>
+                          </label>
                         )
                       })
                     )}
                   </div>
-
-                  {/* Selected count info & preview */}
-                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
-                    <span>
-                      เลือกแล้ว: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedPttypeTokens.length}</strong> สิทธิ/คีย์เวิร์ด
-                    </span>
-                    <span className="text-[10px] text-slate-400">
-                      รหัสสิทธิทั้งหมดใน HOSxP: {pttypes.length} รายการ
-                    </span>
-                  </div>
                 </div>
 
-                {/* Display Label and Raw Filter Code Fields */}
-                <div className="grid grid-cols-2 gap-2 mt-1">
-                  <div>
-                    <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">ชื่อแสดงของสิทธิ:</span>
+                {/* Column 2: Rights & Interval Details */}
+                <div className="space-y-3.5">
+                  {/* Rights Selection */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                        2. เลือกสิทธิการรักษา <span className="text-rose-500">*</span>
+                      </label>
+                      <span className="text-[11px] text-slate-400 font-medium">
+                        (เลือกสิทธิที่ต้องการบังคับใช้)
+                      </span>
+                    </div>
+
+                    {/* Preset Chips */}
+                    <div className="flex flex-wrap gap-1.5">
+                      {RIGHT_PRESETS.map((p) => {
+                        const isSelected = formPttypeLabel === p.label || formPttypeFilter === p.filter
+                        return (
+                          <button
+                            key={p.label}
+                            type="button"
+                            onClick={() => handleSelectPreset(p)}
+                            className={cn(
+                              'px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer',
+                              isSelected
+                                ? `${p.color} ring-2 ring-emerald-500 font-bold shadow-xs`
+                                : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                            )}
+                          >
+                            {p.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+
+                    {/* HOSxP Pttype Search & Multi-select Box */}
+                    <div className="rounded-xl border border-slate-200 dark:border-[#34304a] bg-slate-50/50 dark:bg-[#101326] p-2.5 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                          <input
+                            type="text"
+                            value={pttypeSearchQuery}
+                            onChange={(e) => setPttypeSearchQuery(e.target.value)}
+                            placeholder="ค้นหารหัสสิทธิ หรือชื่อสิทธิการรักษา..."
+                            className="w-full rounded-lg bg-white dark:bg-[#181c30] ring-1 border-0 ring-slate-200 dark:ring-[#34304a] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                          />
+                        </div>
+                        {filteredPttypes.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleSelectAllFiltered}
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
+                          >
+                            เลือกที่ค้นพบ ({filteredPttypes.length})
+                          </button>
+                        )}
+                        {selectedPttypeTokens.length > 0 && (
+                          <button
+                            type="button"
+                            onClick={handleClearAllSelected}
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
+                          >
+                            ล้างที่เลือก
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Scrollable list of pttypes */}
+                      <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
+                        {isLoadingPttypes ? (
+                          <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                            <Loader2 className="size-4 animate-spin text-emerald-500" />
+                            <span>กำลังโหลดรหัสสิทธิการรักษาจาก HOSxP…</span>
+                          </div>
+                        ) : filteredPttypes.length === 0 ? (
+                          <div className="py-4 text-center text-xs text-slate-400">
+                            ไม่พบรหัสสิทธิที่ตรงกับ "{pttypeSearchQuery}"
+                          </div>
+                        ) : (
+                          filteredPttypes.map((p) => {
+                            const checked = isPttypeSelected(p)
+                            return (
+                              <div
+                                key={p.pttype}
+                                onClick={() => handleTogglePttype(p)}
+                                className={cn(
+                                  'px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors select-none',
+                                  checked
+                                    ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-medium'
+                                    : 'hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                                )}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    onChange={() => {}}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 size-3.5 cursor-pointer shrink-0"
+                                  />
+                                  <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-white/10 shrink-0">
+                                    [{p.pttype}]
+                                  </span>
+                                  <span className="truncate text-xs">{p.name}</span>
+                                </div>
+                                {p.pcode && (
+                                  <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                    กลุ่ม {p.pcode}
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+
+                      {/* Selected count info & preview */}
+                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                        <span>
+                          เลือกแล้ว: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedPttypeTokens.length}</strong> สิทธิ
+                        </span>
+                        <span className="text-[10px] text-slate-400">
+                          รหัสสิทธิ HOSxP ทั้งหมด: {pttypes.length} รายการ
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Display Label and Raw Filter Code Fields */}
+                    <div className="grid grid-cols-2 gap-2 mt-1">
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">ชื่อแสดงของสิทธิ:</span>
+                        <input
+                          type="text"
+                          value={formPttypeLabel}
+                          onChange={(e) => setFormPttypeLabel(e.target.value)}
+                          placeholder="เช่น สิทธิ UC / บัตรทอง หรือ [89] UC ทั่วไป"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">รหัสสิทธิ/คีย์เวิร์ดกรอง:</span>
+                        <input
+                          type="text"
+                          value={formPttypeFilter}
+                          onChange={(e) => setFormPttypeFilter(e.target.value)}
+                          placeholder="เช่น 89, 02, UC, บัตรทอง"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Interval Days */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                      3. กำหนดรอบการจ่าย (วัน) <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {DAY_PRESETS.map((d) => (
+                        <button
+                          key={d}
+                          type="button"
+                          onClick={() => handleSelectDays(d)}
+                          className={cn(
+                            'px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer',
+                            formIntervalDays === d
+                              ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 font-bold ring-2 ring-amber-500 shadow-xs'
+                              : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                          )}
+                        >
+                          {d} วัน
+                        </button>
+                      ))}
+                      <div className="flex items-center gap-1">
+                        <input
+                          type="number"
+                          min={1}
+                          max={365}
+                          value={formIntervalDays}
+                          onChange={(e) => handleSelectDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                          className="w-16 rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2 py-1 text-center font-mono text-xs text-slate-900 dark:text-white"
+                        />
+                        <span className="text-xs text-slate-500">วัน</span>
+                      </div>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                      หากคนไข้มารับยานี้อีกครั้งก่อนครบกำหนด <strong className="text-amber-700 dark:text-amber-300">{formIntervalDays} วัน</strong> ระบบจะตัดสินเป็น <strong>"ไม่ผ่าน"</strong> ในหน้าตรวจสอบการจ่ายยาสมุนไพร
+                    </p>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                      4. คำอธิบาย / หมายเหตุเงื่อนไข
+                    </label>
                     <input
                       type="text"
-                      value={formPttypeLabel}
-                      onChange={(e) => setFormPttypeLabel(e.target.value)}
-                      placeholder="เช่น สิทธิ UC / บัตรทอง หรือ [89] UC ทั่วไป"
-                      className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
-                      required
+                      value={formDescription}
+                      onChange={(e) => setFormDescription(e.target.value)}
+                      placeholder="เช่น เงื่อนไขสิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน"
+                      className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-3 py-1.5 text-xs text-slate-900 dark:text-white"
                     />
                   </div>
-                  <div>
-                    <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">รหัสสิทธิ/คีย์เวิร์ดกรอง (คั่นด้วยจุลภาค):</span>
-                    <input
-                      type="text"
-                      value={formPttypeFilter}
-                      onChange={(e) => setFormPttypeFilter(e.target.value)}
-                      placeholder="เช่น 89, 02, UC, บัตรทอง"
-                      className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
-                      required
-                    />
+
+                  {/* Status Switch */}
+                  <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/10">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      สถานะการเปิดใช้งานเงื่อนไขนี้
+                    </span>
+                    <label className="inline-flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formIsActive}
+                        onChange={(e) => setFormIsActive(e.target.checked)}
+                        className="sr-only"
+                      />
+                      <div className={cn('w-10 h-5 rounded-full transition-colors relative', formIsActive ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700')}>
+                        <div className={cn('size-4 rounded-full bg-white transition-transform absolute top-0.5', formIsActive ? 'left-5.5' : 'left-0.5')} />
+                      </div>
+                      <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
+                        {formIsActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
+                      </span>
+                    </label>
                   </div>
                 </div>
-              </div>
-
-              {/* Interval Days */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                  3. กำหนดรอบการจ่าย (วัน) <span className="text-rose-500">*</span>
-                </label>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {DAY_PRESETS.map((d) => (
-                    <button
-                      key={d}
-                      type="button"
-                      onClick={() => handleSelectDays(d)}
-                      className={cn(
-                        'px-2.5 py-1 rounded-xl text-xs font-semibold border transition-all cursor-pointer',
-                        formIntervalDays === d
-                          ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 font-bold ring-2 ring-amber-500'
-                          : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
-                      )}
-                    >
-                      {d} วัน
-                    </button>
-                  ))}
-                  <div className="flex items-center gap-1">
-                    <input
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={formIntervalDays}
-                      onChange={(e) => handleSelectDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                      className="w-16 rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2 py-1 text-center font-mono text-xs text-slate-900 dark:text-white"
-                    />
-                    <span className="text-xs text-slate-500">วัน</span>
-                  </div>
-                </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  หากคนไข้มารับยานี้อีกครั้งก่อนครบกำหนด <strong className="text-amber-700 dark:text-amber-300">{formIntervalDays} วัน</strong> ระบบจะตัดสินเป็น <strong>"ไม่ผ่าน"</strong> ในหน้าตรวจสอบการจ่ายยาสมุนไพร
-                </p>
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                  4. คำอธิบาย / หมายเหตุเงื่อนไข
-                </label>
-                <input
-                  type="text"
-                  value={formDescription}
-                  onChange={(e) => setFormDescription(e.target.value)}
-                  placeholder="เช่น เงื่อนไขสิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน"
-                  className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-3 py-1.5 text-xs text-slate-900 dark:text-white"
-                />
-              </div>
-
-              {/* Status Switch */}
-              <div className="flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/10">
-                <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                  สถานะการเปิดใช้งานเงื่อนไขนี้
-                </span>
-                <label className="inline-flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={formIsActive}
-                    onChange={(e) => setFormIsActive(e.target.checked)}
-                    className="sr-only"
-                  />
-                  <div className={cn('w-10 h-5 rounded-full transition-colors relative', formIsActive ? 'bg-emerald-600' : 'bg-slate-300 dark:bg-slate-700')}>
-                    <div className={cn('size-4 rounded-full bg-white transition-transform absolute top-0.5', formIsActive ? 'left-5.5' : 'left-0.5')} />
-                  </div>
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-200">
-                    {formIsActive ? 'เปิดใช้งาน' : 'ปิดใช้งาน'}
-                  </span>
-                </label>
               </div>
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100 dark:border-[#292440]">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#292440]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/10 cursor-pointer"
                 >
                   ยกเลิก
                 </button>
                 <button
                   type="submit"
                   disabled={isSaving}
-                  className="btn-pill-action inline-flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 disabled:opacity-50"
+                  className="btn-pill-action inline-flex items-center gap-1.5 px-5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 disabled:opacity-50"
                 >
                   {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Check className="size-3.5" />}
                   <span>{editingRule ? 'บันทึกการแก้ไข' : 'บันทึกเงื่อนไข'}</span>
