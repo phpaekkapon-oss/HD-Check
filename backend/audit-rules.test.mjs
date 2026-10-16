@@ -75,6 +75,28 @@ test('target Thai-medicine doctor needs a U-code diagnosis', () => {
   assert.equal(run({ pdx: 'K30', doctor_name: 'แพทย์ทั่วไป' }).audit_result, 'PASS')
 })
 
+test('Department Thai-medicine requires both modern ICD (K30) and Thai med U-code (U6680)', () => {
+  // แผนกแพทย์แผนไทย คีย์ K30 แต่ไม่คีย์ U6680 -> ไม่ผ่าน (FAIL)
+  const failThaiMed = run({ pdx: 'K30', department_name: 'แพทย์แผนไทย' })
+  assert.equal(failThaiMed.audit_result, 'FAIL')
+  assert.match(failThaiMed.audit_reason, /รหัสแพทย์แผนไทย/)
+
+  // แผนกแพทย์แผนไทย คีย์ K30 และคีย์ U6680 -> ผ่าน (PASS)
+  const passThaiMed = run({ pdx: 'K30', dx0: 'U6680', department_name: 'แพทย์แผนไทย' })
+  assert.equal(passThaiMed.audit_result, 'PASS')
+  assert.deepEqual(passThaiMed.matched_dx, ['K30', 'U6680'])
+
+  // แผนกแพทย์แผนไทย คีย์เฉพาะ U6680 แต่ไม่คีย์ K30 -> ไม่ผ่าน (FAIL)
+  const missingModernThaiMed = run({ pdx: 'U6680', department_name: 'แพทย์แผนไทย' })
+  assert.equal(missingModernThaiMed.audit_result, 'FAIL')
+  assert.match(missingModernThaiMed.audit_reason, /รหัสแผนปัจจุบัน/)
+
+  // แพทย์แผนปัจจุบัน (เช่น OPD) คีย์ K30 ไม่คีย์ U6680 -> ผ่าน (PASS)
+  const passModernDoctor = run({ pdx: 'K30', department_name: 'ผู้ป่วยนอก (OPD)' })
+  assert.equal(passModernDoctor.audit_result, 'PASS')
+  assert.deepEqual(passModernDoctor.matched_dx, ['K30'])
+})
+
 const { evaluateHealthMedAudit } = await import('./healthmed.mjs')
 
 test('HealthMed - M179 + U5753 age >= 40 with all 4 knee operations passes', () => {

@@ -16,10 +16,19 @@ export function evaluate(row, dxMap, minQtyMap) {
     .filter(Boolean)
   const unique = [...new Set(dxList)]
 
-  // 2. ตรวจสอบแพทย์แผนไทย 5 ท่านที่ต้องมีรหัสการวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U)
+  // 2. ตรวจสอบประเภทแผนก/แพทย์: แผนกแพทย์แผนไทย หรือ แพทย์แผนปัจจุบัน
+  const deptName = String(row.department_name ?? '').trim()
   const doctorName = String(row.doctor_name ?? '').trim()
-  const isTargetThaiMedDoctor = THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
-  const hasUDx = unique.some((dx) => dx.startsWith('U'))
+  const isThaiMed =
+    deptName.includes('แพทย์แผนไทย') ||
+    deptName.includes('แผนไทย') ||
+    THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name)) ||
+    doctorName.includes('พท.') ||
+    doctorName.includes('แพทย์แผนไทย')
+
+  const uDxList = unique.filter((dx) => dx.startsWith('U'))
+  const hasUDx = uDxList.length > 0
+  const modernDxList = unique.filter((dx) => !dx.startsWith('U'))
 
   if (unique.length === 0) {
     return {
@@ -35,8 +44,6 @@ export function evaluate(row, dxMap, minQtyMap) {
   }
 
   const allowed = dxMap.get(row.drug_icode) ?? []
-  const matched = unique.filter((dx) => allowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
-
   if (allowed.length === 0) {
     return {
       audit_result: 'NO_MAP',
@@ -50,15 +57,59 @@ export function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
-  // หากเป็นแพทย์แผนไทย 5 ท่านนี้ ต้องมีรหัสวินิจฉัยแผนไทย (รหัส U เช่น U57.., U66..) ร่วมด้วยเสมอ
-  if (isTargetThaiMedDoctor && !hasUDx) {
-    return {
-      audit_result: 'FAIL',
-      matched_dx: matched,
-      allowed_dx: allowed,
-      min_qty: minQty,
-      is_qty_fail: isQtyFail,
-      audit_reason: `แพทย์แผนไทย (${doctorName}) สั่งจ่ายยา ต้องระบุรหัสวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U เช่น U57, U66) ร่วมด้วย`,
+  // แยกเกณฑ์ ICD ที่ตั้งไว้: รหัสแผนปัจจุบัน (ไม่ขึ้นต้นด้วย U) กับ รหัสแผนไทย (ขึ้นต้นด้วย U)
+  const modernAllowed = allowed.filter((p) => !p.toUpperCase().startsWith('U'))
+  const uAllowed = allowed.filter((p) => p.toUpperCase().startsWith('U'))
+
+  // รหัสแผนปัจจุบันที่ตรงกับเกณฑ์
+  const effectiveModernAllowed = modernAllowed.length > 0 ? modernAllowed : allowed
+  const matchedModern = modernDxList.filter((dx) =>
+    effectiveModernAllowed.some((p) => dx.startsWith(normalizeIcdCode(p)))
+  )
+
+  // รหัสแผนไทยที่ตรงกับเกณฑ์ (หากในเกณฑ์ระบุรหัส U เจาะจง เช่น U6680 หรือถ้าไม่ระบุ ก็ยอมรับรหัส U ทุกรหัส)
+  const matchedU = uAllowed.length > 0
+    ? uDxList.filter((dx) => uAllowed.some((p) => dx.startsWith(normalizeIcdCode(p))))
+    : uDxList
+
+  // 3. กฎเกณฑ์ตามประเภทผู้สั่งจ่าย:
+  // - แพทย์แผนปัจจุบัน: เอาเฉพาะรหัสแผนปัจจุบันที่ตรงกับเกณฑ์ของยา (ไม่ต้องมีรหัส U เช่น U6680 ก็ผ่าน)
+  // - แผนกแพทย์แผนไทย: ต้องมีทั้งรหัสแผนปัจจุบันที่ตรงเกณฑ์ + รหัสแผนไทย (ขึ้นต้นด้วย U)
+  let isDxPass = false
+  let failDxReason = ''
+  let matchedList = []
+
+  if (isThaiMed) {
+    // แผนกแพทย์แผนไทย: ต้องมี (รหัสแผนปัจจุบัน + รหัสแผนไทย)
+    const hasValidModern = matchedModern.length > 0
+    const hasValidU = (uAllowed.length > 0 ? matchedU.length > 0 : hasUDx)
+
+    if (hasValidModern && hasValidU) {
+      isDxPass = true
+      matchedList = [...matchedModern, ...(matchedU.length > 0 ? matchedU : uDxList)]
+    } else if (hasValidModern && !hasValidU) {
+      isDxPass = false
+      matchedList = matchedModern
+      const expectedU = uAllowed.length > 0 ? uAllowed.join(', ') : 'U6680'
+      failDxReason = `แผนกแพทย์แผนไทยสั่งจ่ายยานี้ ต้องระบุรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (รหัสขึ้นต้นด้วย U เช่น ${expectedU})`
+    } else if (!hasValidModern && hasValidU) {
+      isDxPass = false
+      matchedList = matchedU.length > 0 ? matchedU : uDxList
+      failDxReason = `แผนกแพทย์แผนไทยสั่งจ่ายยานี้ ต้องระบุรหัสแผนปัจจุบันที่ตรงกับเกณฑ์ยา (เกณฑ์: ${effectiveModernAllowed.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (พบ ${uDxList.join(', ')})`
+    } else {
+      isDxPass = false
+      matchedList = []
+      failDxReason = `แผนกแพทย์แผนไทยสั่งจ่ายยานี้ ต้องระบุทั้งรหัสแผนปัจจุบัน (เกณฑ์: ${effectiveModernAllowed.join(', ')}) และรหัสแพทย์แผนไทย (รหัสขึ้นต้นด้วย U)`
+    }
+  } else {
+    // แพทย์แผนปัจจุบัน: เอาเฉพาะรหัสแผนปัจจุบันที่ตรงกับเกณฑ์ของยา
+    if (matchedModern.length > 0) {
+      isDxPass = true
+      matchedList = matchedModern
+    } else {
+      isDxPass = false
+      matchedList = []
+      failDxReason = `ไม่พบ DX แผนปัจจุบันที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (พบ ${unique.join(', ')}; เกณฑ์ ${effectiveModernAllowed.join(', ')})`
     }
   }
 
@@ -66,13 +117,13 @@ export function evaluate(row, dxMap, minQtyMap) {
   if (isQtyFail) {
     return {
       audit_result: 'FAIL',
-      matched_dx: matched,
+      matched_dx: matchedList,
       allowed_dx: allowed,
       min_qty: minQty,
       is_qty_fail: true,
-      audit_reason: matched.length > 0
+      audit_reason: isDxPass
         ? `จ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์กำหนดขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`
-        : `ไม่พบ DX ที่ตรงกับเกณฑ์ และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์ขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`,
+        : `${failDxReason} และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์ขั้นต่ำ ${minQty}${units})`,
     }
   }
 
@@ -91,7 +142,7 @@ export function evaluate(row, dxMap, minQtyMap) {
 
     return {
       audit_result: 'FAIL',
-      matched_dx: matched,
+      matched_dx: matchedList,
       allowed_dx: allowed,
       min_qty: minQty,
       is_qty_fail: false,
@@ -101,32 +152,37 @@ export function evaluate(row, dxMap, minQtyMap) {
       interval_rule_info: ruleInfo,
       cinnamon_prev_date: prevDate,
       cinnamon_days_diff: daysDiff,
-      audit_reason: matched.length > 0
+      audit_reason: isDxPass
         ? `${pttypeLabel}: ${drugName} ตัดการจ่าย ${minDays} วัน (ได้รับยาครั้งก่อนหน้าเมื่อ ${prevDate} ห่างกันเพียง ${daysDiff} วัน ยังไม่ครบ ${minDays} วัน)`
-        : `ไม่พบ DX ที่ตรงเกณฑ์ และ${pttypeLabel} ${drugName} ได้รับยาครั้งก่อนหน้าห่างกันเพียง ${daysDiff} วัน (ไม่ครบ ${minDays} วัน)`,
+        : `${failDxReason} และ${pttypeLabel} ${drugName} ได้รับยาครั้งก่อนหน้าห่างกันเพียง ${daysDiff} วัน (ไม่ครบ ${minDays} วัน)`,
     }
   }
 
-  if (matched.length > 0) {
+  if (isDxPass) {
     const exemptNotice = isPttypeExempt && minQty > 0 && qty < minQty
       ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`
       : ''
+    const reasonText = isThaiMed
+      ? `ผ่านเกณฑ์แพทย์แผนไทย: พบรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (${(matchedU.length > 0 ? matchedU : uDxList).join(', ')})${exemptNotice}`
+      : `พบ DX แผนปัจจุบันที่ตรงกับเกณฑ์ของยา (${matchedModern.join(', ')})${exemptNotice}`
+
     return {
       audit_result: 'PASS',
-      matched_dx: matched,
+      matched_dx: matchedList,
       allowed_dx: allowed,
       min_qty: minQty,
       is_qty_fail: false,
-      audit_reason: `พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้${exemptNotice}`,
+      audit_reason: reasonText,
     }
   }
 
   return {
     audit_result: 'FAIL',
-    matched_dx: [],
+    matched_dx: matchedList,
     allowed_dx: allowed,
     min_qty: minQty,
     is_qty_fail: false,
-    audit_reason: `ไม่พบ DX ที่ตรงกับเกณฑ์ของยาที่ตั้งไว้ (พบ ${unique.join(', ')}; เกณฑ์ ${allowed.join(', ')})`,
+    audit_reason: failDxReason,
   }
 }
+
