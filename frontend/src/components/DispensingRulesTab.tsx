@@ -341,18 +341,19 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
           <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
-            เปิดใช้งาน {rules.filter((r) => r.is_active).length} จาก {rules.length} เงื่อนไข
+            เปิดใช้งาน <strong className="font-bold text-slate-800 dark:text-slate-200">{rules.filter((r) => r.is_active).length}</strong>/{rules.length} เงื่อนไข
           </div>
           {canEdit && (
             <button
               type="button"
               onClick={handleOpenAddModal}
-              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all"
+              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
             >
               <Plus className="size-3.5" />
-              <span>เพิ่มเงื่อนไขรอบการจ่าย</span>
+              <span className="sm:hidden">+ เพิ่มเงื่อนไข</span>
+              <span className="hidden sm:inline">เพิ่มเงื่อนไขรอบการจ่าย</span>
             </button>
           )}
         </div>

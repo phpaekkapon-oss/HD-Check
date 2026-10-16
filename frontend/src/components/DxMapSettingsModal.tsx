@@ -420,22 +420,24 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
   return (
     <div className="space-y-4 pb-20 sm:pb-6">
-      {/* Tab Navigation with responsive touch scroll on mobile */}
-      <div className="flex items-center gap-1.5 sm:gap-2 border-b border-slate-200 dark:border-[#292440] pb-2 overflow-x-auto no-scrollbar scroll-smooth -mx-3 px-3 sm:mx-0 sm:px-0">
+      {/* Tab Navigation: Segmented Control on mobile, flex row on desktop */}
+      <div className="grid grid-cols-3 gap-1 sm:gap-2 p-1 sm:p-0 rounded-2xl sm:rounded-none bg-slate-100/90 sm:bg-transparent dark:bg-[#121526] sm:dark:bg-transparent border sm:border-0 sm:border-b border-slate-200/90 dark:border-white/10 sm:border-slate-200 sm:dark:border-[#292440] sm:pb-2 shadow-xs sm:shadow-none">
         <button
           type="button"
           onClick={() => setActiveTab('dxmap')}
           className={cn(
-            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
+            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
             activeTab === 'dxmap'
-              ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#1b1f36] text-emerald-800 dark:text-emerald-300 shadow-sm border border-emerald-500/40 ring-1 ring-emerald-500/20 sm:bg-emerald-500/15 sm:dark:bg-emerald-950/40 sm:border-emerald-500/30 sm:ring-0'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
           )}
         >
-          <Info className="size-3.5 sm:size-4 text-emerald-500 shrink-0" />
-          <span className="hidden sm:inline">เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
-          <span className="sm:hidden">จับคู่รหัส ICD-10</span>
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-white/10 font-mono font-bold">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <Info className="size-3.5 sm:size-4 text-emerald-500 shrink-0" />
+            <span className="hidden sm:inline font-bold">เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
+            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">เกณฑ์ ICD-10</span>
+          </div>
+          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-white/10 font-mono font-bold shrink-0">
             {dxMap.length}
           </span>
         </button>
@@ -444,16 +446,18 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           type="button"
           onClick={() => setActiveTab('interval')}
           className={cn(
-            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
+            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
             activeTab === 'interval'
-              ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#1b1f36] text-amber-800 dark:text-amber-300 shadow-sm border border-amber-500/40 ring-1 ring-amber-500/20 sm:bg-amber-500/15 sm:dark:bg-amber-950/40 sm:border-amber-500/30 sm:ring-0'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
           )}
         >
-          <Clock className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
-          <span className="hidden sm:inline">เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
-          <span className="sm:hidden">รอบการจ่าย & สิทธิ</span>
-          <span className="text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <Clock className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
+            <span className="hidden sm:inline font-bold">เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
+            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">รอบจ่าย & สิทธิ</span>
+          </div>
+          <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
             <span className="hidden sm:inline">สปสช. / สิทธิ UC 7 วัน</span>
             <span className="sm:hidden">UC 7 วัน</span>
           </span>
@@ -463,16 +467,18 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           type="button"
           onClick={() => setActiveTab('healthmed')}
           className={cn(
-            'shrink-0 whitespace-nowrap flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none',
+            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
             activeTab === 'healthmed'
-              ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shadow-xs'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+              ? 'bg-white dark:bg-[#1b1f36] text-amber-800 dark:text-amber-300 shadow-sm border border-amber-500/40 ring-1 ring-amber-500/20 sm:bg-amber-500/15 sm:dark:bg-amber-950/40 sm:border-amber-500/30 sm:ring-0'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
           )}
         >
-          <Layers className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
-          <span className="hidden sm:inline">เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
-          <span className="sm:hidden">เกณฑ์ตรวจค่าบริการ</span>
-          <span className="text-[10px] px-1.5 sm:px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
+            <Layers className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
+            <span className="hidden sm:inline font-bold">เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
+            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">ค่าบริการซ้ำ</span>
+          </div>
+          <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
             <span className="hidden sm:inline">คิดค่าบริการซ้ำ</span>
             <span className="sm:hidden">ตรวจซ้ำ</span>
           </span>
@@ -533,9 +539,9 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto">
+        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
           <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
-            ตั้งค่าทั้งหมด {dxMap.length} รายการ
+            ทั้งหมด <strong className="font-bold text-slate-800 dark:text-slate-200">{dxMap.length}</strong> รายการ
           </div>
           {canEdit && (
             <button
@@ -549,10 +555,11 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                 setAddError(null)
                 setIsAddModalOpen(true)
               }}
-              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all"
+              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
             >
               <Plus className="size-3.5" />
-              <span>ตั้งค่าเพิ่มรายการยา</span>
+              <span className="sm:hidden">+ เพิ่มรายการยา</span>
+              <span className="hidden sm:inline">ตั้งค่าเพิ่มรายการยา</span>
             </button>
           )}
         </div>
@@ -706,8 +713,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                 </div>
                 {!isEditing && (
                   canEdit ? (
-                    <button type="button" onClick={() => handleStartEdit(item)} className="min-h-11 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 px-3 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 touch-manipulation">
-                      <Edit3 className="size-3.5" /> แก้ไข
+                    <button type="button" onClick={() => handleStartEdit(item)} className="h-8 sm:h-9 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 px-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition-all touch-manipulation">
+                      <Edit3 className="size-3.5 text-slate-500 dark:text-slate-400" /> แก้ไข
                     </button>
                   ) : <span className="shrink-0 text-[11px] text-slate-400">ดูอย่างเดียว</span>
                 )}

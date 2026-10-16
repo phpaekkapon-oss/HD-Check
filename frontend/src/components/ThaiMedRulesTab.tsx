@@ -244,7 +244,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
 
       {/* Action Bar */}
       {canEdit && (
-        <div className="flex items-center justify-between pt-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2">
           <div>
             {savedSuccess && (
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400">
@@ -256,7 +256,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
             type="button"
             disabled={isSaving}
             onClick={handleSave}
-            className="btn-pill-action inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white shadow-md cursor-pointer hover:brightness-105 active:scale-95 transition-all disabled:opacity-50"
+            className="btn-pill-action inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold text-white shadow-md cursor-pointer hover:brightness-105 active:scale-95 transition-all disabled:opacity-50 touch-manipulation"
           >
             {isSaving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             <span>บันทึกเกณฑ์แพทย์แผนไทย</span>
