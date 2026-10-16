@@ -40,6 +40,7 @@ import type { DateRange, HealthMedRecord } from '@/types/herbdx.types'
 import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { CopyButton } from '@/components/CopyButton'
 import {
   Table,
   TableBody,
@@ -176,22 +177,43 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'patient_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้รับบริการ / HN" />,
         cell: ({ row }) => (
-          <div className="whitespace-nowrap min-w-[150px] max-w-[200px]">
-            <button
-              type="button"
-              onClick={() => setSelectedRecord(row.original)}
-              className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 group"
-            >
-              <span className="truncate">{row.original.patient_name}</span>
-              <Eye className="size-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
-            </button>
+          <div className="whitespace-nowrap min-w-[155px] max-w-[215px]">
+            <div className="flex items-center gap-1 group">
+              <button
+                type="button"
+                onClick={() => setSelectedRecord(row.original)}
+                className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 truncate"
+                title="คลิกเพื่อดูรายละเอียดเวชระเบียน"
+              >
+                <span className="truncate">{row.original.patient_name}</span>
+                <Eye className="size-3 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
+              </button>
+              <CopyButton
+                text={row.original.patient_name}
+                title="คัดลอกชื่อผู้รับบริการ"
+                iconSize="size-3"
+                className="opacity-50 hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
+              />
+            </div>
             <div className="flex items-center gap-1.5 mt-1 text-[10.5px]">
-              <span className="px-1.5 py-0.2 rounded font-mono font-semibold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/20">
-                HN: {row.original.hn}
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
+                <span>HN: {row.original.hn}</span>
+                <CopyButton
+                  text={row.original.hn}
+                  title="คัดลอก HN"
+                  iconSize="size-2.5"
+                  className="p-0.5 hover:bg-teal-500/25 text-teal-600 dark:text-teal-300 rounded cursor-pointer transition"
+                />
               </span>
               {row.original.vn && (
-                <span className="font-mono text-slate-400 dark:text-slate-500 text-[10px]">
-                  VN: {row.original.vn}
+                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-500 text-[10px]">
+                  <span>VN: {row.original.vn}</span>
+                  <CopyButton
+                    text={row.original.vn}
+                    title="คัดลอก VN"
+                    iconSize="size-2.5"
+                    className="p-0.5 hover:bg-slate-500/20 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded cursor-pointer transition"
+                  />
                 </span>
               )}
             </div>
@@ -909,13 +931,34 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <User className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    {selectedRecord.patient_name}
-                  </h3>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      {selectedRecord.patient_name}
+                    </h3>
+                    <CopyButton
+                      text={selectedRecord.patient_name}
+                      title="คัดลอกชื่อผู้รับบริการ"
+                      iconSize="size-3.5"
+                    />
+                  </div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400">
-                    <span className="text-teal-600 dark:text-teal-400 font-bold">HN: {selectedRecord.hn}</span>
+                    <span className="text-teal-600 dark:text-teal-400 font-bold inline-flex items-center gap-1">
+                      <span>HN: {selectedRecord.hn}</span>
+                      <CopyButton
+                        text={selectedRecord.hn}
+                        title="คัดลอก HN"
+                        iconSize="size-3"
+                      />
+                    </span>
                     <span>•</span>
-                    <span>VN: {selectedRecord.vn}</span>
+                    <span className="inline-flex items-center gap-1">
+                      <span>VN: {selectedRecord.vn}</span>
+                      <CopyButton
+                        text={selectedRecord.vn}
+                        title="คัดลอก VN"
+                        iconSize="size-3"
+                      />
+                    </span>
                     <span>•</span>
                     <span>อายุ {selectedRecord.age_y} ปี</span>
                   </div>
