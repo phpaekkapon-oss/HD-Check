@@ -661,13 +661,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               <Activity className="size-4 sm:size-4.5" />
             </div>
             <div>
-              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>ตรวจหัตถการแพทย์แผนไทย</span>
-                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
-                  <Sparkles className="size-2.5" /> HOSxP Audit Engine
+                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
+                  <Sparkles className="size-3" /> HOSxP Audit Engine
                 </span>
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 คลิกการ์ดสรุปตัวชี้วัดเพื่อกรองดูรายชื่อผู้ป่วยในแต่ละกลุ่ม
               </p>
             </div>
@@ -706,12 +706,12 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   )}
                 >
                   <Icon className="size-3 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-300 text-[11px]">{card.label}:</span>
-                  <strong className={cn('font-mono font-bold', card.valueColor)}>
+                  <span className="text-slate-600 dark:text-slate-300 text-xs">{card.label}:</span>
+                  <strong className={cn('font-mono font-bold text-sm', card.valueColor)}>
                     <AnimatedNumber value={card.value} />
                   </strong>
                   {card.rate !== undefined && (
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
                       ({card.rate}%)
                     </span>
                   )}
@@ -721,7 +721,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           </div>
         ) : (
           /* If Expanded: Render Compact Space-Saving KPI Cards */
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5 mt-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 mt-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
             {kpiCards.map((card) => {
               const isSelected = kpiFilter === card.id
               const Icon = card.icon
@@ -731,8 +731,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   type="button"
                   onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
                   className={cn(
-                    'rounded-xl p-2.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
-                    'border flex flex-col justify-between min-h-[72px] sm:min-h-[78px]',
+                    'rounded-xl p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer relative group',
+                    'border flex flex-col justify-between min-h-[82px] sm:min-h-[88px]',
                     'backdrop-blur-md',
                     isSelected
                       ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5 ring-1')
@@ -743,35 +743,35 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   )}
                 >
                   {/* Top row: Label & Icon */}
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className="text-xs sm:text-[12.5px] font-semibold text-slate-800 dark:text-slate-100 truncate leading-snug">
                       {card.label}
                     </span>
-                    <div className={cn('size-5 sm:size-5.5 rounded-md grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
-                      <Icon className="size-3" />
+                    <div className={cn('size-6 rounded-md grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
+                      <Icon className="size-3.5" />
                     </div>
                   </div>
 
                   {/* Metric Value */}
-                  <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
-                    <span className={cn('text-xl sm:text-2xl font-bold tabular-nums tracking-normal font-sans leading-none', card.valueColor)}>
+                  <div className="flex items-baseline gap-1.5 flex-wrap my-1">
+                    <span className={cn('text-2xl sm:text-[26px] font-bold tabular-nums font-sans leading-none', card.valueColor)}>
                       <AnimatedNumber value={card.value} />
                     </span>
                     {card.rate !== undefined && (
-                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-300 px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-300 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
                         {card.rate}%
                       </span>
                     )}
                   </div>
 
                   {/* Bottom row: Subtext or Active Badge */}
-                  <div className="mt-1 pt-1 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[9px] gap-1">
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[11px] sm:text-[11.5px] leading-tight gap-1">
                     <span className={cn('truncate font-medium', card.subColor)}>
                       {card.sub}
                     </span>
                     {isSelected && (
-                      <span className="shrink-0 flex items-center gap-0.5 font-bold text-[8.5px] px-1 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
-                        <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
+                      <span className="shrink-0 flex items-center gap-1 font-bold text-[9.5px] px-1.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                        <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         เลือก
                       </span>
                     )}
