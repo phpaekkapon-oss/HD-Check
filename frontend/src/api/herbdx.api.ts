@@ -103,4 +103,16 @@ export const herbDxApi = {
       method: 'POST',
       body: JSON.stringify(record),
     }),
+
+  aiChat: (message: string, history?: Array<{ role: 'user' | 'model'; content: string }>) =>
+    request<{
+      success: boolean
+      reply: string
+      model?: string
+      timestamp?: string
+      error?: string
+    }>('/api/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ message, history }),
+    }),
 }

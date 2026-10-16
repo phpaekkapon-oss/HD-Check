@@ -4,6 +4,7 @@ import { Sidebar, NAV_ITEMS } from '@/components/Sidebar'
 import { AuditHeader } from '@/components/AuditHeader'
 import { VersionChangelogModal } from '@/components/VersionChangelogModal'
 import { VersionUpdateNotice } from '@/components/VersionUpdateNotice'
+import { AiChatCopilot } from '@/components/AiChatCopilot'
 import type { ActivePage, DbStatus, SyncResult } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 
@@ -171,15 +172,15 @@ export const AppLayout: FC<AppLayoutProps> = ({
         </button>
       </nav>
 
-      {/* Back-to-top: sits above the mobile bottom nav / desktop status bar */}
+      {/* Back-to-top: sits cleanly above the AI Chat Copilot button */}
       <button
         type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="เลื่อนขึ้นบนสุด"
         title="เลื่อนขึ้นบนสุด"
         className={cn(
-          'fixed right-4 z-30 size-12 lg:size-11 grid place-items-center rounded-full text-white shadow-lg shadow-black/30 ring-1 ring-white/20 backdrop-blur-md transition-all duration-200 cursor-pointer active:scale-95',
-          'bg-violet-600/90 hover:bg-violet-600 bottom-[calc(5rem+env(safe-area-inset-bottom,0px)+var(--update-notice-offset,0px))] lg:bottom-14',
+          'fixed right-4 lg:right-6 z-30 size-11 grid place-items-center rounded-full text-white shadow-lg shadow-black/30 ring-1 ring-white/20 backdrop-blur-md transition-all duration-200 cursor-pointer active:scale-95',
+          'bg-slate-700/80 hover:bg-slate-700 dark:bg-slate-800/90 dark:hover:bg-slate-800 bottom-[calc(8.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-28',
           showScrollTop && !mobileMenuOpen && !moreOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
         )}
       >
@@ -226,6 +227,9 @@ export const AppLayout: FC<AppLayoutProps> = ({
           </button>
         </div>
       </footer>
+
+      {/* Floating AI Smart Copilot Chat Widget */}
+      <AiChatCopilot />
 
       {/* Version Changelog & Release Notes Modal */}
       <VersionChangelogModal

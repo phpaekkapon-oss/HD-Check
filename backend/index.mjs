@@ -754,6 +754,164 @@ app.post('/api/healthmed/ai-advisor', requireSession, async (req, res) => {
   }
 })
 
+// General AI Smart Copilot Chat Endpoint
+app.post('/api/ai/chat', requireSession, async (req, res) => {
+  try {
+    const { message, history } = req.body || {}
+    if (!message || typeof message !== 'string' || !message.trim()) {
+      return res.status(400).json({ success: false, error: 'กรุณาระบุข้อความคำถาม' })
+    }
+
+    const geminiKey = process.env.GEMINI_API_KEY
+    const query = message.trim()
+
+    // Smart Offline Knowledge Base Fallback
+    const getOfflineAnswer = (q) => {
+      const lower = q.toLowerCase()
+      if (lower.includes('พอกเข่า') || lower.includes('m179') || lower.includes('u5753')) {
+        return `### 🌿 เกณฑ์การเบิกชดเชยหัตถการพอกเข่า (สปสช.)
+1. **เกณฑ์อายุ**: ผู้ป่วยต้องมีอายุตั้งแต่ **40 ปีบริบูรณ์ขึ้นไป**
+2. **รหัสการวินิจฉัย (ICD-10)**:
+   - รหัสโรคหลัก (PDX/DX): **M179** (Gonarthrosis, unspecified) คู่กับ **U5753** (โรคลมจับโปงแห้งเข่า)
+3. **รหัสหัตถการ ICD-10-TM** (ต้องลงให้ครบ 4 รหัส):
+   - **872-78-11** (การตรวจร่างกายทางแพทย์แผนไทย)
+   - **873-78-11** (การวินิจฉัยทางแพทย์แผนไทย)
+   - **874-78-11** (การวางแผนการรักษา)
+   - **873-78-35** (การรักษาด้วยการพอกยา/พอกเข่า)
+4. **ข้อควรระวัง**: ห้ามลงรหัสปิดสิทธิ (EP) และต้องมีบันทึกประเมินอาการก่อน-หลังการรักษาใน HOSxP`
+      }
+      if (lower.includes('หลังคลอด') || lower.includes('u506') || lower.includes('m6260')) {
+        return `### 🤱 เกณฑ์การบริบาลหญิงหลังคลอด (สปสช.)
+1. **เงื่อนไขเวลา**: ต้องเป็นหญิงหลังคลอดบุตรในช่วงระยะเวลาที่กำหนด (บันทึกในระบบงานบัญชี 2 มีวันคลอดเชื่อมโยง)
+2. **รหัสโรค**: **M6260** หรือกลุ่มโรคหลังคลอด ร่วมกับ **U506** (การดูแลมารดาหลังคลอด)
+3. **รหัสหัตถการ ICD-10-TM (5 รหัส)**:
+   - **900-77-12** (การประคบสมุนไพร)
+   - **900-77-13** (การนวดฟื้นฟูสภาพ)
+   - **900-77-14** (การทับหม้อเกลือ)
+   - **900-77-16** (การอบไอน้ำสมุนไพร)
+   - **900-77-30** (การให้คำแนะนำการปฏิบัติตัว)
+4. **ข้อควรระวัง**: ตรวจสอบวันคลอดบุตรในระบบงานบัญชี 2 ให้ตรงกับข้อเท็จจริง`
+      }
+      if (lower.includes('ep') || lower.includes('ปิดสิทธิ')) {
+        return `### ⚠️ รหัสปิดสิทธิ (EP) คืออะไร และแก้ไขอย่างไร?
+- **รหัส EP...** คือรหัสที่ใช้ปิดสิทธิการเบิกจ่าย หรือระบุเงื่อนไขพิเศษที่ไม่สามารถเบิกเงินชดเชยจากกองทุน สปสช. (UC) ได้
+- **สาเหตุที่ติด Denial**: หากผู้ป่วยเป็นสิทธิบัตรทอง (UC) แล้วมีรหัส EP แนบมา e-Claim จะปฏิเสธการจ่ายทันที
+- **วิธีแก้ไขใน HOSxP**:
+  1. เปิดหน้าจอลงทะเบียน/บันทึกการตรวจผู้ป่วยนอก
+  2. ตรวจสอบแท็บการเลือกสิทธิการรักษา
+  3. นำรหัสปิดสิทธิ EP ที่ไม่ถูกต้องออก หรือเลือกสิทธิให้ตรงกับกองทุนที่ต้องการเบิก`
+      }
+      if (lower.includes('34 รายการ') || lower.includes('สมุนไพร') || lower.includes('ยา')) {
+        return `### 💊 ยาสมุนไพร 34 รายการในระบบหลักประกันสุขภาพ
+- รายการยาสมุนไพรที่ สปสช. สนับสนุนงบประมาณเพิ่มเติม เช่น ขมิ้นชัน, ฟ้าทะลายโจร, ไพล, เถาวัลย์เปรียง, มะขามป้อม, ยาหอมนวโกฐ, ธาตุบรรจบ ฯลฯ
+- **การบันทึกใน HOSxP**:
+  1. สั่งยาผ่านหน้าจอห้องตรวจแพทย์/ห้องยาตามรหัส `icode` ที่กำหนด
+  2. ตรวจสอบการ Map รหัสยามาตรฐาน 24 หลัก (TMT)
+  3. ตรวจสอบรายการในเมนู **"ตรวจสอบการสั่งยา"** ของระบบ SMART-HOSCHECK เพื่อเช็คความครบถ้วน`
+      }
+      if (lower.includes('เอกพล') || lower.includes('ติดต่อ') || lower.includes('it') || lower.includes('257')) {
+        return `### 📞 ช่องทางติดต่อผู้พัฒนาระบบ SMART-HOSCHECK
+- **ผู้พัฒนา**: นายเอกพล อันคำวงศ์ (นักวิชาการคอมพิวเตอร์ปฏิบัติการ)
+- **กลุ่มงาน**: สุขภาพดิจิทัล (งานเทคโนโลยีสารสนเทศ) โรงพยาบาลพังโคน
+- **โทรศัพท์ภายใน**: ต่อ **257**
+- ยินดีช่วยเหลือและรับข้อเสนอแนะในการพัฒนาระบบครับ!`
+      }
+      return `สวัสดีครับ! ผมคือ **AI Smart Copilot** ผู้ช่วยอัจฉริยะประจำระบบ SMART-HOSCHECK โรงพยาบาลพังโคน 
+
+ผมสามารถช่วยท่านในเรื่อง:
+- 🌿 **เกณฑ์การเบิกจ่ายแพทย์แผนไทย สปสช.**: พอกเข่า (M179), บริบาลหญิงหลังคลอด (U506), นวด/ประคบ
+- 💻 **การลงบันทึกใน HOSxP**: การลงรหัสหัตถการ ICD-10-TM, รหัสโรค และการแก้ไขรหัสปิดสิทธิ (EP)
+- 💊 **การตรวจสอบยาสมุนไพร 34 รายการ**
+- 📊 **แนวทางการแก้ไขเวชระเบียนที่ไม่ผ่านเกณฑ์ Audit**
+
+💡 *ท่านสามารถพิมพ์ถามคำถาม เช่น "เกณฑ์พอกเข่าต้องอายุเท่าไหร่" หรือ "รหัส EP แก้อย่างไร" ได้เลยครับ*`
+    }
+
+    let replyText = null
+    let modelUsed = null
+
+    if (geminiKey) {
+      const candidateModels = [
+        process.env.GEMINI_MODEL,
+        'gemini-flash-lite-latest',
+        'gemini-3.8-flash',
+        'gemini-flash-latest',
+      ].filter(Boolean)
+
+      const systemInstruction = `คุณคือ AI Smart Copilot ผู้ช่วยผู้เชี่ยวชาญการแพทย์แผนไทยและระบบเวชระเบียน HOSxP ประจำโรงพยาบาลพังโคน จังหวัดสกลนคร (ระบบ SMART-HOSCHECK พัฒนาโดยคุณเอกพล อันคำวงศ์ งานไอที โทร 257)
+บทบาทของคุณ:
+1. ตอบคำถามเกี่ยวกับเกณฑ์การตรวจประเมินเวชระเบียน (Audit) และการเบิกชดเชยค่าบริการทางการแพทย์แผนไทย กองทุน สปสช. (e-Claim)
+2. แนะนำรหัสการวินิจฉัย ICD-10 สากล (กลุ่ม M...) และรหัสแพทย์แผนไทย ICD-10-TM (กลุ่ม U50-U77 เช่น U506 หญิงหลังคลอด, U5753 ปวดเข่า)
+3. แนะนำรหัสหัตถการ ICD-10-TM เช่น พอกเข่า (872-78-11, 873-78-11, 874-78-11, 873-78-35), หลังคลอด (900-77-12 ถึง 900-77-30)
+4. ช่วยแนะนำวิธีลงข้อมูลและแก้ไขในระบบ HOSxP เช่น การแก้รหัสปิดสิทธิ EP, การสั่งยา 34 รายการ
+5. ตอบเป็นภาษาไทยที่สุภาพ เป็นมิตร กระชับ เข้าใจง่าย และใช้ Markdown จัดรูปแบบ (bullet, ตัวหนา, หัวข้อ)`
+
+      // Format conversation contents
+      const contents = []
+      if (Array.isArray(history) && history.length > 0) {
+        for (const item of history.slice(-6)) {
+          if (item.role && item.content) {
+            contents.push({
+              role: item.role === 'user' ? 'user' : 'model',
+              parts: [{ text: String(item.content) }],
+            })
+          }
+        }
+      }
+      contents.push({
+        role: 'user',
+        parts: [{ text: query }],
+      })
+
+      for (const model of candidateModels) {
+        try {
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 12000)
+          const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              systemInstruction: { parts: [{ text: systemInstruction }] },
+              contents,
+              generationConfig: {
+                temperature: 0.3,
+                maxOutputTokens: 1024,
+              },
+            }),
+          })
+          clearTimeout(timer)
+          if (apiRes.ok) {
+            const data = await apiRes.json()
+            const text = data.candidates?.[0]?.content?.parts?.[0]?.text
+            if (text && text.trim()) {
+              replyText = text.trim()
+              modelUsed = `Google Gemini (${model})`
+              break
+            }
+          }
+        } catch {
+          // try next model
+        }
+      }
+    }
+
+    if (!replyText) {
+      replyText = getOfflineAnswer(query)
+      modelUsed = 'SMART-HOSCHECK Rule Engine (Offline Mode)'
+    }
+
+    res.json({
+      success: true,
+      reply: replyText,
+      model: modelUsed,
+      timestamp: new Date().toISOString(),
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 app.get('/api/drugs', requireSession, async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
