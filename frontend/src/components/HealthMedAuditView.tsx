@@ -30,6 +30,9 @@ import {
   Bot,
   Copy,
   Check,
+  ChevronDown,
+  ChevronUp,
+  SlidersHorizontal,
 } from 'lucide-react'
 import { useHealthMedAudit } from '@/hooks/useHerbDx'
 import { herbDxApi } from '@/api/herbdx.api'
@@ -58,6 +61,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
   const [search, setSearch] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
   const [selectedRecord, setSelectedRecord] = useState<HealthMedRecord | null>(null)
+  const [isKpiCollapsed, setIsKpiCollapsed] = useState(false)
+  const [density, setDensity] = useState<'compact' | 'normal'>('compact')
 
   // AI Clinical Advisor State
   const [aiAdvice, setAiAdvice] = useState<{
@@ -281,39 +286,38 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const thaiMedItems = parsed.filter((p) => p.isThaiMed)
 
           return (
-            <div className="space-y-1.5 min-w-[210px] max-w-[280px]">
+            <div className="space-y-1 min-w-[180px] max-w-[260px]">
               {/* รายการค่าบริการ 58xxx */}
-              {thaiMedItems.map((p, idx) => (
-                <div
-                  key={idx}
-                  className={cn(
-                    'text-[11px] flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-lg border transition shadow-2xs',
-                    p.isDup
-                      ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40'
-                      : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
-                  )}
-                >
-                  <span className="truncate flex items-center gap-1">
-                    <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
-                      [{p.code}]
-                    </strong>
-                    <span className="truncate" title={p.name}>
-                      {p.name}
+              {thaiMedItems.length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {thaiMedItems.map((p, idx) => (
+                    <span
+                      key={idx}
+                      className={cn(
+                        'text-[10px] inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md border transition shadow-2xs',
+                        p.isDup
+                          ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40 font-semibold'
+                          : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
+                      )}
+                      title={`${p.name} (${p.code}) x${p.qty} ราคา ${Number(p.price || 0).toLocaleString()} บ.`}
+                    >
+                      <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                        [{p.code}]
+                      </strong>
+                      <span className="truncate max-w-[95px]">{p.name}</span>
+                      <span className="font-mono text-[9.5px] opacity-80 shrink-0">x{p.qty}</span>
                     </span>
-                  </span>
-                  <span className="font-mono font-bold shrink-0 text-[10px] text-slate-500 dark:text-slate-400">
-                    x{p.qty} ({Number(p.price || 0).toLocaleString()}.-)
-                  </span>
+                  ))}
                 </div>
-              ))}
+              )}
 
               {/* รายการรหัสหัตถการ ICD-10-TM */}
               {operations.length > 0 && (
-                <div className="flex flex-wrap gap-1 pt-0.5">
+                <div className="flex flex-wrap gap-1">
                   {operations.map((op, idx) => (
                     <span
                       key={idx}
-                      className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[130px]"
+                      className="px-1.5 py-0.2 rounded text-[9.5px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[120px]"
                       title={`${op.code}: ${op.name}`}
                     >
                       {op.code}
@@ -325,20 +329,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               {/* วันคลอดในระบบงานบัญชี 2 (แสดงเฉพาะกรณีบริบาลหญิงหลังคลอดเท่านั้น) */}
               {isPostpartum && (
                 laborDate ? (
-                  <div className="text-[10px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold pt-0.5">
-                    <Baby className="size-3 shrink-0" />
-                    <span>วันคลอด: {laborDate}</span>
+                  <div className="text-[9.5px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold">
+                    <Baby className="size-2.5 shrink-0" />
+                    <span>คลอด: {laborDate}</span>
                   </div>
                 ) : (
-                  <div className="text-[10px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold pt-0.5">
-                    <AlertTriangle className="size-3 shrink-0" />
+                  <div className="text-[9.5px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold">
+                    <AlertTriangle className="size-2.5 shrink-0" />
                     <span>ไม่มีวันคลอดในบัญชี 2</span>
                   </div>
                 )
               )}
 
               {thaiMedItems.length === 0 && operations.length === 0 && (
-                <div className="text-[11px] text-slate-400 italic">
+                <div className="text-[10px] text-slate-400 italic">
                   ไม่มีรหัสหัตถการ/ค่าบริการ
                 </div>
               )}
@@ -362,7 +366,6 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
           const seen = new Set<string>()
           // คัดเฉพาะรหัสหลักและรหัสรองแพทย์แผนไทย (รหัสกลุ่ม M, U และ EP) ตามที่แผนกแพทย์แผนไทยกำหนด
-          // ตัดรหัสโรคทั่วไป เช่น E119, I10, E789, J209, R21, Z713 ออก (เนื่องจากตรวจสอบที่หน้าตรวจจ่ายยาสมุนไพร)
           const thaiMedDxs = rawDxs.filter((d) => {
             const code = d.code.toUpperCase()
             const isRelevant = code.startsWith('M') || code.startsWith('U') || code.startsWith('EP')
@@ -383,14 +386,14 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
           if (thaiMedDxs.length === 0) {
             return (
-              <span className="text-amber-500 font-medium text-[11px] italic">
+              <span className="text-amber-500 font-medium text-[10.5px] italic">
                 ไม่มีรหัสแผนไทย (M/U)
               </span>
             )
           }
 
           return (
-            <div className="flex flex-wrap gap-1 max-w-[200px]">
+            <div className="flex flex-wrap gap-1 max-w-[180px]">
               {thaiMedDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
@@ -399,7 +402,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span
                     key={idx}
                     className={cn(
-                      'px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-bold border transition shadow-2xs',
+                      'px-1.5 py-0.2 rounded-md text-[10px] font-mono font-bold border transition shadow-2xs',
                       isM
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-1 ring-blue-400/50'
                         : isU
@@ -430,37 +433,42 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row }) => {
           const isFail = row.original.audit_result === 'FAIL'
           return (
-            <div className="flex flex-col items-center gap-1 min-w-[150px] max-w-[190px] mx-auto text-center">
+            <div className="flex flex-col items-center justify-center gap-0.5 min-w-[130px] max-w-[210px] mx-auto text-center">
               {isFail ? (
                 <>
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
-                    <XCircle className="size-3.5 text-rose-500" /> ไม่ผ่าน
-                  </span>
-                  {Boolean(row.original.is_duplicate_fail || row.original.failures?.some((f) => f.includes('ซ้ำ'))) && (
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
-                      ⚠️ คิดค่าบริการซ้ำ
+                  <div className="flex items-center justify-center gap-1 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
+                      <XCircle className="size-3 text-rose-500" /> ไม่ผ่าน
                     </span>
-                  )}
-                  <p className="text-[10px] leading-snug text-rose-600 dark:text-rose-300/90 font-sans mt-0.5 font-medium">
+                    {Boolean(row.original.is_duplicate_fail || row.original.failures?.some((f) => f.includes('ซ้ำ'))) && (
+                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full text-[9px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
+                        ⚠️ ซ้ำ
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setSelectedRecord(row.original)
+                        handleAskAi(row.original)
+                      }}
+                      className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9.5px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer group shrink-0"
+                      title="ถาม AI ช่วยวิเคราะห์สาเหตุและวิธีแก้ไขใน HOSxP"
+                    >
+                      <Bot className="size-2.5 text-teal-500 group-hover:scale-110 transition-transform" />
+                      <span>AI</span>
+                    </button>
+                  </div>
+                  <p
+                    className="text-[10px] leading-tight text-rose-600 dark:text-rose-300/90 font-sans font-medium truncate max-w-[200px] cursor-help mt-0.5"
+                    title={row.original.audit_reason}
+                  >
                     {row.original.audit_reason}
                   </p>
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      setSelectedRecord(row.original)
-                      handleAskAi(row.original)
-                    }}
-                    className="inline-flex items-center gap-1 mt-0.5 px-2 py-0.5 rounded-lg text-[10px] font-bold bg-gradient-to-r from-teal-500/15 via-cyan-500/15 to-violet-500/15 hover:from-teal-500/25 hover:to-violet-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer shadow-2xs group"
-                    title="ให้ Google Gemini AI ช่วยวิเคราะห์สาเหตุและแนะนำวิธีแก้ไขใน HOSxP"
-                  >
-                    <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
-                    <span>ถาม AI แก้ไข</span>
-                  </button>
                 </>
               ) : (
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
-                  <CheckCircle2 className="size-3.5 text-emerald-500" /> ผ่านเกณฑ์
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
+                  <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
                 </span>
               )}
             </div>
@@ -623,98 +631,143 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
   return (
     <div className="space-y-4">
-      {/* Header Banner - Enterprise Style */}
-      <div className="rounded-2xl bg-themed-card p-4 sm:p-5 border border-themed shadow-xs">
+      {/* Header Banner - Enterprise Space-Saving Style */}
+      <div className="rounded-2xl bg-themed-card p-3 sm:p-4 border border-themed shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-teal-500/15 text-teal-400 grid place-items-center">
-              <Activity className="size-5" />
+          <div className="flex items-center gap-2.5">
+            <div className="size-8 sm:size-9 rounded-xl bg-teal-500/15 text-teal-400 grid place-items-center shrink-0">
+              <Activity className="size-4 sm:size-4.5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white tracking-tight flex items-center gap-2">
                 <span>ตรวจหัตถการแพทย์แผนไทย</span>
-                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
-                  <Sparkles className="size-3" /> HOSxP Audit Engine
+                <span className="text-[10px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
+                  <Sparkles className="size-2.5" /> HOSxP Audit Engine
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                คลิกที่การ์ดสรุปตัวชี้วัดด้านล่าง เพื่อกรองดูรายชื่อผู้ป่วยในแต่ละกลุ่มได้ทันที
+              <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                คลิกการ์ดสรุปตัวชี้วัดเพื่อกรองดูรายชื่อผู้ป่วยในแต่ละกลุ่ม
               </p>
             </div>
           </div>
+
+          {/* Quick Action: Collapse/Expand KPI Cards */}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setIsKpiCollapsed(!isKpiCollapsed)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 transition shadow-2xs cursor-pointer"
+              title={isKpiCollapsed ? 'ขยายดูการ์ดสรุปทั้งหมด' : 'ย่อการ์ดสรุปเพื่อประหยัดพื้นที่หน้าจอ'}
+            >
+              {isKpiCollapsed ? <ChevronDown className="size-3.5 text-teal-500" /> : <ChevronUp className="size-3.5 text-teal-500" />}
+              <span>{isKpiCollapsed ? 'แสดงการ์ดสรุป' : 'ย่อการ์ดสรุป'}</span>
+            </button>
+          </div>
         </div>
 
-        {/* Interactive KPI Cards Grid - Seamless Executive Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10">
-          {kpiCards.map((card) => {
-            const isSelected = kpiFilter === card.id
-            const Icon = card.icon
-            return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
-                className={cn(
-                  'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
-                  'border-2 flex flex-col justify-between min-h-[120px]',
-                  'backdrop-blur-md',
-                  isSelected
-                    ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5')
-                    : cn(
-                        'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:-translate-y-0.5',
-                        card.hoverBorder
-                      )
-                )}
-              >
-                {/* Top row: Label & Icon */}
-                <div>
-                  <div className="flex items-center justify-between gap-1 mb-2">
-                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+        {/* If Collapsed: Render High-Density Single-Line Stat Ribbon */}
+        {isKpiCollapsed ? (
+          <div className="flex items-center gap-1.5 overflow-x-auto pt-2.5 mt-2.5 border-t border-slate-200/80 dark:border-white/10 scrollbar-none">
+            {kpiCards.map((card) => {
+              const isSelected = kpiFilter === card.id
+              const Icon = card.icon
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
+                  className={cn(
+                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium whitespace-nowrap transition-all border cursor-pointer shrink-0 shadow-2xs',
+                    isSelected
+                      ? cn(card.activeBorder, card.activeBg, 'ring-1 ring-current')
+                      : 'bg-white/90 dark:bg-slate-900/80 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                  )}
+                >
+                  <Icon className="size-3 shrink-0" />
+                  <span className="text-slate-600 dark:text-slate-300 text-[11px]">{card.label}:</span>
+                  <strong className={cn('font-mono font-bold', card.valueColor)}>
+                    <AnimatedNumber value={card.value} />
+                  </strong>
+                  {card.rate !== undefined && (
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
+                      ({card.rate}%)
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        ) : (
+          /* If Expanded: Render Compact Space-Saving KPI Cards */
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2 sm:gap-2.5 mt-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
+            {kpiCards.map((card) => {
+              const isSelected = kpiFilter === card.id
+              const Icon = card.icon
+              return (
+                <button
+                  key={card.id}
+                  type="button"
+                  onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
+                  className={cn(
+                    'rounded-xl p-2.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
+                    'border flex flex-col justify-between min-h-[72px] sm:min-h-[78px]',
+                    'backdrop-blur-md',
+                    isSelected
+                      ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5 ring-1')
+                      : cn(
+                          'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-sm hover:-translate-y-0.5',
+                          card.hoverBorder
+                        )
+                  )}
+                >
+                  {/* Top row: Label & Icon */}
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[10px] sm:text-[10.5px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
                       {card.label}
                     </span>
-                    <div className={cn('size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
-                      <Icon className="size-3.5" />
+                    <div className={cn('size-5 sm:size-5.5 rounded-md grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
+                      <Icon className="size-3" />
                     </div>
                   </div>
 
                   {/* Metric Value */}
-                  <div className="flex items-baseline gap-2 flex-wrap">
-                    <span className={cn('text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none', card.valueColor)}>
+                  <div className="flex items-baseline gap-1.5 flex-wrap mt-0.5">
+                    <span className={cn('text-xl sm:text-2xl font-bold tabular-nums tracking-normal font-sans leading-none', card.valueColor)}>
                       <AnimatedNumber value={card.value} />
                     </span>
                     {card.rate !== undefined && (
-                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-300 px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/25">
                         {card.rate}%
                       </span>
                     )}
                   </div>
-                </div>
 
-                {/* Bottom row: Subtext or Active Badge */}
-                <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
-                  <span className={cn('truncate font-medium', card.subColor)}>
-                    {card.sub}
-                  </span>
-                  {isSelected && (
-                    <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
-                      <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
-                      เลือก
+                  {/* Bottom row: Subtext or Active Badge */}
+                  <div className="mt-1 pt-1 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[9px] gap-1">
+                    <span className={cn('truncate font-medium', card.subColor)}>
+                      {card.sub}
                     </span>
-                  )}
-                </div>
-              </button>
-            )
-          })}
-        </div>
+                    {isSelected && (
+                      <span className="shrink-0 flex items-center gap-0.5 font-bold text-[8.5px] px-1 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                        <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
+                        เลือก
+                      </span>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
       </div>
 
       {/* Filter Status Badge & Search Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2.5">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           {kpiFilter !== 'ALL' && (
             <div
               className={cn(
-                'flex items-center gap-2 px-3 py-1.5 rounded-xl border text-xs shadow-2xs transition-all animate-in fade-in',
+                'flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs shadow-2xs transition-all animate-in fade-in',
                 kpiFilter === 'PASS' && 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200',
                 kpiFilter === 'FAIL' && 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200',
                 kpiFilter === 'DUPLICATE' && 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200',
@@ -725,38 +778,52 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               )}
             >
               <span className="size-2 rounded-full bg-current animate-pulse shrink-0" />
-              <span className="opacity-75">กรองเฉพาะกลุ่ม:</span>
-              <strong className="font-bold">
+              <span className="opacity-75 text-[11px]">กลุ่ม:</span>
+              <strong className="font-bold text-xs">
                 {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
                 {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
                 {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
-                {kpiFilter === 'KNEE' && 'ข้อเข่า / พอกเข่า (M179+U5753)'}
-                {kpiFilter === 'MUSCLE' && 'โรคกล้ามเนื้อ (รหัส M... + U...)'}
-                {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด (M6260+U506)'}
-                {kpiFilter === 'EP' && 'ติดรหัสปิดสิทธิ (EP)'}
+                {kpiFilter === 'KNEE' && 'ข้อเข่า (M179+U5753)'}
+                {kpiFilter === 'MUSCLE' && 'กล้ามเนื้อ (M+U)'}
+                {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด'}
+                {kpiFilter === 'EP' && 'ปิดสิทธิ (EP)'}
               </strong>
-              <span className="font-mono font-bold">({filteredRecords.length} รายการ)</span>
+              <span className="font-mono font-bold text-xs">({filteredRecords.length})</span>
               <button
                 type="button"
                 onClick={() => setKpiFilter('ALL')}
-                className="ml-1 p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/20 transition cursor-pointer"
-                title="ล้างตัวกรองและดูทั้งหมด"
+                className="ml-0.5 p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/20 transition cursor-pointer"
+                title="ล้างตัวกรอง"
               >
-                <X className="size-3.5" />
+                <X className="size-3" />
               </button>
             </div>
           )}
         </div>
 
-        <div className="relative min-w-[260px]">
-          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหา HN, ผู้ป่วย, แพทย์, รหัสโรค..."
-            className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 pl-9 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 shadow-2xs"
-          />
+        <div className="flex items-center gap-2">
+          {/* Density Switch Button */}
+          <button
+            type="button"
+            onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition shadow-2xs cursor-pointer"
+            title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
+          >
+            <SlidersHorizontal className="size-3 text-teal-500" />
+            <span className="text-[11px] font-semibold">{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
+          </button>
+
+          {/* Search Box */}
+          <div className="relative min-w-[220px] sm:min-w-[260px]">
+            <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหา HN, ผู้ป่วย, แพทย์..."
+              className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 shadow-2xs"
+            />
+          </div>
         </div>
       </div>
 
@@ -768,7 +835,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-slate-200 dark:border-white/10">
                   {headerGroup.headers.map((header) => (
-                    <TableHead key={header.id} className="text-slate-600 dark:text-slate-300 font-bold text-xs py-3 px-3 whitespace-nowrap">
+                    <TableHead
+                      key={header.id}
+                      className={cn(
+                        'text-slate-600 dark:text-slate-300 font-bold text-xs whitespace-nowrap',
+                        density === 'compact' ? 'py-2 px-2.5' : 'py-3 px-3'
+                      )}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(header.column.columnDef.header, header.getContext())}
@@ -803,7 +876,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       )}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <TableCell key={cell.id} className="py-3 px-3 align-middle">
+                        <TableCell
+                          key={cell.id}
+                          className={cn(
+                            'align-middle',
+                            density === 'compact' ? 'py-1.5 px-2.5 text-xs' : 'py-3 px-3'
+                          )}
+                        >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </TableCell>
                       ))}
