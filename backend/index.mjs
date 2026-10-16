@@ -454,7 +454,78 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
 
     const [rows] = await dwPool.query(sql, params)
     const { dxMap, minQtyMap } = await loadDxMap()
-    const evaluated = rows.map((r) => ({ ...r, drug_qty: Number(r.drug_qty), ...evaluate(r, dxMap, minQtyMap) }))
+
+    // ตรวจสอบเงื่อนไข ยาธาตุอบเชย (1490024) สิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน
+    const cinnamonRows = rows.filter((r) => {
+      const isCinnamon = r.drug_icode === '1490024' || (r.drug_name && r.drug_name.includes('ยาธาตุอบเชย'))
+      const pttype = String(r.pttype_name ?? '')
+      const isUc = pttype.includes('ประกันสุขภาพ') || pttype.includes('บัตรทอง') || pttype.toUpperCase().includes('UC') || String(r.pttype ?? '').startsWith('U')
+      return isCinnamon && isUc
+    })
+
+    const cinnamonHns = [...new Set(cinnamonRows.map((r) => r.hn).filter(Boolean))]
+    const cinnamonHistoryByHn = new Map()
+
+    if (cinnamonHns.length > 0) {
+      const [historyRows] = await dwPool.query(
+        `SELECT hn, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
+         FROM dw_hd_check_prescriptions
+         WHERE (drug_icode = '1490024' OR drug_name LIKE '%ยาธาตุอบเชย%')
+           AND hn IN (?)
+           AND drug_qty > 0
+         ORDER BY hn, visit_date ASC, id ASC`,
+        [cinnamonHns]
+      )
+      for (const h of historyRows) {
+        if (!cinnamonHistoryByHn.has(h.hn)) cinnamonHistoryByHn.set(h.hn, [])
+        cinnamonHistoryByHn.get(h.hn).push(h)
+      }
+    }
+
+    const evaluated = rows.map((r) => {
+      const isCinnamon = r.drug_icode === '1490024' || (r.drug_name && r.drug_name.includes('ยาธาตุอบเชย'))
+      const pttype = String(r.pttype_name ?? '')
+      const isUc = pttype.includes('ประกันสุขภาพ') || pttype.includes('บัตรทอง') || pttype.toUpperCase().includes('UC') || String(r.pttype ?? '').startsWith('U')
+
+      let cinnamon_interval_fail = false
+      let cinnamon_prev_date = null
+      let cinnamon_days_diff = null
+
+      if (isCinnamon && isUc) {
+        const hist = cinnamonHistoryByHn.get(r.hn) || []
+        // หาครั้งก่อนหน้า (previous visit before this one)
+        const prevList = hist.filter((h) => {
+          if (h.id === r.id) return false
+          if (h.visit_date < r.visit_date) return true
+          if (h.visit_date === r.visit_date && (h.id < r.id || (h.visit_time && r.visit_time && h.visit_time < r.visit_time))) return true
+          return false
+        })
+        if (prevList.length > 0) {
+          const lastPrev = prevList[prevList.length - 1]
+          const currD = new Date(r.visit_date + 'T00:00:00')
+          const prevD = new Date(lastPrev.visit_date + 'T00:00:00')
+          const diffDays = Math.round((currD.getTime() - prevD.getTime()) / (1000 * 60 * 60 * 24))
+          if (diffDays < 7) {
+            cinnamon_interval_fail = true
+            cinnamon_prev_date = lastPrev.visit_date
+            cinnamon_days_diff = diffDays
+          }
+        }
+      }
+
+      const rowWithInfo = {
+        ...r,
+        drug_qty: Number(r.drug_qty),
+        cinnamon_interval_fail,
+        cinnamon_prev_date,
+        cinnamon_days_diff,
+      }
+
+      return {
+        ...rowWithInfo,
+        ...evaluate(rowWithInfo, dxMap, minQtyMap),
+      }
+    })
 
     const count = (k) => evaluated.filter((r) => r.audit_result === k).length
     const kpi = {

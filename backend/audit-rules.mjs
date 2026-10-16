@@ -76,6 +76,25 @@ export function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
+  // เงื่อนไขสิทธิ UC ยาธาตุอบเชย (ขวด 120 ml.): ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน
+  if (row.cinnamon_interval_fail) {
+    const prevDate = row.cinnamon_prev_date || 'ก่อนหน้า'
+    const daysDiff = row.cinnamon_days_diff ?? 0
+    return {
+      audit_result: 'FAIL',
+      matched_dx: matched,
+      allowed_dx: allowed,
+      min_qty: minQty,
+      is_qty_fail: false,
+      is_interval_fail: true,
+      cinnamon_prev_date: prevDate,
+      cinnamon_days_diff: daysDiff,
+      audit_reason: matched.length > 0
+        ? `สิทธิ UC: ยาธาตุอบเชย ตัดการจ่าย 7 วัน (ได้รับยาครั้งก่อนหน้าเมื่อ ${prevDate} ห่างกันเพียง ${daysDiff} วัน ยังไม่ครบ 7 วัน)`
+        : `ไม่พบ DX ที่ตรงเกณฑ์ และสิทธิ UC ยาธาตุอบเชยได้รับยาครั้งก่อนหน้าห่างกันเพียง ${daysDiff} วัน (ไม่ครบ 7 วัน)`,
+    }
+  }
+
   if (matched.length > 0) {
     const exemptNotice = isPttypeExempt && minQty > 0 && qty < minQty
       ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`

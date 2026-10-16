@@ -41,6 +41,10 @@ export interface AuditRecord {
   readonly drug_qty: number
   readonly min_qty?: number
   readonly is_qty_fail?: boolean
+  readonly is_interval_fail?: boolean
+  readonly cinnamon_interval_fail?: boolean
+  readonly cinnamon_prev_date?: string
+  readonly cinnamon_days_diff?: number
   readonly drug_units?: string
   readonly department_name: string
   readonly main_pdx: string

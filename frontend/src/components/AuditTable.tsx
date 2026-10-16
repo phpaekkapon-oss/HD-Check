@@ -366,12 +366,19 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             )
           }
           if (r.audit_result === 'FAIL') {
+            const isIntervalFail = Boolean(r.is_interval_fail || r.cinnamon_interval_fail || r.audit_reason?.includes('7 วัน'))
             return (
               <span
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30 whitespace-nowrap"
+                className={cn(
+                  'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap',
+                  isIntervalFail
+                    ? 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-700 animate-pulse'
+                    : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30'
+                )}
                 title={r.audit_reason}
               >
-                <AlertCircle className="size-3 text-rose-600" /> DX ไม่ตรงข้อบ่งใช้
+                <AlertCircle className="size-3 text-rose-600 shrink-0" />
+                {isIntervalFail ? 'จ่ายซ้ำไม่ครบ 7 วัน (สิทธิ UC)' : 'DX ไม่ตรงข้อบ่งใช้'}
               </span>
             )
           }

@@ -176,3 +176,41 @@ test('HealthMed - General muscle M... + U... requires allowed procedure', () => 
   assert.equal(failRecord.audit_result, 'FAIL')
 })
 
+test('Cinnamon drug (1490024) under UC fails when dispensed within 7 days', () => {
+  const r = evaluate(
+    {
+      drug_icode: '1490024',
+      drug_name: 'ยาธาตุอบเชย',
+      drug_qty: 3,
+      pttype_name: 'UC30บาท(UCS) 12-59 ปีในเขต',
+      pdx: 'K30',
+      cinnamon_interval_fail: true,
+      cinnamon_prev_date: '2026-10-01',
+      cinnamon_days_diff: 4,
+    },
+    new Map([['1490024', ['K30']]]),
+    new Map()
+  )
+  assert.equal(r.audit_result, 'FAIL')
+  assert.equal(r.is_interval_fail, true)
+  assert.match(r.audit_reason, /ตัดการจ่าย 7 วัน/)
+  assert.match(r.audit_reason, /ไม่ครบ 7 วัน/)
+})
+
+test('Cinnamon drug (1490024) passes when interval >= 7 days or first visit', () => {
+  const r = evaluate(
+    {
+      drug_icode: '1490024',
+      drug_name: 'ยาธาตุอบเชย',
+      drug_qty: 3,
+      pttype_name: 'UC30บาท(UCS) 12-59 ปีในเขต',
+      pdx: 'K30',
+      cinnamon_interval_fail: false,
+    },
+    new Map([['1490024', ['K30']]]),
+    new Map()
+  )
+  assert.equal(r.audit_result, 'PASS')
+})
+
+
