@@ -9,6 +9,8 @@ import {
   Loader2,
   ChevronLeft,
   ChevronRight,
+  Maximize2,
+  Minimize2,
 } from 'lucide-react'
 import { herbDxApi } from '@/api/herbdx.api'
 import { cn } from '@/lib/utils'
@@ -97,6 +99,7 @@ function formatInlineMarkdown(text: string): string {
 
 export const AiChatCopilot: FC = () => {
   const [isOpen, setIsOpen] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>(() => [
@@ -147,7 +150,10 @@ export const AiChatCopilot: FC = () => {
     }
 
     setMessages((prev) => [...prev, userMsg])
-    if (!customText) setInput('')
+    if (!customText) {
+      setInput('')
+      if (inputRef.current) inputRef.current.style.height = 'auto'
+    }
     setLoading(true)
 
     try {
@@ -243,7 +249,12 @@ export const AiChatCopilot: FC = () => {
         <div
           role="dialog"
           aria-label="หน้าต่างสนทนา AI Smart Copilot"
-          className="fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-14 right-3.5 sm:right-5 lg:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-[420px] md:w-[450px] max-h-[calc(100vh-6rem)] sm:max-h-[640px] flex flex-col rounded-2xl bg-themed-card border border-themed shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200"
+          className={cn(
+            'fixed bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-14 right-3.5 sm:right-5 lg:right-6 z-50 flex flex-col rounded-2xl bg-themed-card border border-themed shadow-2xl shadow-black/40 overflow-hidden animate-in fade-in slide-in-from-bottom-5 duration-200 transition-all',
+            isExpanded
+              ? 'w-[calc(100vw-1.5rem)] sm:w-[660px] lg:w-[740px] h-[calc(100vh-5.5rem)] max-h-[820px]'
+              : 'w-[calc(100vw-1.5rem)] sm:w-[450px] md:w-[480px] h-[580px] sm:h-[620px] max-h-[calc(100vh-5.5rem)]'
+          )}
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-violet-700 via-indigo-700 to-purple-800 text-white px-4 py-3 flex items-center justify-between shrink-0 shadow-md">
@@ -266,6 +277,14 @@ export const AiChatCopilot: FC = () => {
             </div>
 
             <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsExpanded((prev) => !prev)}
+                title={isExpanded ? 'ย่อขนาดหน้าต่าง' : 'ขยายหน้าต่างกว้างขึ้น (เต็มตา)'}
+                className="size-8 rounded-lg hover:bg-white/15 flex items-center justify-center text-violet-200 hover:text-white transition-colors cursor-pointer"
+              >
+                {isExpanded ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+              </button>
               <button
                 type="button"
                 onClick={clearMessages}
@@ -405,12 +424,16 @@ export const AiChatCopilot: FC = () => {
               <textarea
                 ref={inputRef}
                 value={input}
-                onChange={(e) => setInput(e.target.value)}
+                onChange={(e) => {
+                  setInput(e.target.value)
+                  e.target.style.height = 'auto'
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+                }}
                 onKeyDown={handleKeyDown}
-                placeholder="ถามข้อสงสัยเกณฑ์ สปสช. หรือ HOSxP (กด Enter เพื่อส่ง)..."
+                placeholder="ถามข้อสงสัยเกณฑ์ สปสช., รหัส ICD-10 หรือ HOSxP (กด Enter เพื่อส่ง)..."
                 rows={1}
                 disabled={loading}
-                className="flex-1 bg-transparent border-0 resize-none text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2 py-1.5 focus:outline-none max-h-24 disabled:opacity-50"
+                className="flex-1 bg-transparent border-0 resize-none text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2.5 py-1.5 focus:outline-none min-h-[38px] max-h-28 disabled:opacity-50 chat-scrollbar leading-relaxed"
               />
               <button
                 type="button"
