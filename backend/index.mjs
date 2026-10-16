@@ -645,15 +645,26 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     const laborDateByHn = new Map()
     if (postpartumHns.length > 0) {
       const [ancRows] = await hosPool.query(`
-        SELECT p.patient_hn, MAX(pa.labor_date) AS labor_date
-        FROM person p
-        JOIN person_anc pa ON pa.person_id = p.person_id
-        WHERE p.patient_hn IN (${postpartumHns.map(() => '?').join(',')})
-          AND pa.labor_date IS NOT NULL
-        GROUP BY p.patient_hn
+        SELECT 
+          pt.hn,
+          COALESCE(
+            MAX(pa.labor_date),
+            MAX(pa.force_labor_complete_date),
+            MAX(i.regdate),
+            MAX(DATE(il.entry_datetime))
+          ) AS labor_date
+        FROM patient pt
+        LEFT JOIN person p ON (p.patient_hn = pt.hn OR (p.cid = pt.cid AND pt.cid IS NOT NULL AND pt.cid != ''))
+        LEFT JOIN person_anc pa ON pa.person_id = p.person_id
+        LEFT JOIN ipt i ON i.hn = pt.hn AND i.an IN (SELECT an FROM ipt_labour)
+        LEFT JOIN ipt_labour il ON il.hn = pt.hn
+        WHERE pt.hn IN (${postpartumHns.map(() => '?').join(',')})
+        GROUP BY pt.hn
       `, postpartumHns)
       for (const r of ancRows) {
-        laborDateByHn.set(r.patient_hn, r.labor_date)
+        if (r.labor_date) {
+          laborDateByHn.set(r.hn, r.labor_date)
+        }
       }
     }
 
