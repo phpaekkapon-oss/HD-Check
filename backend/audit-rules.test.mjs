@@ -197,20 +197,31 @@ test('Cinnamon drug (1490024) under UC fails when dispensed within 7 days', () =
   assert.match(r.audit_reason, /ไม่ครบ 7 วัน/)
 })
 
-test('Cinnamon drug (1490024) passes when interval >= 7 days or first visit', () => {
+test('Custom dispensing interval rule (e.g. SSS 14 days) fails when within interval', () => {
   const r = evaluate(
     {
-      drug_icode: '1490024',
-      drug_name: 'ยาธาตุอบเชย',
-      drug_qty: 3,
-      pttype_name: 'UC30บาท(UCS) 12-59 ปีในเขต',
+      drug_icode: '1540012',
+      drug_name: 'ขมิ้นชัน',
+      drug_qty: 30,
+      pttype_name: 'ประกันสังคม',
       pdx: 'K30',
-      cinnamon_interval_fail: false,
+      interval_fail: true,
+      interval_prev_date: '2026-10-10',
+      interval_days_diff: 5,
+      interval_rule_info: {
+        drug_name: 'ขมิ้นชัน',
+        pttype_label: 'สิทธิประกันสังคม',
+        min_days: 14,
+      },
     },
-    new Map([['1490024', ['K30']]]),
+    new Map([['1540012', ['K30']]]),
     new Map()
   )
-  assert.equal(r.audit_result, 'PASS')
+  assert.equal(r.audit_result, 'FAIL')
+  assert.equal(r.is_interval_fail, true)
+  assert.match(r.audit_reason, /ตัดการจ่าย 14 วัน/)
+  assert.match(r.audit_reason, /สิทธิประกันสังคม/)
+  assert.match(r.audit_reason, /ห่างกันเพียง 5 วัน/)
 })
 
 

@@ -366,7 +366,23 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             )
           }
           if (r.audit_result === 'FAIL') {
-            const isIntervalFail = Boolean(r.is_interval_fail || r.cinnamon_interval_fail || r.audit_reason?.includes('7 วัน'))
+            const isIntervalFail = Boolean(
+              r.is_interval_fail ||
+              r.cinnamon_interval_fail ||
+              r.audit_reason?.includes('ตัดการจ่าย') ||
+              r.audit_reason?.includes('รอบการจ่าย') ||
+              r.audit_reason?.includes('7 วัน')
+            )
+            let badgeLabel = 'DX ไม่ตรงข้อบ่งใช้'
+            if (isIntervalFail) {
+              if (r.interval_rule_info) {
+                badgeLabel = `จ่ายซ้ำไม่ครบ ${r.interval_rule_info.min_days} วัน (${r.interval_rule_info.pttype_label || 'สิทธิ'})`
+              } else if (r.audit_reason?.includes('7 วัน')) {
+                badgeLabel = 'จ่ายซ้ำไม่ครบ 7 วัน (สิทธิ UC)'
+              } else {
+                badgeLabel = 'จ่ายซ้ำไม่ครบรอบวัน'
+              }
+            }
             return (
               <span
                 className={cn(
@@ -378,7 +394,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
                 title={r.audit_reason}
               >
                 <AlertCircle className="size-3 text-rose-600 shrink-0" />
-                {isIntervalFail ? 'จ่ายซ้ำไม่ครบ 7 วัน (สิทธิ UC)' : 'DX ไม่ตรงข้อบ่งใช้'}
+                {badgeLabel}
               </span>
             )
           }

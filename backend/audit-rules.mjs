@@ -76,10 +76,19 @@ export function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
-  // เงื่อนไขสิทธิ UC ยาธาตุอบเชย (ขวด 120 ml.): ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน
-  if (row.cinnamon_interval_fail) {
-    const prevDate = row.cinnamon_prev_date || 'ก่อนหน้า'
-    const daysDiff = row.cinnamon_days_diff ?? 0
+  // เงื่อนไขรอบการจ่ายยาสมุนไพรตามสิทธิ (เช่น สิทธิ UC ยาธาตุอบเชย ตัดการจ่าย 7 วัน หรือเงื่อนไขที่กำหนดเอง)
+  if (row.interval_fail || row.cinnamon_interval_fail) {
+    const prevDate = row.interval_prev_date || row.cinnamon_prev_date || 'ก่อนหน้า'
+    const daysDiff = row.interval_days_diff ?? row.cinnamon_days_diff ?? 0
+    const ruleInfo = row.interval_rule_info || {
+      drug_name: row.drug_name || 'ยาธาตุอบเชย',
+      pttype_label: 'สิทธิ UC',
+      min_days: 7,
+    }
+    const pttypeLabel = ruleInfo.pttype_label || 'สิทธิ'
+    const drugName = ruleInfo.drug_name || row.drug_name || 'รายการยา'
+    const minDays = ruleInfo.min_days ?? 7
+
     return {
       audit_result: 'FAIL',
       matched_dx: matched,
@@ -87,11 +96,14 @@ export function evaluate(row, dxMap, minQtyMap) {
       min_qty: minQty,
       is_qty_fail: false,
       is_interval_fail: true,
+      interval_prev_date: prevDate,
+      interval_days_diff: daysDiff,
+      interval_rule_info: ruleInfo,
       cinnamon_prev_date: prevDate,
       cinnamon_days_diff: daysDiff,
       audit_reason: matched.length > 0
-        ? `สิทธิ UC: ยาธาตุอบเชย ตัดการจ่าย 7 วัน (ได้รับยาครั้งก่อนหน้าเมื่อ ${prevDate} ห่างกันเพียง ${daysDiff} วัน ยังไม่ครบ 7 วัน)`
-        : `ไม่พบ DX ที่ตรงเกณฑ์ และสิทธิ UC ยาธาตุอบเชยได้รับยาครั้งก่อนหน้าห่างกันเพียง ${daysDiff} วัน (ไม่ครบ 7 วัน)`,
+        ? `${pttypeLabel}: ${drugName} ตัดการจ่าย ${minDays} วัน (ได้รับยาครั้งก่อนหน้าเมื่อ ${prevDate} ห่างกันเพียง ${daysDiff} วัน ยังไม่ครบ ${minDays} วัน)`
+        : `ไม่พบ DX ที่ตรงเกณฑ์ และ${pttypeLabel} ${drugName} ได้รับยาครั้งก่อนหน้าห่างกันเพียง ${daysDiff} วัน (ไม่ครบ ${minDays} วัน)`,
     }
   }
 

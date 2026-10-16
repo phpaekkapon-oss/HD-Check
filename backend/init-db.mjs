@@ -170,8 +170,42 @@ export async function initDatabaseAndTables() {
     [DEFAULT_DX_MAP]
   )
 
+  // 7) Dispensing interval & benefit rules
+  await conn.query(`
+    CREATE TABLE IF NOT EXISTS dw_hd_check_dispensing_rules (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      drug_icode VARCHAR(20) NOT NULL,
+      drug_name VARCHAR(255) NOT NULL,
+      pttype_filter VARCHAR(255) NOT NULL DEFAULT 'UC',
+      pttype_name_label VARCHAR(255) NOT NULL DEFAULT 'สิทธิ UC / บัตรทอง',
+      min_interval_days INT NOT NULL DEFAULT 7,
+      rule_description VARCHAR(255) NULL,
+      is_active TINYINT(1) NOT NULL DEFAULT 1,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      INDEX idx_drug_icode (drug_icode)
+    ) ENGINE=InnoDB DEFAULT CHARSET=tis620
+  `)
+
+  const [existingRules] = await conn.query('SELECT COUNT(*) as cnt FROM dw_hd_check_dispensing_rules')
+  if (existingRules[0].cnt === 0) {
+    await conn.query(
+      `INSERT INTO dw_hd_check_dispensing_rules 
+       (drug_icode, drug_name, pttype_filter, pttype_name_label, min_interval_days, rule_description, is_active)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`,
+      [
+        '1490024',
+        'ยาธาตุอบเชย',
+        'UC,บัตรทอง,ประกันสุขภาพ,UCS',
+        'สิทธิ UC / บัตรทอง',
+        7,
+        'เงื่อนไขสิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน',
+      ]
+    )
+  }
+
   await conn.end()
-  console.log(`Database \`${DW_DB}\` ready (6 tables, 2FA enabled, ${DEFAULT_DX_MAP.length} default drug-ICD rules).`)
+  console.log(`Database \`${DW_DB}\` ready (7 tables, 2FA enabled, ${DEFAULT_DX_MAP.length} default drug-ICD rules).`)
 }
 
 if (process.argv[1]?.replace(/\\/g, '/').endsWith('server/init-db.mjs')) {

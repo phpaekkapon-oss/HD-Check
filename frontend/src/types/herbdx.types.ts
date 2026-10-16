@@ -42,6 +42,14 @@ export interface AuditRecord {
   readonly min_qty?: number
   readonly is_qty_fail?: boolean
   readonly is_interval_fail?: boolean
+  readonly interval_fail?: boolean
+  readonly interval_prev_date?: string | null
+  readonly interval_days_diff?: number | null
+  readonly interval_rule_info?: {
+    readonly drug_name: string
+    readonly pttype_label: string
+    readonly min_days: number
+  } | null
   readonly cinnamon_interval_fail?: boolean
   readonly cinnamon_prev_date?: string
   readonly cinnamon_days_diff?: number
@@ -217,5 +225,18 @@ export interface HealthMedKpi {
   readonly postpartumFail: number
   readonly muscleFail?: number
   readonly epFail: number
+}
+
+export interface DispensingRule {
+  readonly id?: number
+  readonly drug_icode: string
+  readonly drug_name: string
+  readonly pttype_filter: string
+  readonly pttype_name_label: string
+  readonly min_interval_days: number
+  readonly rule_description?: string
+  readonly is_active: boolean
+  readonly created_at?: string
+  readonly updated_at?: string
 }
 

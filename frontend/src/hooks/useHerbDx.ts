@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { herbDxApi } from '@/api/herbdx.api'
-import type { AuditFilterParams, DateRange, DxMapUpdate } from '@/types/herbdx.types'
+import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule } from '@/types/herbdx.types'
 
 export const herbDxKeys = {
   all: ['herbdx'] as const,
@@ -8,6 +8,7 @@ export const herbDxKeys = {
   prescriptions: (f: AuditFilterParams) => [...herbDxKeys.all, 'prescriptions', f] as const,
   drugs: (r: DateRange) => [...herbDxKeys.all, 'drugs', r] as const,
   dxMap: () => [...herbDxKeys.all, 'dx-map'] as const,
+  dispensingRules: () => [...herbDxKeys.all, 'dispensing-rules'] as const,
 }
 
 export function useDbStatus() {
@@ -75,6 +76,48 @@ export function useHealthMedAudit(filters: AuditFilterParams) {
     queryFn: () => herbDxApi.healthMedAudit(filters),
     placeholderData: keepPreviousData,
     refetchInterval: 15_000,
+  })
+}
+
+export function useDispensingRules() {
+  return useQuery({
+    queryKey: herbDxKeys.dispensingRules(),
+    queryFn: herbDxApi.dispensingRules,
+    select: (r) => r.data,
+  })
+}
+
+export function useSaveDispensingRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rule: Partial<DispensingRule>) => herbDxApi.saveDispensingRule(rule),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+    },
+  })
+}
+
+export function useToggleDispensingRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ id, isActive }: { id: number; isActive: boolean }) =>
+      herbDxApi.toggleDispensingRule(id, isActive),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+    },
+  })
+}
+
+export function useDeleteDispensingRule() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: number) => herbDxApi.deleteDispensingRule(id),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+    },
   })
 }
 

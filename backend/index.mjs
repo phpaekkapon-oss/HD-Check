@@ -8,6 +8,14 @@ import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
 import { HEALTH_MED_AUDIT_SQL, evaluateHealthMedAudit } from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
 import {
+  initDispensingRulesTable,
+  getDispensingRules,
+  saveDispensingRule,
+  toggleDispensingRule,
+  deleteDispensingRule,
+  matchesPttype,
+} from './dispensing-rules.mjs'
+import {
   initAuthTables,
   authenticateHosUser,
   verify2FALogin,
@@ -455,45 +463,65 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
     const [rows] = await dwPool.query(sql, params)
     const { dxMap, minQtyMap } = await loadDxMap()
 
-    // ตรวจสอบเงื่อนไข ยาธาตุอบเชย (1490024) สิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน
-    const cinnamonRows = rows.filter((r) => {
-      const isCinnamon = r.drug_icode === '1490024' || (r.drug_name && r.drug_name.includes('ยาธาตุอบเชย'))
-      const pttype = String(r.pttype_name ?? '')
-      const isUc = pttype.includes('ประกันสุขภาพ') || pttype.includes('บัตรทอง') || pttype.toUpperCase().includes('UC') || String(r.pttype ?? '').startsWith('U')
-      return isCinnamon && isUc
-    })
+    // ตรวจสอบเงื่อนไขรอบการจ่ายยาสมุนไพรและสิทธิการรักษาที่ตั้งค่าไว้
+    let activeDispensingRules = []
+    try {
+      activeDispensingRules = await getDispensingRules(dwPool, true)
+    } catch {
+      activeDispensingRules = []
+    }
 
-    const cinnamonHns = [...new Set(cinnamonRows.map((r) => r.hn).filter(Boolean))]
-    const cinnamonHistoryByHn = new Map()
+    // หาแถวที่เข้าข่ายเงื่อนไขรอบการจ่ายยา
+    const candidateRows = []
+    for (const r of rows) {
+      for (const rule of activeDispensingRules) {
+        const isDrug =
+          (rule.drug_icode && String(r.drug_icode) === String(rule.drug_icode)) ||
+          (rule.drug_name && r.drug_name && r.drug_name.includes(rule.drug_name))
+        if (isDrug && matchesPttype(r.pttype_name, r.pttype, rule.pttype_filter)) {
+          candidateRows.push({ row: r, rule })
+          break
+        }
+      }
+    }
 
-    if (cinnamonHns.length > 0) {
+    const candidateHns = [...new Set(candidateRows.map((c) => c.row.hn).filter(Boolean))]
+    const candidateIcodes = [...new Set(candidateRows.map((c) => c.rule.drug_icode).filter(Boolean))]
+    const historyByKey = new Map()
+
+    if (candidateHns.length > 0 && candidateIcodes.length > 0) {
       const [historyRows] = await dwPool.query(
-        `SELECT hn, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
+        `SELECT hn, drug_icode, drug_name, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
          FROM dw_hd_check_prescriptions
-         WHERE (drug_icode = '1490024' OR drug_name LIKE '%ยาธาตุอบเชย%')
-           AND hn IN (?)
+         WHERE hn IN (?)
+           AND drug_icode IN (?)
            AND drug_qty > 0
-         ORDER BY hn, visit_date ASC, id ASC`,
-        [cinnamonHns]
+         ORDER BY hn, drug_icode, visit_date ASC, id ASC`,
+        [candidateHns, candidateIcodes]
       )
       for (const h of historyRows) {
-        if (!cinnamonHistoryByHn.has(h.hn)) cinnamonHistoryByHn.set(h.hn, [])
-        cinnamonHistoryByHn.get(h.hn).push(h)
+        const key = `${h.hn}__${h.drug_icode}`
+        if (!historyByKey.has(key)) historyByKey.set(key, [])
+        historyByKey.get(key).push(h)
       }
     }
 
     const evaluated = rows.map((r) => {
-      const isCinnamon = r.drug_icode === '1490024' || (r.drug_name && r.drug_name.includes('ยาธาตุอบเชย'))
-      const pttype = String(r.pttype_name ?? '')
-      const isUc = pttype.includes('ประกันสุขภาพ') || pttype.includes('บัตรทอง') || pttype.toUpperCase().includes('UC') || String(r.pttype ?? '').startsWith('U')
+      let interval_fail = false
+      let interval_prev_date = null
+      let interval_days_diff = null
+      let interval_rule_info = null
 
-      let cinnamon_interval_fail = false
-      let cinnamon_prev_date = null
-      let cinnamon_days_diff = null
+      const matchedRule = activeDispensingRules.find((rule) => {
+        const isDrug =
+          (rule.drug_icode && String(r.drug_icode) === String(rule.drug_icode)) ||
+          (rule.drug_name && r.drug_name && r.drug_name.includes(rule.drug_name))
+        return isDrug && matchesPttype(r.pttype_name, r.pttype, rule.pttype_filter)
+      })
 
-      if (isCinnamon && isUc) {
-        const hist = cinnamonHistoryByHn.get(r.hn) || []
-        // หาครั้งก่อนหน้า (previous visit before this one)
+      if (matchedRule) {
+        const key = `${r.hn}__${matchedRule.drug_icode}`
+        const hist = historyByKey.get(key) || []
         const prevList = hist.filter((h) => {
           if (h.id === r.id) return false
           if (h.visit_date < r.visit_date) return true
@@ -505,20 +533,30 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
           const currD = new Date(r.visit_date + 'T00:00:00')
           const prevD = new Date(lastPrev.visit_date + 'T00:00:00')
           const diffDays = Math.round((currD.getTime() - prevD.getTime()) / (1000 * 60 * 60 * 24))
-          if (diffDays < 7) {
-            cinnamon_interval_fail = true
-            cinnamon_prev_date = lastPrev.visit_date
-            cinnamon_days_diff = diffDays
+          if (diffDays < matchedRule.min_interval_days) {
+            interval_fail = true
+            interval_prev_date = lastPrev.visit_date
+            interval_days_diff = diffDays
+            interval_rule_info = {
+              drug_name: matchedRule.drug_name,
+              pttype_label: matchedRule.pttype_name_label,
+              min_days: matchedRule.min_interval_days,
+            }
           }
         }
       }
 
+      const isCinnamon = r.drug_icode === '1490024' || (r.drug_name && r.drug_name.includes('ยาธาตุอบเชย'))
       const rowWithInfo = {
         ...r,
         drug_qty: Number(r.drug_qty),
-        cinnamon_interval_fail,
-        cinnamon_prev_date,
-        cinnamon_days_diff,
+        interval_fail,
+        interval_prev_date,
+        interval_days_diff,
+        interval_rule_info,
+        cinnamon_interval_fail: isCinnamon ? interval_fail : false,
+        cinnamon_prev_date: isCinnamon ? interval_prev_date : null,
+        cinnamon_days_diff: isCinnamon ? interval_days_diff : null,
       }
 
       return {
@@ -1193,6 +1231,46 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
     )
     activeHerbCacheAt = 0 // Invalidate herbal drugs cache so new drug shows up everywhere immediately
     res.json({ success: true, icode, drug_name: drugName, dx_prefixes: [...new Set(prefixes)].join(','), min_qty, indication })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+/* ---------------- Dispensing Interval & Benefit Rules ---------------- */
+app.get('/api/dispensing-rules', requireSession, async (_req, res) => {
+  try {
+    const rules = await getDispensingRules(dwPool, false)
+    res.json({ success: true, data: rules })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/dispensing-rules', requireHerbDxManager, async (req, res) => {
+  try {
+    const result = await saveDispensingRule(dwPool, req.body)
+    res.json(result)
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.put('/api/dispensing-rules/:id/toggle', requireHerbDxManager, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10)
+    const isActive = Boolean(req.body?.is_active)
+    const result = await toggleDispensingRule(dwPool, id, isActive)
+    res.json(result)
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.delete('/api/dispensing-rules/:id', requireHerbDxManager, async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10)
+    const result = await deleteDispensingRule(dwPool, id)
+    res.json(result)
   } catch (err) {
     fail(res, err)
   }
@@ -1954,6 +2032,7 @@ for (let attempt = 1; ; attempt++) {
   try {
     await initAuthTables(dwPool)
     await initSsoTables(dwPool)
+    await initDispensingRulesTable(dwPool)
     break
   } catch (err) {
     const delaySec = Math.min(5 * attempt, 30)

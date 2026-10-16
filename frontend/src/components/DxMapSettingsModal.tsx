@@ -8,7 +8,8 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock } from 'lucide-react'
+import { DispensingRulesTab } from '@/components/DispensingRulesTab'
 import { herbDxApi } from '@/api/herbdx.api'
 import { useAuth } from '@/context/AuthContext'
 import { useDxMap, useUpdateDxMap } from '@/hooks/useHerbDx'
@@ -51,6 +52,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const { data: dxMap = [], isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
+  const [activeTab, setActiveTab] = useState<'dxmap' | 'interval'>('dxmap')
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
   const [prefixes, setPrefixes] = useState('')
   const [minQty, setMinQty] = useState<number>(0)
@@ -417,8 +419,49 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
   return (
     <div className="space-y-4">
-      {/* Informational Banner with Hospital Gradient */}
-      <div className="rounded-2xl bg-themed-card border border-themed p-4 text-xs text-slate-600 dark:text-slate-200 flex items-start gap-3 shadow-xs">
+      {/* Tab Navigation */}
+      <div className="flex items-center gap-2 border-b border-slate-200 dark:border-[#292440] pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab('dxmap')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            activeTab === 'dxmap'
+              ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+          )}
+        >
+          <Info className="size-4" />
+          <span>เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-200 dark:bg-white/10 font-mono font-bold">
+            {dxMap.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('interval')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            activeTab === 'interval'
+              ? 'bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 border border-emerald-500/30 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+          )}
+        >
+          <Clock className="size-4 text-amber-500" />
+          <span>เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+            สปสช. / สิทธิ UC 7 วัน
+          </span>
+        </button>
+      </div>
+
+      {activeTab === 'interval' ? (
+        <DispensingRulesTab dxMap={dxMap} canEdit={canEdit} />
+      ) : (
+        <>
+          {/* Informational Banner with Hospital Gradient */}
+          <div className="rounded-2xl bg-themed-card border border-themed p-4 text-xs text-slate-600 dark:text-slate-200 flex items-start gap-3 shadow-xs">
         <div className="grid place-items-center size-8 rounded-xl bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
           <Info className="size-4.5" />
         </div>
@@ -945,6 +988,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             )}
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   )

@@ -10,6 +10,7 @@ import type {
   SyncResult,
   HealthMedRecord,
   HealthMedKpi,
+  DispensingRule,
 } from '@/types/herbdx.types'
 
 export class ApiError extends Error {
@@ -114,5 +115,25 @@ export const herbDxApi = {
     }>('/api/ai/chat', {
       method: 'POST',
       body: JSON.stringify({ message, history }),
+    }),
+
+  dispensingRules: () =>
+    request<{ success: true; data: readonly DispensingRule[] }>('/api/dispensing-rules'),
+
+  saveDispensingRule: (rule: Partial<DispensingRule>) =>
+    request<{ success: true; id: number }>('/api/dispensing-rules', {
+      method: 'POST',
+      body: JSON.stringify(rule),
+    }),
+
+  toggleDispensingRule: (id: number, isActive: boolean) =>
+    request<{ success: true }>(`/api/dispensing-rules/${id}/toggle`, {
+      method: 'PUT',
+      body: JSON.stringify({ is_active: isActive }),
+    }),
+
+  deleteDispensingRule: (id: number) =>
+    request<{ success: true }>(`/api/dispensing-rules/${id}`, {
+      method: 'DELETE',
     }),
 }
