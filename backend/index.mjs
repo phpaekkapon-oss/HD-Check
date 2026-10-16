@@ -1932,6 +1932,24 @@ const sniffImageMime = (buf) => {
   return null
 }
 
+// รูปโปรไฟล์ระหว่างยืนยัน 2FA: ผ่านรหัสผ่านแล้วแต่ยังไม่มี session จริง
+// ใช้ tempToken (ส่งใน body ไม่ใส่ใน URL) และได้เฉพาะรูปของบัญชีที่ล็อกอินเท่านั้น
+app.post('/api/auth/2fa/avatar', async (req, res) => {
+  try {
+    const tempSession = verifyTempSession(req.body?.tempToken)
+    if (!tempSession) return res.status(401).send('Unauthorized')
+    const avatar = await getUserAvatar(dwPool, tempSession.user.loginname)
+    const mime = avatar?.image_blob ? sniffImageMime(avatar.image_blob) : null
+    if (!mime) return res.status(404).send('Avatar not found')
+    res.setHeader('Content-Type', mime)
+    res.setHeader('Cache-Control', 'private, no-store')
+    res.send(avatar.image_blob)
+  } catch (err) {
+    console.error('[2FA AVATAR]', err?.message)
+    res.status(500).send('Error loading avatar')
+  }
+})
+
 app.get('/api/auth/avatar/:loginname', async (req, res) => {
   try {
     // Any signed-in session may load avatars (also while screen-locked); anonymous visitors may not

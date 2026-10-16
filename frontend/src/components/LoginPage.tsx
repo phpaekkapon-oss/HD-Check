@@ -51,7 +51,7 @@ export const LoginPage: FC = () => {
   const [otpCode, setOtpCode] = useState('')
   const [isBackupMode, setIsBackupMode] = useState(false)
   const [tempToken, setTempToken] = useState('')
-  const [tempUser, setTempUser] = useState<{ loginname: string; name: string; groupname: string } | null>(null)
+  const [tempUser, setTempUser] = useState<{ loginname: string; name: string; groupname: string; position?: string; entryposition?: string } | null>(null)
 
   // 2FA Setup state
   const [setupData, setSetupData] = useState<TotpSetupData | null>(null)
@@ -77,6 +77,36 @@ export const LoginPage: FC = () => {
   const setupSecondsLeft = setupData ? Math.max(0, Math.ceil((setupData.expiresAt - now) / 1000)) : 0
   const setupExpired = step === 'setup_2fa' && Boolean(setupData) && setupSecondsLeft === 0
   const otpComplete = isBackupMode ? otpCode.replace(/[^0-9A-Z]/g, '').length >= 8 : otpCode.length === 6
+
+  // รูปโปรไฟล์บนหน้ายืนยัน 2FA (ยืนยันสิทธิ์ด้วย tempToken ของขั้นรหัสผ่าน)
+  const [avatarSrc, setAvatarSrc] = useState<string | null>(null)
+  useEffect(() => {
+    if (!tempToken || (step !== 'verify_2fa' && step !== 'setup_2fa')) return
+    let objectUrl: string | null = null
+    let cancelled = false
+    fetch('/api/auth/2fa/avatar', {
+      method: 'POST',
+      credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tempToken }),
+    })
+      .then((res) => (res.ok ? res.blob() : null))
+      .then((blob) => {
+        if (!blob || cancelled) return
+        objectUrl = URL.createObjectURL(blob)
+        setAvatarSrc(objectUrl)
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+      setAvatarSrc(null)
+    }
+  }, [tempToken, step])
+
+  // ตัวอักษรย่อ: ตัดคำนำหน้าและสระหน้า (เ แ โ ใ ไ) เช่น "นายเอกพล" -> "อ"
+  const displayName = tempUser?.name || loginname
+  const initial = displayName.replace(/^(นางสาว|นาง|นาย|น\.ส\.|ดร\.|พญ\.|นพ\.|พท\.|ภก\.|ภญ\.)\s*/, '').replace(/^[เแโใไ]+/, '').trim().charAt(0) || '?'
 
   // ThaiD / Provider ID buttons (configured by admin; demo = preview only)
   const [ssoProviders, setSsoProviders] = useState<readonly SsoProviderButton[]>([])
@@ -475,12 +505,23 @@ export const LoginPage: FC = () => {
 
               {/* Signed-in account */}
               <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
-                <div className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">
-                  {(tempUser?.name || loginname || '?').replace(/^(นาย|นางสาว|นาง|น\.ส\.)/, '').trim().charAt(0)}
-                </div>
+                {avatarSrc ? (
+                  <img
+                    src={avatarSrc}
+                    alt={`รูปโปรไฟล์ ${displayName}`}
+                    className="size-11 shrink-0 rounded-full object-cover ring-2 ring-white/15"
+                  />
+                ) : (
+                  <div className="grid size-11 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-base font-bold text-white ring-2 ring-white/15">
+                    {initial}
+                  </div>
+                )}
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-semibold text-white">{tempUser?.name || loginname}</div>
-                  <div className="truncate text-xs text-slate-400">
+                  <div className="truncate text-sm font-semibold text-white">{displayName}</div>
+                  {(tempUser?.position || tempUser?.entryposition) && (
+                    <div className="truncate text-xs text-slate-300">{tempUser?.position || tempUser?.entryposition}</div>
+                  )}
+                  <div className="truncate font-mono text-[11px] text-slate-500">
                     {tempUser?.loginname || loginname}
                     {tempUser?.groupname ? ` · ${tempUser.groupname}` : ''}
                   </div>
