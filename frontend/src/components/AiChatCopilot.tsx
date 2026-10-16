@@ -201,32 +201,38 @@ export const AiChatCopilot: FC = () => {
 
   return (
     <>
-      {/* Floating Action Button (Launcher): Compact Circular Design matching professional standards */}
-      <div className="fixed right-3.5 sm:right-5 lg:right-6 bottom-[calc(4.5rem+env(safe-area-inset-bottom,0px))] lg:bottom-12 z-40 select-none">
+      {/* Floating Action Button (Launcher): 3D Living & Floating Design */}
+      <div className="fixed right-3.5 sm:right-5 lg:right-6 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-14 z-40 select-none">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
           aria-label={isOpen ? 'ปิดผู้ช่วย AI Chat' : 'เปิดผู้ช่วย AI Chat'}
           className={cn(
-            'group relative flex items-center justify-center size-10 sm:size-11 rounded-full text-white shadow-lg shadow-violet-500/25 ring-2 ring-white/30 backdrop-blur-md transition-all duration-300 cursor-pointer active:scale-95 touch-manipulation',
-            'bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 hover:shadow-xl hover:shadow-violet-500/40',
-            isOpen ? 'ring-violet-400 rotate-90 scale-95' : 'hover:scale-105'
+            'group relative flex items-center justify-center size-10 sm:size-11 rounded-full text-white shadow-xl backdrop-blur-md transition-all duration-300 cursor-pointer active:scale-95 touch-manipulation',
+            'bg-gradient-to-br from-violet-500 via-indigo-600 to-purple-700 hover:from-violet-400 hover:to-purple-600',
+            'border-t border-white/40 ring-1 ring-violet-400/40 shadow-[0_8px_20px_-3px_rgba(124,58,237,0.5),0_4px_8px_-2px_rgba(0,0,0,0.3)]',
+            isOpen ? 'ring-violet-400 rotate-90 scale-95 shadow-md' : 'animate-fab-float hover:scale-110'
           )}
         >
+          {/* Ambient 3D Glowing Aura */}
+          {!isOpen && (
+            <div className="absolute inset-0 rounded-full bg-violet-600/35 blur-md -z-10 animate-pulse-ring pointer-events-none" />
+          )}
+
           {isOpen ? (
             <X className="size-5 transition-transform" />
           ) : (
-            <div className="relative flex items-center justify-center">
-              <Bot className="size-5 transition-transform group-hover:rotate-12" />
-              <span className="absolute -top-1 -right-1 size-2 rounded-full bg-emerald-400 ring-2 ring-violet-700 animate-pulse" />
+            <div className="relative flex items-center justify-center animate-bot-bob">
+              <Bot className="size-5 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.4)]" />
+              <span className="absolute -top-1 -right-1 size-2.5 rounded-full bg-emerald-400 ring-2 ring-violet-800 shadow-sm animate-pulse" />
             </div>
           )}
 
           {/* Desktop Tooltip Tag (floats on the left, does not block clicks) */}
           {!isOpen && (
-            <div className="absolute right-full mr-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/90 dark:bg-black/85 text-white text-xs font-semibold whitespace-nowrap shadow-md pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 border border-white/10 backdrop-blur-xs">
-              <Sparkles className="size-3 text-amber-300" />
-              <span>ผู้ช่วย AI Copilot</span>
+            <div className="absolute right-full mr-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/95 dark:bg-black/90 text-white text-xs font-semibold whitespace-nowrap shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 border border-white/10 backdrop-blur-xs">
+              <Sparkles className="size-3 text-amber-300 animate-spin" style={{ animationDuration: '4s' }} />
+              <span>ผู้ช่วย AI Copilot (Online)</span>
             </div>
           )}
         </button>

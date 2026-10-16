@@ -394,3 +394,48 @@ select {
 .dark .chat-scrollbar::-webkit-scrollbar-thumb:hover {
   background: #9333ea;
 }
+
+/* 3D Living Floating Animation for Floating Action Buttons */
+@keyframes fab-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-5px) rotate(0.5deg);
+  }
+}
+
+@keyframes bot-bob {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-5deg) scale(1.06);
+  }
+  75% {
+    transform: rotate(5deg) scale(1.06);
+  }
+}
+
+@keyframes fab-pulse-ring {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 0.4;
+  }
+  50% {
+    transform: scale(1.25);
+    opacity: 0.8;
+  }
+}
+
+.animate-fab-float {
+  animation: fab-float 3.5s ease-in-out infinite;
+}
+
+.animate-bot-bob {
+  animation: bot-bob 3.8s ease-in-out infinite;
+}
+
+.animate-pulse-ring {
+  animation: fab-pulse-ring 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

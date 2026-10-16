@@ -172,20 +172,20 @@ export const AppLayout: FC<AppLayoutProps> = ({
         </button>
       </nav>
 
-      {/* Back-to-top: Perfectly stacked above the AI Chat Copilot button */}
+      {/* Back-to-top: Perfectly stacked above the AI Chat Copilot button with 3D response */}
       <button
         type="button"
         onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
         aria-label="เลื่อนขึ้นบนสุด"
         title="เลื่อนขึ้นบนสุด"
         className={cn(
-          'fixed right-3.5 sm:right-5 lg:right-6 z-30 size-10 sm:size-11 grid place-items-center rounded-full text-white shadow-lg shadow-black/25 ring-1 ring-white/20 backdrop-blur-md transition-all duration-200 cursor-pointer active:scale-95',
-          'bg-slate-800/90 hover:bg-slate-700/90 dark:bg-slate-800/90 dark:hover:bg-slate-700/90 border border-white/10',
-          'bottom-[calc(7.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-[6.5rem]',
-          showScrollTop && !mobileMenuOpen && !moreOpen ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-3 pointer-events-none'
+          'fixed right-3.5 sm:right-5 lg:right-6 z-30 size-10 sm:size-11 grid place-items-center rounded-full text-white shadow-xl backdrop-blur-md transition-all duration-300 cursor-pointer active:scale-95',
+          'bg-gradient-to-b from-slate-700/90 to-slate-900/95 hover:from-slate-600 hover:to-slate-800 border-t border-white/30 ring-1 ring-white/10 shadow-[0_6px_16px_-2px_rgba(0,0,0,0.4)]',
+          'bottom-[calc(8rem+env(safe-area-inset-bottom,0px))] lg:bottom-[7rem]',
+          showScrollTop && !mobileMenuOpen && !moreOpen ? 'opacity-100 translate-y-0 hover:-translate-y-1 hover:scale-105' : 'opacity-0 translate-y-3 pointer-events-none'
         )}
       >
-        <ArrowUp className="size-4.5 sm:size-5" />
+        <ArrowUp className="size-4.5 sm:size-5 drop-shadow-[0_1px_2px_rgba(0,0,0,0.5)]" />
       </button>
 
       {/* Hospital System Desktop Bottom Status Bar */}
