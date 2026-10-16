@@ -94,16 +94,31 @@ function analyzeGitChanges() {
   let detectedTitle = ''
 
   try {
+    // 1. ตรวจสอบไฟล์ที่ยังไม่ได้ commit
     const statusOutput = execSync('git status --porcelain', { cwd: rootDir, encoding: 'utf8' })
-    const changedFiles = statusOutput
+    const uncommittedFiles = statusOutput
       .split('\n')
       .map((line) => line.trim().slice(3))
       .filter(Boolean)
 
+    // 2. ตรวจสอบไฟล์ที่มีการ commit ตั้งแต่ tag ล่าสุด
+    let committedFiles = []
+    try {
+      const latestTag = execSync('git describe --tags --abbrev=0', { cwd: rootDir, encoding: 'utf8' }).trim()
+      const diffOutput = execSync(`git diff ${latestTag}..HEAD --name-only`, { cwd: rootDir, encoding: 'utf8' })
+      committedFiles = diffOutput.split('\n').map((l) => l.trim()).filter(Boolean)
+    } catch {
+      // no tags
+    }
+
+    const allChangedFiles = Array.from(new Set([...uncommittedFiles, ...committedFiles]))
     const categories = new Set()
 
-    for (const f of changedFiles) {
-      if (f.includes('AuditFilterBar')) {
+    for (const f of allChangedFiles) {
+      if (f.includes('HealthMed') || f.includes('healthmed') || f.includes('audit-rules')) {
+        detectedHighlights.push('ปรับปรุงระบบตรวจสอบรหัสหัตถการแพทย์แผนไทยและเกณฑ์ประเมิน (HealthMed Audit Engine)')
+        categories.add('HealthMed')
+      } else if (f.includes('AuditFilterBar')) {
         detectedHighlights.push('ปรับปรุงการจัดวางและการทำงานของแถบตัวกรองการตรวจสอบ (Audit Filter Bar Layout)')
         categories.add('FilterBar')
       } else if (f.includes('DrugSummaryView')) {
@@ -130,7 +145,9 @@ function analyzeGitChanges() {
       }
     }
 
-    if (categories.has('FilterBar') || categories.has('DrugSummary')) {
+    if (categories.has('HealthMed')) {
+      detectedTitle = 'อัปเดตระบบตรวจหัตถการแพทย์แผนไทย (HealthMed Audit Engine)'
+    } else if (categories.has('FilterBar') || categories.has('DrugSummary')) {
       detectedTitle = 'ปรับปรุงส่วนติดต่อผู้ใช้ (UI/UX) และระบบตัวกรองข้อมูล'
     } else if (categories.has('VersionSystem')) {
       detectedTitle = 'เพิ่มระบบแจ้งเตือนเวอร์ชันใหม่และบันทึกการอัปเดตอัตโนมัติ'
@@ -269,8 +286,36 @@ async function main() {
   const currentVersion = rootPkgData.version || '1.0.0'
   console.log(`[*] เวอร์ชันปัจจุบันในระบบ: v${currentVersion}`)
 
-  // Parse arguments or prompt
+  // ตรวจสอบการแก้ไขโค้ดจริง (ป้องกันการสร้างเวอร์ชันใหม่ซ้ำซ้อนเมื่อไม่มีการแก้โค้ด)
+  let hasGitChanges = false
+  try {
+    const statusOutput = execSync('git status --porcelain', { cwd: rootDir, encoding: 'utf8' }).trim()
+    let commitsSinceTag = 0
+    try {
+      const latestTag = execSync('git describe --tags --abbrev=0', { cwd: rootDir, encoding: 'utf8' }).trim()
+      commitsSinceTag = parseInt(execSync(`git rev-list ${latestTag}..HEAD --count`, { cwd: rootDir, encoding: 'utf8' }).trim(), 10) || 0
+    } catch {
+      commitsSinceTag = 1
+    }
+    hasGitChanges = statusOutput.length > 0 || commitsSinceTag > 0
+  } catch {
+    hasGitChanges = true
+  }
+
   const args = process.argv.slice(2)
+  const isForce = args.includes('--force') || args.includes('-f')
+  if (!hasGitChanges && !isForce) {
+    console.log('\n====================================================================')
+    console.log('  ⚠️  [แจ้งเตือน] ไม่พบการแก้ไขโค้ดใหม่ (No Code Changes Detected)')
+    console.log('====================================================================')
+    console.log(`  - โค้ดปัจจุบันตรงกับเวอร์ชันล่าสุด v${currentVersion} อยู่แล้ว`)
+    console.log('  - ไม่มีไฟล์ที่ถูกแก้ไข และไม่มี Commit ใหม่')
+    console.log('  - ระบบจะระงับการสร้างเวอร์ชันใหม่โดยอัตโนมัติ เพื่อป้องกันการเพิ่มเลขเวอร์ชันและ Changelog ซ้ำซ้อน')
+    console.log('  - (หากต้องการ Release ซ้ำ ให้ระบุ flag --force)\n')
+    process.exit(0)
+  }
+
+  // Parse arguments or prompt
   let bumpType = 'patch'
   let newVersion = ''
   let releaseTitle = ''
