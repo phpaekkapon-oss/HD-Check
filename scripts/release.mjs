@@ -322,12 +322,13 @@ async function main() {
   let releaseTitle = ''
   let highlightsInput = ''
   let isAuto = false
+  const isYes = args.includes('--yes') || args.includes('-y')
 
   for (const arg of args) {
     if (arg === '--patch') bumpType = 'patch'
     else if (arg === '--minor') bumpType = 'minor'
     else if (arg === '--major') bumpType = 'major'
-    else if (arg === '--auto' || arg === '--yes' || arg === '-y') isAuto = true
+    else if (arg === '--auto') isAuto = true
     else if (arg.startsWith('--version=')) newVersion = arg.split('=')[1]
     else if (arg.startsWith('--title=')) releaseTitle = arg.split('=')[1]
     else if (arg.startsWith('--highlights=')) highlightsInput = arg.split('=')[1]
@@ -383,10 +384,11 @@ async function main() {
   console.log(`  - ไฮไลท์: ${highlights.length} รายการ`)
   highlights.forEach((h, i) => console.log(`     ${i + 1}. ${h}`))
 
-  if (!isAuto) {
-    const confirm = await ask('ยืนยันการเริ่ม Release อัตโนมัติ? (y/n)', 'y')
+  if (!isYes) {
+    console.log('\n[คำเตือน] คุณกำลังจะทำการสร้างเวอร์ชันใหม่ อัปเดต Changelog และ Deploy ขึ้นสู่ระบบ')
+    const confirm = await ask('ยืนยันการเริ่ม Release & Deploy หรือไม่? พิมพ์ Y เพื่อยืนยัน (Y/N)', 'y')
     if (confirm.toLowerCase() !== 'y') {
-      console.log('[*] ยกเลิกการทำงาน')
+      console.log('\n[*] ยกเลิกเรียบร้อย - ระบบจะไม่เปลี่ยนเวอร์ชันและไม่มีการแก้ไขใดๆ\n')
       process.exit(0)
     }
   }
