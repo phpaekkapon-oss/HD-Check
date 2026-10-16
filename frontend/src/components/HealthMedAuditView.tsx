@@ -47,7 +47,7 @@ interface HealthMedAuditViewProps {
   readonly range: DateRange
 }
 
-type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'DUPLICATE' | 'KNEE' | 'POSTPARTUM' | 'EP'
+type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'DUPLICATE' | 'KNEE' | 'MUSCLE' | 'POSTPARTUM' | 'EP'
 
 export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
   const [kpiFilter, setKpiFilter] = useState<KpiFilterType>('ALL')
@@ -74,6 +74,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
       if (kpiFilter === 'DUPLICATE' && !r.failures?.some((f) => f.includes('ซ้ำ'))) return false
       if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า') || f.includes('พอกเข่า'))) return false
+      if (kpiFilter === 'MUSCLE' && !r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))) return false
       if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) return false
       if (kpiFilter === 'EP' && !r.failures?.some((f) => f.includes('EP'))) return false
 
@@ -486,6 +487,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       hoverBorder: 'hover:border-cyan-400/60 dark:hover:border-cyan-500/40',
     },
     {
+      id: 'MUSCLE' as const,
+      label: 'โรคกล้ามเนื้อ',
+      value: kpi?.muscleFail ?? 0,
+      sub: (kpi?.muscleFail ?? 0) > 0 ? 'รหัส M/หัตถการไม่ครบ' : '✓ ปกติ ครบหัตถการ',
+      icon: Activity,
+      iconBg: 'bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300 border border-violet-500/30',
+      valueColor: (kpi?.muscleFail ?? 0) > 0 ? 'text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.muscleFail ?? 0) > 0 ? 'text-violet-700/80 dark:text-violet-400/80' : 'text-slate-400 dark:text-slate-500',
+      activeBorder: 'border-violet-500 dark:border-violet-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(139,92,246,0.3)]',
+      activeBg: 'bg-violet-500/[0.06] dark:bg-violet-950/40',
+      hoverBorder: 'hover:border-violet-400/60 dark:hover:border-violet-500/40',
+    },
+    {
       id: 'POSTPARTUM' as const,
       label: 'บริบาลหลังคลอด',
       value: kpi?.postpartumFail ?? 0,
@@ -539,7 +554,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         </div>
 
         {/* Interactive KPI Cards Grid - Seamless Executive Cards */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10">
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mt-4 pt-4 border-t border-slate-200/80 dark:border-white/10">
           {kpiCards.map((card) => {
             const isSelected = kpiFilter === card.id
             const Icon = card.icon
@@ -613,6 +628,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 kpiFilter === 'FAIL' && 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200',
                 kpiFilter === 'DUPLICATE' && 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200',
                 kpiFilter === 'KNEE' && 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-500/30 text-cyan-800 dark:text-cyan-200',
+                kpiFilter === 'MUSCLE' && 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-500/30 text-violet-800 dark:text-violet-200',
                 kpiFilter === 'POSTPARTUM' && 'bg-fuchsia-50 dark:bg-fuchsia-950/40 border-fuchsia-200 dark:border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200',
                 kpiFilter === 'EP' && 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
               )}
@@ -624,6 +640,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
                 {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
                 {kpiFilter === 'KNEE' && 'ข้อเข่า / พอกเข่า (M179+U5753)'}
+                {kpiFilter === 'MUSCLE' && 'โรคกล้ามเนื้อ (รหัส M... + U...)'}
                 {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด (M6260+U506)'}
                 {kpiFilter === 'EP' && 'ติดรหัสปิดสิทธิ (EP)'}
               </strong>

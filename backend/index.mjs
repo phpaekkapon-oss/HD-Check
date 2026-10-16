@@ -577,6 +577,7 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       duplicateFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('ซ้ำ'))).length,
       kneeFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length,
       postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))).length,
+      muscleFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))).length,
       epFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('EP'))).length,
     }
     kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0

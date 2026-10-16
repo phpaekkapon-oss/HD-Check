@@ -211,6 +211,7 @@ export interface HealthMedKpi {
   readonly duplicateFail: number
   readonly kneeFail: number
   readonly postpartumFail: number
+  readonly muscleFail?: number
   readonly epFail: number
 }
 
