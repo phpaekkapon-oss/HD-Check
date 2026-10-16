@@ -34,3 +34,6 @@ release/
 *.njsproj
 *.sln
 *.sw?
+
+# Claude Code local settings (dev preview config)
+.claude/
