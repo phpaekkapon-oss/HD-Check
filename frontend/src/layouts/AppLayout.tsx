@@ -94,7 +94,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           />
 
           {/* Main Content Area (Adaptive Padding: Mobile, Tablet, Desktop) */}
-          <main className={cn('flex-1 p-3.5 sm:p-4.5 md:p-5 lg:p-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-6 space-y-4 w-full mx-auto', collapsed ? 'max-w-none' : 'max-w-[1600px]')}>
+          <main className={cn('flex-1 p-3.5 sm:p-4.5 md:p-5 lg:p-6 pb-[calc(6rem+env(safe-area-inset-bottom,0px))] lg:pb-14 space-y-4 w-full mx-auto', collapsed ? 'max-w-none' : 'max-w-[1600px]')}>
             {children}
           </main>
         </div>
@@ -189,7 +189,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
       </button>
 
       {/* Hospital System Desktop Bottom Status Bar */}
-      <footer className="hidden lg:flex sticky bottom-0 z-30 h-9 bg-themed-card border-t border-themed px-4 text-[11px] text-slate-600 dark:text-slate-300 items-center justify-between gap-3 whitespace-nowrap overflow-hidden select-none">
+      <footer className="hidden lg:flex fixed bottom-0 inset-x-0 z-30 h-9 bg-themed-card border-t border-themed px-4 text-[11px] text-slate-600 dark:text-slate-300 items-center justify-between gap-3 whitespace-nowrap overflow-hidden select-none">
         <div className="flex items-center gap-3 min-w-0 overflow-hidden">
           <span>
             HOSxP Database :{' '}
