@@ -508,18 +508,27 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       })
     }
 
-    // 3. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) สำหรับผู้ป่วยในกลุ่มนี้
-    const hns = [...new Set(rows.map((r) => r.hn).filter(Boolean))]
+    // 3. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) เฉพาะผู้ป่วยที่เป็นเคสบริบาลหลังคลอด
+    const postpartumRows = rows.filter((r) => {
+      const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]
+      const ops = opsByVn.get(r.vn) || []
+      const hasU506 = dxs.includes('U506')
+      const hasPostpartumOp = ops.some((o) => String(o.code).startsWith('900-77'))
+      const hasPostpartumService = Number(r.count_58220 ?? 0) > 0 || Number(r.count_58131 ?? 0) > 0
+      return hasU506 || hasPostpartumOp || hasPostpartumService
+    })
+
+    const postpartumHns = [...new Set(postpartumRows.map((r) => r.hn).filter(Boolean))]
     const laborDateByHn = new Map()
-    if (hns.length > 0) {
+    if (postpartumHns.length > 0) {
       const [ancRows] = await hosPool.query(`
         SELECT p.patient_hn, MAX(pa.labor_date) AS labor_date
         FROM person p
         JOIN person_anc pa ON pa.person_id = p.person_id
-        WHERE p.patient_hn IN (${hns.map(() => '?').join(',')})
+        WHERE p.patient_hn IN (${postpartumHns.map(() => '?').join(',')})
           AND pa.labor_date IS NOT NULL
         GROUP BY p.patient_hn
-      `, hns)
+      `, postpartumHns)
       for (const r of ancRows) {
         laborDateByHn.set(r.patient_hn, r.labor_date)
       }
@@ -529,7 +538,13 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     const evaluated = rows.map((r) => {
       const operations = opsByVn.get(r.vn) || []
       const operation_codes = operations.map((o) => o.code).filter(Boolean)
-      const labor_date = laborDateByHn.get(r.hn) || null
+      const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]
+      const isPostpartumCase =
+        dxs.includes('U506') ||
+        operations.some((o) => String(o.code).startsWith('900-77')) ||
+        Number(r.count_58220 ?? 0) > 0 ||
+        Number(r.count_58131 ?? 0) > 0
+      const labor_date = isPostpartumCase ? (laborDateByHn.get(r.hn) || null) : null
       const fullRow = {
         ...r,
         operations,

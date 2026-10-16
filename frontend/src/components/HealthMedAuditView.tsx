@@ -203,7 +203,12 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const items = raw.split('||').filter(Boolean)
           const operations = row.original.operations ?? []
           const laborDate = row.original.labor_date
-          const isPostpartum = row.original.pdx === 'M6260' && (row.original.dx0 === 'U506' || row.original.dx1 === 'U506')
+          const dxs = [row.original.pdx, row.original.dx0, row.original.dx1, row.original.dx2, row.original.dx3, row.original.dx4, row.original.dx5].filter(Boolean)
+          const isPostpartum =
+            dxs.includes('U506') ||
+            (row.original.count_58220 > 0) ||
+            (row.original.count_58131 > 0) ||
+            operations.some((o) => o.code?.startsWith('900-77'))
 
           const parsed = items.map((s) => {
             const [code, name, qty, price] = s.split(':')
@@ -263,18 +268,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 </div>
               )}
 
-              {/* วันคลอดในระบบงานบัญชี 2 */}
-              {laborDate ? (
-                <div className="text-[10px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold pt-0.5">
-                  <Baby className="size-3 shrink-0" />
-                  <span>วันคลอด: {laborDate}</span>
-                </div>
-              ) : isPostpartum ? (
-                <div className="text-[10px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold pt-0.5">
-                  <AlertTriangle className="size-3 shrink-0" />
-                  <span>ไม่มีวันคลอดในบัญชี 2</span>
-                </div>
-              ) : null}
+              {/* วันคลอดในระบบงานบัญชี 2 (แสดงเฉพาะกรณีบริบาลหญิงหลังคลอดเท่านั้น) */}
+              {isPostpartum && (
+                laborDate ? (
+                  <div className="text-[10px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold pt-0.5">
+                    <Baby className="size-3 shrink-0" />
+                    <span>วันคลอด: {laborDate}</span>
+                  </div>
+                ) : (
+                  <div className="text-[10px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold pt-0.5">
+                    <AlertTriangle className="size-3 shrink-0" />
+                    <span>ไม่มีวันคลอดในบัญชี 2</span>
+                  </div>
+                )
+              )}
 
               {thaiMedItems.length === 0 && operations.length === 0 && (
                 <div className="text-[11px] text-slate-400 italic">
@@ -880,26 +887,37 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               </div>
             </div>
 
-            {/* Labor Date Section (Account 2) */}
-            {(selectedRecord.pdx === 'M6260' || selectedRecord.dx0 === 'U506' || selectedRecord.labor_date) && (
-              <div className="space-y-1.5">
-                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                  <Baby className="size-3.5 text-fuchsia-500" /> ข้อมูลการคลอดบุตร (ระบบงานบัญชี 2: หญิงตั้งครรภ์และหลังคลอด)
-                </h4>
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5 flex items-center justify-between text-xs">
-                  <span className="text-slate-600 dark:text-slate-300">วันคลอดที่บันทึกในระบบงานบัญชี 2:</span>
-                  {selectedRecord.labor_date ? (
-                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
-                      ✓ {selectedRecord.labor_date}
-                    </span>
-                  ) : (
-                    <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/30">
-                      ⚠️ ไม่พบวันคลอดในระบบงานบัญชี 2
-                    </span>
-                  )}
+            {/* Labor Date Section (Account 2) - เฉพาะเคสบริบาลหญิงหลังคลอด */}
+            {(() => {
+              const modalDxs = [selectedRecord.pdx, selectedRecord.dx0, selectedRecord.dx1, selectedRecord.dx2, selectedRecord.dx3, selectedRecord.dx4, selectedRecord.dx5].filter(Boolean)
+              const isPostpartumModal =
+                modalDxs.includes('U506') ||
+                (selectedRecord.count_58220 > 0) ||
+                (selectedRecord.count_58131 > 0) ||
+                (selectedRecord.operations ?? []).some((o) => o.code?.startsWith('900-77'))
+
+              if (!isPostpartumModal) return null
+
+              return (
+                <div className="space-y-1.5">
+                  <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                    <Baby className="size-3.5 text-fuchsia-500" /> ข้อมูลการคลอดบุตร (ระบบงานบัญชี 2: หญิงตั้งครรภ์และหลังคลอด)
+                  </h4>
+                  <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5 flex items-center justify-between text-xs">
+                    <span className="text-slate-600 dark:text-slate-300">วันคลอดที่บันทึกในระบบงานบัญชี 2:</span>
+                    {selectedRecord.labor_date ? (
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
+                        ✓ {selectedRecord.labor_date}
+                      </span>
+                    ) : (
+                      <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/30">
+                        ⚠️ ไม่พบวันคลอดในระบบงานบัญชี 2
+                      </span>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )
+            })()}
 
             {/* Modal Footer */}
             <div className="pt-2 flex justify-end border-t border-slate-200 dark:border-white/10">
