@@ -13,6 +13,7 @@ import {
 } from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
 import { analyzeHerbRecord } from './herb-advice.mjs'
+import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
 import {
   initDispensingRulesTable,
   getDispensingRules,
@@ -1003,6 +1004,22 @@ app.post('/api/healthmed/ai-advisor', requireSession, async (req, res) => {
   }
 })
 
+// ฐานความรู้ Copilot: เกณฑ์ยา↔ICD, รอบการจ่าย, เกณฑ์ค่าบริการซ้ำ และชื่อหัตถการจาก HOSxP (cache 60 วินาที)
+let copilotKbCache = { at: 0, kb: null }
+async function loadCopilotKb() {
+  if (copilotKbCache.kb && Date.now() - copilotKbCache.at < 60_000) return copilotKbCache.kb
+  const [dxMapRows] = await dwPool.query('SELECT icode, drug_name, dx_prefixes, min_qty, indication FROM dw_hd_check_drug_dx_map')
+  const dispensingRules = await getDispensingRules(dwPool, true).catch(() => [])
+  const duplicateRules = await getDuplicateRules(dwPool)
+  const opRows = await hosPool
+    .query('SELECT icd10tm AS code, health_med_operation_item_name AS name FROM health_med_operation_item WHERE icd10tm IN (?)', [COPILOT_OP_CODES])
+    .then(([rows]) => rows)
+    .catch(() => [])
+  const kb = buildCopilotKb({ dxMapRows, dispensingRules, duplicateRules, opRows })
+  copilotKbCache = { at: Date.now(), kb }
+  return kb
+}
+
 // General AI Smart Copilot Chat Endpoint
 app.post('/api/ai/chat', requireSession, async (req, res) => {
   try {
@@ -1014,67 +1031,8 @@ app.post('/api/ai/chat', requireSession, async (req, res) => {
     const geminiKey = process.env.GEMINI_API_KEY
     const query = message.trim()
 
-    // Smart Offline Knowledge Base Fallback
-    const getOfflineAnswer = (q) => {
-      const lower = q.toLowerCase()
-      if (lower.includes('พอกเข่า') || lower.includes('m179') || lower.includes('u5753')) {
-        return `### 🌿 เกณฑ์การเบิกชดเชยหัตถการพอกเข่า (สปสช.)
-1. **เกณฑ์อายุ**: ผู้ป่วยต้องมีอายุตั้งแต่ **40 ปีบริบูรณ์ขึ้นไป**
-2. **รหัสการวินิจฉัย (ICD-10)**:
-   - รหัสโรคหลัก (PDX/DX): **M179** (Gonarthrosis, unspecified) คู่กับ **U5753** (โรคลมจับโปงแห้งเข่า)
-3. **รหัสหัตถการ ICD-10-TM** (ต้องลงให้ครบ 4 รหัส):
-   - **872-78-11** (การตรวจร่างกายทางแพทย์แผนไทย)
-   - **873-78-11** (การวินิจฉัยทางแพทย์แผนไทย)
-   - **874-78-11** (การวางแผนการรักษา)
-   - **873-78-35** (การรักษาด้วยการพอกยา/พอกเข่า)
-4. **ข้อควรระวัง**: ห้ามลงรหัสปิดสิทธิ (EP) และต้องมีบันทึกประเมินอาการก่อน-หลังการรักษาใน HOSxP`
-      }
-      if (lower.includes('หลังคลอด') || lower.includes('u506') || lower.includes('m6260')) {
-        return `### 🤱 เกณฑ์การบริบาลหญิงหลังคลอด (สปสช.)
-1. **เงื่อนไขเวลา**: ต้องเป็นหญิงหลังคลอดบุตรในช่วงระยะเวลาที่กำหนด (บันทึกในระบบงานบัญชี 2 มีวันคลอดเชื่อมโยง)
-2. **รหัสโรค**: **M6260** หรือกลุ่มโรคหลังคลอด ร่วมกับ **U506** (การดูแลมารดาหลังคลอด)
-3. **รหัสหัตถการ ICD-10-TM (5 รหัส)**:
-   - **900-77-12** (การประคบสมุนไพร)
-   - **900-77-13** (การนวดฟื้นฟูสภาพ)
-   - **900-77-14** (การทับหม้อเกลือ)
-   - **900-77-16** (การอบไอน้ำสมุนไพร)
-   - **900-77-30** (การให้คำแนะนำการปฏิบัติตัว)
-4. **ข้อควรระวัง**: ตรวจสอบวันคลอดบุตรในระบบงานบัญชี 2 ให้ตรงกับข้อเท็จจริง`
-      }
-      if (lower.includes('ep') || lower.includes('ปิดสิทธิ')) {
-        return `### ⚠️ รหัสปิดสิทธิ (EP) คืออะไร และแก้ไขอย่างไร?
-- **รหัส EP...** คือรหัสที่ใช้ปิดสิทธิการเบิกจ่าย หรือระบุเงื่อนไขพิเศษที่ไม่สามารถเบิกเงินชดเชยจากกองทุน สปสช. (UC) ได้
-- **สาเหตุที่ติด Denial**: หากผู้ป่วยเป็นสิทธิบัตรทอง (UC) แล้วมีรหัส EP แนบมา e-Claim จะปฏิเสธการจ่ายทันที
-- **วิธีแก้ไขใน HOSxP**:
-  1. เปิดหน้าจอลงทะเบียน/บันทึกการตรวจผู้ป่วยนอก
-  2. ตรวจสอบแท็บการเลือกสิทธิการรักษา
-  3. นำรหัสปิดสิทธิ EP ที่ไม่ถูกต้องออก หรือเลือกสิทธิให้ตรงกับกองทุนที่ต้องการเบิก`
-      }
-      if (lower.includes('34 รายการ') || lower.includes('สมุนไพร') || lower.includes('ยา')) {
-        return `### 💊 ยาสมุนไพร 34 รายการในระบบหลักประกันสุขภาพ
-- รายการยาสมุนไพรที่ สปสช. สนับสนุนงบประมาณเพิ่มเติม เช่น ขมิ้นชัน, ฟ้าทะลายโจร, ไพล, เถาวัลย์เปรียง, มะขามป้อม, ยาหอมนวโกฐ, ธาตุบรรจบ ฯลฯ
-- **การบันทึกใน HOSxP**:
-  1. สั่งยาผ่านหน้าจอห้องตรวจแพทย์/ห้องยาตามรหัส icode ที่กำหนด
-  2. ตรวจสอบการ Map รหัสยามาตรฐาน 24 หลัก (TMT)
-  3. ตรวจสอบรายการในเมนู **"ตรวจสอบการสั่งยา"** ของระบบ SMART-HOSCHECK เพื่อเช็คความครบถ้วน`
-      }
-      if (lower.includes('เอกพล') || lower.includes('ติดต่อ') || lower.includes('it') || lower.includes('257')) {
-        return `### 📞 ช่องทางติดต่อผู้พัฒนาระบบ SMART-HOSCHECK
-- **ผู้พัฒนา**: นายเอกพล อันคำวงศ์ (นักวิชาการคอมพิวเตอร์ปฏิบัติการ)
-- **กลุ่มงาน**: สุขภาพดิจิทัล (งานเทคโนโลยีสารสนเทศ) โรงพยาบาลพังโคน
-- **โทรศัพท์ภายใน**: ต่อ **257**
-- ยินดีช่วยเหลือและรับข้อเสนอแนะในการพัฒนาระบบครับ!`
-      }
-      return `สวัสดีครับ! ผมคือ **AI Smart Copilot** ผู้ช่วยอัจฉริยะประจำระบบ SMART-HOSCHECK โรงพยาบาลพังโคน 
-
-ผมสามารถช่วยท่านในเรื่อง:
-- 🌿 **เกณฑ์การเบิกจ่ายแพทย์แผนไทย สปสช.**: พอกเข่า (M179), บริบาลหญิงหลังคลอด (U506), นวด/ประคบ
-- 💻 **การลงบันทึกใน HOSxP**: การลงรหัสหัตถการ ICD-10-TM, รหัสโรค และการแก้ไขรหัสปิดสิทธิ (EP)
-- 💊 **การตรวจสอบยาสมุนไพร 34 รายการ**
-- 📊 **แนวทางการแก้ไขเวชระเบียนที่ไม่ผ่านเกณฑ์ Audit**
-
-💡 *ท่านสามารถพิมพ์ถามคำถาม เช่น "เกณฑ์พอกเข่าต้องอายุเท่าไหร่" หรือ "รหัส EP แก้อย่างไร" ได้เลยครับ*`
-    }
+    // ฐานความรู้จากเกณฑ์จริงในระบบ (ใช้ทั้งเป็นบริบทให้ AI และตอบแบบ offline)
+    const kb = await loadCopilotKb()
 
     let replyText = null
     let modelUsed = null
@@ -1087,13 +1045,15 @@ app.post('/api/ai/chat', requireSession, async (req, res) => {
         'gemini-flash-latest',
       ].filter(Boolean)
 
-      const systemInstruction = `คุณคือ AI Smart Copilot ผู้ช่วยผู้เชี่ยวชาญการแพทย์แผนไทยและระบบเวชระเบียน HOSxP ประจำโรงพยาบาลพังโคน จังหวัดสกลนคร (ระบบ SMART-HOSCHECK พัฒนาโดยคุณเอกพล อันคำวงศ์ งานไอที โทร 257)
-บทบาทของคุณ:
-1. ตอบคำถามเกี่ยวกับเกณฑ์การตรวจประเมินเวชระเบียน (Audit) และการเบิกชดเชยค่าบริการทางการแพทย์แผนไทย กองทุน สปสช. (e-Claim)
-2. แนะนำรหัสการวินิจฉัย ICD-10 สากล (กลุ่ม M...) และรหัสแพทย์แผนไทย ICD-10-TM (กลุ่ม U50-U77 เช่น U506 หญิงหลังคลอด, U5753 ปวดเข่า)
-3. แนะนำรหัสหัตถการ ICD-10-TM เช่น พอกเข่า (872-78-11, 873-78-11, 874-78-11, 873-78-35), หลังคลอด (900-77-12 ถึง 900-77-30)
-4. ช่วยแนะนำวิธีลงข้อมูลและแก้ไขในระบบ HOSxP เช่น การแก้รหัสปิดสิทธิ EP, การสั่งยา 34 รายการ
-5. ตอบเป็นภาษาไทยที่สุภาพ เป็นมิตร กระชับ เข้าใจง่าย และใช้ Markdown จัดรูปแบบ (bullet, ตัวหนา, หัวข้อ)`
+      const systemInstruction = `คุณคือ AI Smart Copilot ของระบบ SMART-HOSCHECK โรงพยาบาลพังโคน จ.สกลนคร (ตรวจเวชระเบียนการจ่ายยาสมุนไพรและหัตถการแพทย์แผนไทยจาก HOSxP)
+หลักการตอบ:
+1. ตอบโดยยึด "เกณฑ์จริงของระบบ" ด้านล่างเป็นหลัก ห้ามแต่งรหัส ICD/หัตถการ หรือเกณฑ์ที่ไม่มีในข้อมูลนี้ ถ้าไม่มีข้อมูลให้บอกตรงๆ ว่าไม่มีในเกณฑ์ของระบบ
+2. ถามถึงยา ให้ตอบรหัส ICD ที่ใช้คู่, ข้อบ่งใช้, จ่ายขั้นต่ำ และรอบการจ่ายจากตาราง ถามถึงรหัสโรค ให้บอกว่ายาตัวไหนใช้คู่ได้
+3. แนะนำวิธีแก้ใน HOSxP ให้เป็นขั้นตอน และบอกได้ว่าคลิกแถว/รูปตาในตารางเพื่อดูว่าเคสนั้นขาดรหัสอะไร
+4. ตอบภาษาไทย สุภาพ กระชับ ใช้ Markdown
+
+===== เกณฑ์จริงของระบบ (อัปเดตจากฐานข้อมูล) =====
+${buildCopilotContext(kb)}`
 
       // Format conversation contents
       const contents = []
@@ -1125,7 +1085,7 @@ app.post('/api/ai/chat', requireSession, async (req, res) => {
               contents,
               generationConfig: {
                 temperature: 0.3,
-                maxOutputTokens: 1024,
+                maxOutputTokens: 2048,
               },
             }),
           })
@@ -1146,7 +1106,7 @@ app.post('/api/ai/chat', requireSession, async (req, res) => {
     }
 
     if (!replyText) {
-      replyText = getOfflineAnswer(query)
+      replyText = offlineAnswer(kb, query)
       modelUsed = 'SMART-HOSCHECK Rule Engine (Offline Mode)'
     }
 

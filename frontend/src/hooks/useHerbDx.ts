@@ -21,8 +21,9 @@ export function useDbStatus() {
   })
 }
 
-export function useAuditRecords(filters: AuditFilterParams) {
+export function useAuditRecords(filters: AuditFilterParams, enabled = true) {
   return useQuery({
+    enabled,
     queryKey: herbDxKeys.prescriptions(filters),
     queryFn: () => herbDxApi.prescriptions(filters),
     placeholderData: keepPreviousData, // keep table while refetching → zero layout shift

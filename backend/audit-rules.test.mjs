@@ -392,3 +392,34 @@ test('HealthMed - knee rule applies only to UC (hipdata UCS, incl. elderly right
   const ofc = evaluateHealthMedAudit({ ...kneeIncomplete, pttype: '23', pttype_name: 'สิทธิเบิกกรมบัญชีกลาง', pttype_hipdata: 'OFC' })
   assert.equal(ofc.audit_result, 'PASS')
 })
+
+const { buildCopilotKb, offlineAnswer } = await import('./copilot-knowledge.mjs')
+const copilotKb = buildCopilotKb({
+  dxMapRows: [
+    { icode: '1490024', drug_name: 'ยาธาตุอบเชย', dx_prefixes: 'K30,R14,U6680', min_qty: 3, indication: 'ท้องอืด' },
+    { icode: '1540011', drug_name: 'ยาประคบ (ลูกประคบ)', dx_prefixes: 'M,S,U', min_qty: 0, indication: 'ปวดเมื่อย' },
+  ],
+  dispensingRules: [{ drug_icode: '1490024', min_interval_days: 7, pttype_name_label: 'สิทธิ UC' }],
+  opRows: [{ code: '873-78-35', name: 'การพอกยาสมุนไพร แบบราชสำนัก ที่หัวเข่า - 78 (พอกเข่า)' }],
+})
+
+test('Copilot offline - answers from real criteria for drug, ICD code and procedure questions', () => {
+  const drug = offlineAnswer(copilotKb, 'ยาธาตุอบเชย ตัดการจ่ายกี่วัน')
+  assert.match(drug, /K30, R14/)
+  assert.match(drug, /อย่างน้อย 7 วัน/)
+  assert.match(drug, /จ่ายขั้นต่ำ:\*\* 3/)
+
+  assert.match(offlineAnswer(copilotKb, 'K30 ใช้ยาอะไรได้'), /ยาธาตุอบเชย/)
+  assert.match(offlineAnswer(copilotKb, 'r14 ใช้ยาอะไร'), /ยาธาตุอบเชย/)
+
+  const op = offlineAnswer(copilotKb, '873-78-35 คืออะไร')
+  assert.match(op, /การพอกยาสมุนไพร แบบราชสำนัก ที่หัวเข่า \(พอกเข่า\)/)
+  assert.match(op, /4 รหัสพอกเข่า/)
+})
+
+test('Copilot offline - topic questions are not hijacked by drug names', () => {
+  assert.match(offlineAnswer(copilotKb, 'นวดและประคบ 2 ครั้งได้ไหม'), /คิดค่าบริการซ้ำ/)
+  assert.match(offlineAnswer(copilotKb, 'เกณฑ์พอกเข่าต้องอายุเท่าไหร่'), /สิทธิ UC[\s\S]*40 ปีขึ้นไป/)
+  assert.match(offlineAnswer(copilotKb, 'รหัส EP แก้อย่างไร'), /รหัสปิดสิทธิ/)
+  assert.match(offlineAnswer(copilotKb, 'ลูกประคบใช้รหัสอะไร'), /ยาประคบ \(ลูกประคบ\)/)
+})

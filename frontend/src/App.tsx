@@ -162,6 +162,10 @@ const DashboardView: FC = () => {
     }
   }, [filteredAuditData, auditResponse?.kpi, patientTypeFilter])
 
+  // หน้าภาพรวมใช้ข้อมูลทั้งหมด (ทุกผลตรวจ, OPD + IPD) ไม่ขึ้นกับตัวกรองที่ค้างไว้ในหน้าตรวจสอบการจ่ายยา
+  const dashboardParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'ALL' }
+  const { data: dashboardResponse } = useAuditRecords(dashboardParams, activePage === 'dashboard')
+
   const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'FAIL' }
   const { data: mismatchResponse, isLoading: isMismatchLoading } = useAuditRecords(mismatchParams)
   const { data: drugSummaries = [], isLoading: isDrugsLoading } = useDrugSummaries(range)
@@ -260,8 +264,8 @@ const DashboardView: FC = () => {
       {/* Page 0: ภาพรวมระบบ (Executive Dashboard) */}
       {activePage === 'dashboard' && (
         <ExecutiveDashboardView
-          kpi={dynamicKpi}
-          records={filteredAuditData}
+          kpi={dashboardResponse?.kpi}
+          records={dashboardResponse?.data ?? []}
           drugs={drugSummaries}
           status={status}
           range={range}
