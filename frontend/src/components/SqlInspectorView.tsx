@@ -88,32 +88,38 @@ const QUERY_3 = `SELECT
     ps.name AS pttype_name,
     doc.name AS doctor_name,
     ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
-    d.icode, d.name AS service_name, op.qty, op.unitprice,
+    -- ค่าบริการแพทย์แผนไทย (เฉพาะ nondrugitems ไม่รวมยา)
+    GROUP_CONCAT(DISTINCT COALESCE(nd.nhso_adp_code, nd.icode)) AS service_codes,
+    -- หัตถการแพทย์แผนไทย (ICD-10-TM) จาก health_med_service_operation
+    GROUP_CONCAT(DISTINCT hmoi.icd10tm) AS operation_codes,
+    -- วันคลอดจากระบบงานบัญชี 2 (person_anc)
+    MAX(pa.labor_date) AS labor_date,
     CASE 
-        -- กฎข้อ 1: ค่านวดและประคบ ซ้ำกัน >= 2 ครั้งใน visit เดียวกัน
-        WHEN op.qty > 1 AND (d.name LIKE '%ค่านวดและประคบ%' OR d.icode IN ('58130', '58131')) THEN 'FAIL: ค่านวดและประคบซ้ำกัน'
-        -- กฎข้อ 2: พอกเข่า (M179 + U5753 และอายุ 40 ปีขึ้นไป)
-        WHEN (ov.pdx = 'M179' OR ov.dx0 = 'M179') AND NOT (ov.pdx = 'U5753' OR ov.dx0 = 'U5753' OR ov.dx1 = 'U5753') THEN 'FAIL: ขาดรหัส U5753 คู่ M179'
-        WHEN (ov.pdx = 'M179' OR ov.dx0 = 'M179') AND TIMESTAMPDIFF(YEAR, pt.birthday, o.vstdate) < 40 THEN 'FAIL: พอกเข่า/ข้อเข่าเสื่อมอายุต่ำกว่า 40 ปี'
-        -- กฎข้อ 5: มารดาหลังคลอด (M6260 + U506)
-        WHEN (d.name LIKE '%ทับหม้อเกลือ%' OR d.icode = '58220') AND NOT (ov.pdx = 'U506' OR ov.dx0 = 'U506' OR ov.dx1 = 'U506') THEN 'FAIL: มารดาหลังคลอดขาดรหัส U506'
+        -- กฎข้อ 1: พอกเข่า (M179 + U5753 อายุ >= 40 ปี) ต้องครบ 4 รหัสหัตถการ (872-78-11, 873-78-11, 874-78-11, 873-78-35)
+        WHEN (ov.pdx = 'M179' OR ov.dx0 = 'M179') AND TIMESTAMPDIFF(YEAR, pt.birthday, o.vstdate) < 40 THEN 'FAIL: พอกเข่าอายุต่ำกว่า 40 ปี'
+        -- กฎข้อ 4: บริบาลหญิงหลังคลอด (M6260 + U506) ต้องครบ 5 รหัส (900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30) + วันคลอดในบัญชี 2
+        WHEN (ov.pdx = 'M6260' AND (ov.dx0 = 'U506' OR ov.dx1 = 'U506')) AND MAX(pa.labor_date) IS NULL THEN 'FAIL: ไม่มีวันคลอดในระบบงานบัญชี 2'
+        -- กฎข้อ 5: M6260 + U อื่นๆ ถือว่าเป็นโรคกล้ามเนื้ออื่นๆ ผ่านเกณฑ์
+        WHEN (ov.pdx = 'M6260' AND (ov.dx0 LIKE 'U%' AND ov.dx0 <> 'U506')) THEN 'PASS: โรคกล้ามเนื้ออื่นๆ'
         ELSE 'PASS'
     END AS audit_healthmed_status
-FROM opitemrece op
-INNER JOIN ovst o ON op.vn = o.vn
+FROM ovst o
 INNER JOIN vn_stat ov ON o.vn = ov.vn
 INNER JOIN patient pt ON o.hn = pt.hn
-INNER JOIN drugitems d ON op.icode = d.icode
+LEFT JOIN health_med_service hms ON hms.vn = o.vn
+LEFT JOIN health_med_service_operation hso ON hso.health_med_service_id = hms.health_med_service_id
+LEFT JOIN health_med_operation_item hmoi ON hmoi.health_med_operation_item_id = hso.health_med_operation_item_id
+LEFT JOIN opitemrece op ON o.vn = op.vn
+LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
+    AND COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58130', '58131', '58220', '58301')
+LEFT JOIN person p ON p.patient_hn = o.hn
+LEFT JOIN person_anc pa ON pa.person_id = p.person_id AND pa.labor_date IS NOT NULL
 LEFT JOIN pttype ps ON o.pttype = ps.pttype
 LEFT JOIN doctor doc ON o.doctor = doc.code
 WHERE o.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
-  AND (
-    d.name LIKE '%ค่านวด%'
-    OR d.name LIKE '%ค่าประคบ%'
-    OR d.name LIKE '%ค่าทับหม้อเกลือ%'
-    OR d.name LIKE '%ค่าอบไอน้ำ%'
-    OR d.icode IN ('58101', '58130', '58131', '58220', '58301')
-  )
+  AND (hms.vn IS NOT NULL OR nd.icode IS NOT NULL)
+GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
+         ps.name, doc.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
 ORDER BY o.vstdate DESC, o.vsttime DESC;`
 
 const SQL_KEYWORDS = new Set([
@@ -369,7 +375,7 @@ export const SqlInspectorView: FC = () => {
                 QUERY 3 : ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย (งานที่ 1–5 & ตรวจค่าบริการซ้ำ)
               </h4>
               <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
-                ตรวจค่านวด/ประคบซ้ำ (58130, 58101), โรคข้อเข่า (M179+U5753 อายุ &ge; 40), มารดาหลังคลอด (M6260+U506)
+                ตรวจ 5 เกณฑ์ใหม่: พอกเข่า (M179+U5753 ครบ 4 หัตถการ), บริบาลหลังคลอด (M6260+U506 ครบ 5 หัตถการ + วันคลอดบัญชี 2), M6260+U อื่นๆ ผ่านเกณฑ์กล้ามเนื้อ
               </p>
             </div>
           </div>

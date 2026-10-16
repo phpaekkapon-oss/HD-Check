@@ -73,14 +73,16 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
       if (kpiFilter === 'DUPLICATE' && !r.failures?.some((f) => f.includes('ซ้ำ'))) return false
-      if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า'))) return false
-      if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด'))) return false
+      if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า') || f.includes('พอกเข่า'))) return false
+      if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) return false
       if (kpiFilter === 'EP' && !r.failures?.some((f) => f.includes('EP'))) return false
 
       // 2. Text Search Filter
       if (search.trim()) {
         const q = search.toLowerCase()
-        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason}`.toLowerCase()
+        const opCodesText = r.operation_codes?.join(' ') ?? ''
+        const laborText = r.labor_date ?? ''
+        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText}`.toLowerCase()
         if (!text.includes(q)) return false
       }
       return true
@@ -199,11 +201,10 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row }) => {
           const raw = String(row.original.service_items_raw || '')
           const items = raw.split('||').filter(Boolean)
-          if (items.length === 0) {
-            return <span className="text-slate-400 text-xs italic">— ไม่มีรายการ —</span>
-          }
+          const operations = row.original.operations ?? []
+          const laborDate = row.original.labor_date
+          const isPostpartum = row.original.pdx === 'M6260' && (row.original.dx0 === 'U506' || row.original.dx1 === 'U506')
 
-          // แยกหัตถการแพทย์แผนไทย (รหัส 58xxx หรือชื่อมีนวด/ประคบ/อบ/ทับหม้อเกลือ)
           const parsed = items.map((s) => {
             const [code, name, qty, price] = s.split(':')
             const isThaiMed =
@@ -219,48 +220,66 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           })
 
           const thaiMedItems = parsed.filter((p) => p.isThaiMed)
-          const otherItems = parsed.filter((p) => !p.isThaiMed)
 
           return (
-            <div className="space-y-1 min-w-[210px] max-w-[260px]">
-              {thaiMedItems.length > 0 ? (
-                thaiMedItems.map((p, idx) => (
-                  <div
-                    key={idx}
-                    className={cn(
-                      'text-[11px] flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-lg border transition shadow-2xs',
-                      p.isDup
-                        ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40'
-                        : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
-                    )}
-                  >
-                    <span className="truncate flex items-center gap-1">
-                      <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
-                        [{p.code}]
-                      </strong>
-                      <span className="truncate" title={p.name}>
-                        {p.name}
-                      </span>
+            <div className="space-y-1.5 min-w-[210px] max-w-[280px]">
+              {/* รายการค่าบริการ 58xxx */}
+              {thaiMedItems.map((p, idx) => (
+                <div
+                  key={idx}
+                  className={cn(
+                    'text-[11px] flex items-center justify-between gap-1.5 px-2 py-0.5 rounded-lg border transition shadow-2xs',
+                    p.isDup
+                      ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40'
+                      : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30'
+                  )}
+                >
+                  <span className="truncate flex items-center gap-1">
+                    <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                      [{p.code}]
+                    </strong>
+                    <span className="truncate" title={p.name}>
+                      {p.name}
                     </span>
-                    <span className="font-mono font-bold shrink-0 text-[10px] text-slate-500 dark:text-slate-400">
-                      x{p.qty} ({Number(p.price || 0).toLocaleString()}.-)
+                  </span>
+                  <span className="font-mono font-bold shrink-0 text-[10px] text-slate-500 dark:text-slate-400">
+                    x{p.qty} ({Number(p.price || 0).toLocaleString()}.-)
+                  </span>
+                </div>
+              ))}
+
+              {/* รายการรหัสหัตถการ ICD-10-TM */}
+              {operations.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {operations.map((op, idx) => (
+                    <span
+                      key={idx}
+                      className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 truncate max-w-[130px]"
+                      title={`${op.code}: ${op.name}`}
+                    >
+                      {op.code}
                     </span>
-                  </div>
-                ))
-              ) : (
-                <div className="text-[11px] text-slate-400 italic">
-                  ไม่มีรหัสหัตถการหลัก 58xxx
+                  ))}
                 </div>
               )}
 
-              {otherItems.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setSelectedRecord(row.original)}
-                  className="text-[10px] text-slate-400 dark:text-slate-500 hover:text-teal-600 dark:hover:text-teal-400 font-mono block pl-1 cursor-pointer transition text-left"
-                >
-                  + ยา/เวชภัณฑ์อื่น {otherItems.length} รายการ (คลิกดู)
-                </button>
+              {/* วันคลอดในระบบงานบัญชี 2 */}
+              {laborDate ? (
+                <div className="text-[10px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-semibold pt-0.5">
+                  <Baby className="size-3 shrink-0" />
+                  <span>วันคลอด: {laborDate}</span>
+                </div>
+              ) : isPostpartum ? (
+                <div className="text-[10px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-semibold pt-0.5">
+                  <AlertTriangle className="size-3 shrink-0" />
+                  <span>ไม่มีวันคลอดในบัญชี 2</span>
+                </div>
+              ) : null}
+
+              {thaiMedItems.length === 0 && operations.length === 0 && (
+                <div className="text-[11px] text-slate-400 italic">
+                  ไม่มีรหัสหัตถการ/ค่าบริการ
+                </div>
               )}
             </div>
           )
@@ -447,9 +466,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     },
     {
       id: 'KNEE' as const,
-      label: 'ข้อเข่า < 40 ปี',
+      label: 'ข้อเข่า / พอกเข่า',
       value: kpi?.kneeFail ?? 0,
-      sub: (kpi?.kneeFail ?? 0) > 0 ? 'M179 อายุต่ำกว่า 40' : '✓ ปกติ ตามเกณฑ์อายุ',
+      sub: (kpi?.kneeFail ?? 0) > 0 ? 'M179+U5753 ไม่ครบเกณฑ์' : '✓ ปกติ ครบ 4 หัตถการ',
       icon: Bone,
       iconBg: 'bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300 border border-cyan-500/30',
       valueColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-600 dark:text-slate-300',
@@ -461,9 +480,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     },
     {
       id: 'POSTPARTUM' as const,
-      label: 'มารดาหลังคลอด',
+      label: 'บริบาลหลังคลอด',
       value: kpi?.postpartumFail ?? 0,
-      sub: (kpi?.postpartumFail ?? 0) > 0 ? 'รหัสคลอด/U506 ไม่ครบ' : '✓ ปกติ ลงรหัสถูกต้อง',
+      sub: (kpi?.postpartumFail ?? 0) > 0 ? '5 หัตถการ/วันคลอดไม่ครบ' : '✓ ปกติ ครบ 5 หัตถการ',
       icon: Baby,
       iconBg: 'bg-fuchsia-500/15 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-300 border border-fuchsia-500/30',
       valueColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-600 dark:text-slate-300',
@@ -597,8 +616,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
                 {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
                 {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
-                {kpiFilter === 'KNEE' && 'ข้อเข่า < 40 ปี'}
-                {kpiFilter === 'POSTPARTUM' && 'บริบาลมารดาหลังคลอด'}
+                {kpiFilter === 'KNEE' && 'ข้อเข่า / พอกเข่า (M179+U5753)'}
+                {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด (M6260+U506)'}
                 {kpiFilter === 'EP' && 'ติดรหัสปิดสิทธิ (EP)'}
               </strong>
               <span className="font-mono font-bold">({filteredRecords.length} รายการ)</span>
@@ -799,7 +818,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             {/* Service Items Section */}
             <div className="space-y-1.5">
               <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <Stethoscope className="size-3.5 text-teal-500" /> รายการค่าบริการ / หัตถการที่คิดใน Visit นี้
+                <Stethoscope className="size-3.5 text-teal-500" /> รายการค่าบริการที่คิดใน Visit นี้
               </h4>
               <div className="space-y-1.5 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
                 {String(selectedRecord.service_items_raw || '')
@@ -822,8 +841,65 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       </div>
                     )
                   })}
+                {!selectedRecord.service_items_raw && (
+                  <span className="text-slate-400 text-xs italic block text-center py-1">
+                    — ไม่มีรายการค่าบริการ 58xxx —
+                  </span>
+                )}
               </div>
             </div>
+
+            {/* ICD-10-TM Operations Section */}
+            <div className="space-y-1.5">
+              <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Activity className="size-3.5 text-teal-500" /> รหัสหัตถการแพทย์แผนไทย (ICD-10-TM)
+                </span>
+                <span className="text-[10.5px] font-mono text-slate-400">
+                  {selectedRecord.operations?.length ?? 0} รายการ
+                </span>
+              </h4>
+              <div className="space-y-1 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
+                {selectedRecord.operations && selectedRecord.operations.length > 0 ? (
+                  selectedRecord.operations.map((op, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center justify-between text-xs py-1 px-2.5 rounded-lg bg-white dark:bg-white/5 border border-slate-200 dark:border-white/5"
+                    >
+                      <span className="font-medium text-slate-800 dark:text-slate-200">
+                        <strong className="font-mono text-emerald-600 dark:text-emerald-400 mr-2">[{op.code}]</strong>
+                        {op.name}
+                      </span>
+                    </div>
+                  ))
+                ) : (
+                  <span className="text-slate-400 text-xs italic block text-center py-1">
+                    — ไม่มีบันทึกรหัสหัตถการ ICD-10-TM ในระบบ —
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Labor Date Section (Account 2) */}
+            {(selectedRecord.pdx === 'M6260' || selectedRecord.dx0 === 'U506' || selectedRecord.labor_date) && (
+              <div className="space-y-1.5">
+                <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                  <Baby className="size-3.5 text-fuchsia-500" /> ข้อมูลการคลอดบุตร (ระบบงานบัญชี 2: หญิงตั้งครรภ์และหลังคลอด)
+                </h4>
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5 flex items-center justify-between text-xs">
+                  <span className="text-slate-600 dark:text-slate-300">วันคลอดที่บันทึกในระบบงานบัญชี 2:</span>
+                  {selectedRecord.labor_date ? (
+                    <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
+                      ✓ {selectedRecord.labor_date}
+                    </span>
+                  ) : (
+                    <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/30">
+                      ⚠️ ไม่พบวันคลอดในระบบงานบัญชี 2
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Modal Footer */}
             <div className="pt-2 flex justify-end border-t border-slate-200 dark:border-white/10">

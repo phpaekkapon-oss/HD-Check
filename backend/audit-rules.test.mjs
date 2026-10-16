@@ -74,3 +74,105 @@ test('target Thai-medicine doctor needs a U-code diagnosis', () => {
   // other doctors are unaffected
   assert.equal(run({ pdx: 'K30', doctor_name: 'แพทย์ทั่วไป' }).audit_result, 'PASS')
 })
+
+const { evaluateHealthMedAudit } = await import('./healthmed.mjs')
+
+test('HealthMed - M179 + U5753 age >= 40 with all 4 knee operations passes', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M179',
+    dx0: 'U5753',
+    age_y: 45,
+    operation_codes: ['872-78-11', '873-78-11', '874-78-11', '873-78-35'],
+    count_58130: 1,
+  })
+  assert.equal(r.audit_result, 'PASS')
+})
+
+test('HealthMed - M179 + U5753 fails if missing any of the 4 knee operations', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M179',
+    dx0: 'U5753',
+    age_y: 45,
+    operation_codes: ['872-78-11', '873-78-11', '874-78-11'], // missing 873-78-35
+    count_58130: 1,
+  })
+  assert.equal(r.audit_result, 'FAIL')
+  assert.match(r.audit_reason, /873-78-35/)
+})
+
+test('HealthMed - M179 + U5753 fails if age < 40', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M179',
+    dx0: 'U5753',
+    age_y: 39,
+    operation_codes: ['872-78-11', '873-78-11', '874-78-11', '873-78-35'],
+    count_58130: 1,
+  })
+  assert.equal(r.audit_result, 'FAIL')
+  assert.match(r.audit_reason, /40 ปีขึ้นไป/)
+})
+
+test('HealthMed - M6260 + U506 postpartum passes with all 5 operations and labor_date', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M6260',
+    dx0: 'U506',
+    operation_codes: ['900-77-12', '900-77-13', '900-77-14', '900-77-16', '900-77-30'],
+    labor_date: '2026-08-12',
+    count_58220: 1,
+  })
+  assert.equal(r.audit_result, 'PASS')
+})
+
+test('HealthMed - M6260 + U506 fails without labor_date from account 2', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M6260',
+    dx0: 'U506',
+    operation_codes: ['900-77-12', '900-77-13', '900-77-14', '900-77-16', '900-77-30'],
+    labor_date: null,
+    count_58220: 1,
+  })
+  assert.equal(r.audit_result, 'FAIL')
+  assert.match(r.audit_reason, /ไม่มีวันคลอดในระบบงานบัญชี 2/)
+})
+
+test('HealthMed - M6260 + U506 fails if missing any of 5 operations', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M6260',
+    dx0: 'U506',
+    operation_codes: ['900-77-12', '900-77-13', '900-77-14', '900-77-16'], // missing 900-77-30
+    labor_date: '2026-08-12',
+    count_58220: 1,
+  })
+  assert.equal(r.audit_result, 'FAIL')
+  assert.match(r.audit_reason, /900-77-30/)
+})
+
+test('HealthMed - M6260 + U other (not U506) passes as other muscle condition', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M6260',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11', '900-78-20'],
+    count_58130: 1,
+  })
+  assert.equal(r.audit_result, 'PASS')
+  assert.match(r.audit_reason, /โรคกล้ามเนื้ออื่นๆ/)
+})
+
+test('HealthMed - General muscle M... + U... requires allowed procedure', () => {
+  const passRecord = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 1,
+  })
+  assert.equal(passRecord.audit_result, 'PASS')
+
+  const failRecord = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['123-45-67'], // not an allowed procedure
+    count_58130: 0,
+  })
+  assert.equal(failRecord.audit_result, 'FAIL')
+})
+

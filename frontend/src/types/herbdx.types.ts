@@ -163,6 +163,11 @@ export interface SyncResult extends DateRange {
 
 export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
 
+export interface HealthMedOperationItem {
+  readonly code: string
+  readonly name: string
+}
+
 export interface HealthMedRecord {
   readonly vn: string
   readonly hn: string
@@ -184,6 +189,9 @@ export interface HealthMedRecord {
   readonly dx5?: string
   readonly service_items_raw?: string
   readonly service_codes?: string
+  readonly operations?: readonly HealthMedOperationItem[]
+  readonly operation_codes?: readonly string[]
+  readonly labor_date?: string | null
   readonly count_58130: number
   readonly count_58101: number
   readonly count_58301: number

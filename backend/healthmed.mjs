@@ -1,7 +1,7 @@
 import { normalizeIcdCode } from './config.mjs'
 
 /**
- * รหัสค่าบริการทางการแพทย์แผนไทยที่เกี่ยวข้อง
+ * รหัสค่าบริการทางการแพทย์แผนไทยที่เกี่ยวข้อง (nondrugitems)
  * 58101 = ค่านวดเพื่อการบำบัดรักษาโรค (200.-)
  * 58130 = ค่านวดและประคบสมุนไพรเพื่อการบำบัดรักษาโรค (250.-)
  * 58131 = ค่านวดและประคบสมุนไพรเพื่อการฟื้นฟูสมรรถภาพ (250.-)
@@ -11,7 +11,38 @@ import { normalizeIcdCode } from './config.mjs'
 export const THAI_MED_SERVICE_CODES = ['58101', '58130', '58131', '58220', '58301']
 
 /**
- * SQL สำหรับดึงข้อมูลการรับบริการแพทย์แผนไทย ทั้งหัตถการและค่าบริการ
+ * รหัสหัตถการแพทย์แผนไทย (ICD-10-TM) ตามเกณฑ์ตรวจ:
+ * 1. พอกเข่า (M179 + U5753 อายุ >= 40 ปี) ต้องครบ 4 รหัส
+ */
+export const REQUIRED_KNEE_OPS = ['872-78-11', '873-78-11', '874-78-11', '873-78-35']
+
+/**
+ * 2. บริบาลหญิงหลังคลอด (M6260 + U506) ต้องครบ 5 รหัส + วันคลอดในบัญชี 2
+ */
+export const REQUIRED_POSTPARTUM_OPS = ['900-77-12', '900-77-13', '900-77-14', '900-77-16', '900-77-30']
+
+/**
+ * 3. หัตถการสำหรับโรคกล้ามเนื้ออื่นๆ (M... + U... หรือ M6260 + U อื่นๆ)
+ */
+export const ALLOWED_MUSCLE_OPS = [
+  '872-78-11',
+  '873-78-11',
+  '874-78-11',
+  '873-78-35',
+  '900-78-11',
+  '900-78-20',
+  '900-78-00',
+]
+
+/**
+ * ฟังก์ชัน normalize รหัสหัตถการ (ตัดขีดและช่องว่างออกเพื่อเทียบเคียงได้อย่างแม่นยำ)
+ */
+export function normalizeOpCode(code) {
+  return String(code ?? '').replace(/[^0-9a-zA-Z]/g, '').trim().toUpperCase()
+}
+
+/**
+ * SQL สำหรับดึงข้อมูลการรับบริการแพทย์แผนไทย (เฉพาะค่าบริการ/หัตถการ ไม่รวมรายการยาสมุนไพร)
  */
 export const HEALTH_MED_AUDIT_SQL = `
   SELECT 
@@ -28,33 +59,35 @@ export const HEALTH_MED_AUDIT_SQL = `
       sp.name AS department_name,
       ov.pdx,
       ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
-      -- รวบรวมรายการค่าบริการแพทย์แผนไทยใน visit นี้
-      GROUP_CONCAT(DISTINCT CONCAT(COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode), ':', COALESCE(d.name, nd.name, ''), ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
-      GROUP_CONCAT(DISTINCT COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode)) AS service_codes,
-      -- รวมจำนวนครั้ง (ทั้งกรณีคีย์แยกแถว หรือระบุ qty >= 2)
-      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58130' OR COALESCE(d.name, nd.name) LIKE '%ค่านวดและประคบ%บำบัด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
-      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58101' OR (COALESCE(d.name, nd.name) LIKE '%ค่านวด%' AND COALESCE(d.name, nd.name) NOT LIKE '%ประคบ%') THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
-      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58301' OR COALESCE(d.name, nd.name) LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
-      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58220' OR COALESCE(d.name, nd.name) LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
-      SUM(CASE WHEN COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) = '58131' OR COALESCE(d.name, nd.name) LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
+      -- รวบรวมรายการค่าบริการแพทย์แผนไทย (เฉพาะ nondrugitems / ค่าบริการ ไม่เอารหัสยา)
+      GROUP_CONCAT(DISTINCT CONCAT(COALESCE(nd.nhso_adp_code, nd.icode), ':', COALESCE(nd.name, ''), ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
+      GROUP_CONCAT(DISTINCT COALESCE(nd.nhso_adp_code, nd.icode)) AS service_codes,
+      -- รวมจำนวนครั้งค่าบริการ
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58130' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%บำบัด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58101' OR (COALESCE(nd.name, '') LIKE '%ค่านวด%' AND COALESCE(nd.name, '') NOT LIKE '%ประคบ%') THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58301' OR COALESCE(nd.name, '') LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58220' OR COALESCE(nd.name, '') LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58131' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
   FROM ovst o
   INNER JOIN vn_stat ov ON o.vn = ov.vn
   INNER JOIN patient pt ON o.hn = pt.hn
-  INNER JOIN opitemrece op ON o.vn = op.vn
-  LEFT JOIN drugitems d ON op.icode = d.icode
-  LEFT JOIN nondrugitems nd ON op.icode = nd.icode
+  LEFT JOIN health_med_service hms ON hms.vn = o.vn
+  LEFT JOIN opitemrece op ON o.vn = op.vn
+  LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
+      AND (
+        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58130', '58131', '58220', '58301')
+        OR nd.name LIKE '%ค่านวด%'
+        OR nd.name LIKE '%ค่าประคบ%'
+        OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
+        OR nd.name LIKE '%ค่าอบไอน้ำ%'
+      )
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
   WHERE o.vstdate BETWEEN ? AND ?
     AND (
-      -- เฉพาะ visit ที่มีรายการค่าบริการแพทย์แผนไทย หรือแผนกแพทย์แผนไทย
-      (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')
-      OR COALESCE(d.nhso_adp_code, nd.nhso_adp_code, d.did, nd.icode, d.icode) IN ('58101', '58130', '58131', '58220', '58301')
-      OR COALESCE(d.name, nd.name) LIKE '%ค่านวด%'
-      OR COALESCE(d.name, nd.name) LIKE '%ค่าประคบ%'
-      OR COALESCE(d.name, nd.name) LIKE '%ค่าทับหม้อเกลือ%'
-      OR COALESCE(d.name, nd.name) LIKE '%ค่าอบไอน้ำ%'
+      hms.vn IS NOT NULL
+      OR nd.icode IS NOT NULL
     )
   GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
            ps.name, ps.pttype, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
@@ -62,7 +95,13 @@ export const HEALTH_MED_AUDIT_SQL = `
 `
 
 /**
- * ประเมินผลการให้บริการแพทย์แผนไทยตามเกณฑ์ 5 งาน + กฎซ้ำซ้อน + ปิดสิทธิ์ EP
+ * ประเมินผลการให้บริการแพทย์แผนไทยตามเกณฑ์ปรับปรุงใหม่ 5 ข้อ:
+ * 1. M179 + U5753 อายุ >= 40 ปี จับคู่ (872-78-11, 873-78-11, 874-78-11, 873-78-35) ถ้าไม่ครบ 4 รหัส ไม่ผ่าน
+ * 2. เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
+ * 3. ไม่เอายาสมุนไพร/รหัสยาเข้ามาตรวจในระบบหัตถการ
+ * 4. M6260 + U506 เท่านั้น จับคู่กับ 900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30 ไม่ครบ 5 รหัส ไม่ผ่าน
+ *    เชื่อมกับ วันคลอด ในระบบงานบัญชี 2 ถ้าไม่มีวันคลอด ไม่ผ่าน
+ * 5. รหัส M6260 + U อื่นๆ จับคู่หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ถือว่าเป็น โรคกล้ามเนื้ออื่นๆ ผ่านเกณฑ์
  */
 export function evaluateHealthMedAudit(row) {
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
@@ -80,7 +119,11 @@ export function evaluateHealthMedAudit(row) {
   const count58131 = Number(row.count_58131 ?? 0)
 
   const rawServices = String(row.service_items_raw ?? '')
-  const serviceCodes = String(row.service_codes ?? '').split(',').map((s) => s.trim())
+
+  // Normalized operation codes set
+  const operations = Array.isArray(row.operations) ? row.operations : []
+  const opCodesList = (row.operation_codes || operations.map((op) => op.code || op)).map(String)
+  const normalizedOpSet = new Set(opCodesList.map(normalizeOpCode))
 
   const failures = []
   const passes = []
@@ -107,52 +150,96 @@ export function evaluateHealthMedAudit(row) {
   }
 
   // -------------------------------------------------------------
-  // กฎข้อที่ 3: งานที่ 1 & 2 — โรคข้อเข่าเสื่อม / พอกเข่า (M179 + U5753 และอายุ 40 ปีขึ้นไป)
+  // กฎข้อที่ 3 (ข้อ 1 จากผู้ใช้): M179 + U5753 อายุ 40 ปีขึ้นไป จับคู่ 4 รหัสหัตถการ
+  // ( 872-78-11, 873-78-11, 874-78-11, 873-78-35 ) ถ้าไม่ครบ 4 รหัส ไม่ผ่าน
   // -------------------------------------------------------------
   const hasM179 = uniqueDx.includes('M179')
   const hasU5753 = uniqueDx.includes('U5753')
-  const isKneeProcedure = count58101 > 0 || count58130 > 0
+  const hasAnyKneeOp = REQUIRED_KNEE_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
 
-  if (hasM179 || hasU5753) {
+  if (hasM179 || hasU5753 || hasAnyKneeOp) {
     if (!hasM179 || !hasU5753) {
       failures.push('โรคข้อเข่าเสื่อม/พอกเข่า ต้องจับคู่รหัสทั้ง M179 และ U5753 ร่วมกัน')
     }
     if (age < 40) {
       failures.push(`เกณฑ์การพอกเข่า/ข้อเข่าเสื่อม ต้องมีอายุ 40 ปีขึ้นไป (ปัจจุบันอายุ ${age} ปี)`)
     }
-    if (hasM179 && hasU5753 && age >= 40 && isKneeProcedure) {
-      passes.push('งานที่ 1-2: ครบคู่ M179 + U5753 และอายุ 40 ปีขึ้นไป')
+    const missingKneeOps = REQUIRED_KNEE_OPS.filter((req) => !normalizedOpSet.has(normalizeOpCode(req)))
+    if (missingKneeOps.length > 0) {
+      failures.push(`พอกเข่า (M179+U5753) ต้องมีรหัสหัตถการครบทั้ง 4 รหัส (872-78-11, 873-78-11, 874-78-11, 873-78-35) ขาดรหัส: ${missingKneeOps.join(', ')}`)
+    }
+    if (hasM179 && hasU5753 && age >= 40 && missingKneeOps.length === 0) {
+      passes.push('งานพอกเข่า: ครบคู่ M179 + U5753, อายุ 40 ปีขึ้นไป และครบทั้ง 4 รหัสหัตถการ')
     }
   }
 
   // -------------------------------------------------------------
-  // กฎข้อที่ 4: งานที่ 5 — บริบาลหญิงหลังคลอด (M6260 + U506 + รหัสคลอด)
-  // ค่าบริการ: 58220 (ทับหม้อเกลือ), 58131 (นวดประคบหลังคลอด), 58301 (อบไอน้ำ)
+  // กฎข้อที่ 4 (ข้อ 4 & 5 จากผู้ใช้):
+  // 4. M6260 + U506 เท่านั้น จับคู่กับ 900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30 ไม่ครบ 5 รหัส ไม่ผ่าน
+  //    เชื่อมกับ วันคลอด ในระบบงานบัญชี 2 ถ้าไม่มีวันคลอด ไม่ผ่าน
+  // 5. รหัส M6260 + U อื่นๆ จับคู่หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ถือว่าเป็น โรคกล้ามเนื้ออื่นๆ ผ่านเกณฑ์
   // -------------------------------------------------------------
-  const isPostpartumService = count58220 > 0 || count58131 > 0 || (count58301 > 0 && uniqueDx.includes('U506'))
   const hasM6260 = uniqueDx.includes('M6260')
   const hasU506 = uniqueDx.includes('U506')
-  const hasDeliveryCode = uniqueDx.some((dx) => dx.startsWith('O8') || dx.startsWith('Z39'))
+  const hasAnyPostpartumOp = REQUIRED_POSTPARTUM_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
+  const isPostpartumService = count58220 > 0 || count58131 > 0 || hasAnyPostpartumOp
 
-  if (isPostpartumService || hasM6260 || hasU506) {
+  // กรณีบริบาลหญิงหลังคลอด: มี U506 หรือ มีหัตถการ/ค่าบริการบริบาลหลังคลอด
+  if (hasU506 || isPostpartumService) {
     if (!hasM6260) failures.push('บริบาลหญิงหลังคลอด ขาดรหัส M6260')
     if (!hasU506) failures.push('บริบาลหญิงหลังคลอด ขาดรหัส U506')
-    if (!hasDeliveryCode) failures.push('บริบาลหญิงหลังคลอด ต้องมีรหัสการคลอด (กลุ่ม O หรือ Z39)')
-    if (hasM6260 && hasU506 && hasDeliveryCode) {
-      passes.push('งานที่ 5: ครบคู่ M6260 + U506 + รหัสคลอดบุตร')
+
+    // ตรวจสอบรหัสหัตถการ 5 รหัส
+    const missingPostpartumOps = REQUIRED_POSTPARTUM_OPS.filter((req) => !normalizedOpSet.has(normalizeOpCode(req)))
+    if (missingPostpartumOps.length > 0) {
+      failures.push(`บริบาลหญิงหลังคลอด ต้องมีรหัสหัตถการครบทั้ง 5 รหัส (900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30) ขาดรหัส: ${missingPostpartumOps.join(', ')}`)
+    }
+
+    // ตรวจสอบวันคลอดในระบบงานบัญชี 2
+    if (!row.labor_date) {
+      failures.push('ไม่มีวันคลอดในระบบงานบัญชี 2 (ไม่พบข้อมูลวันคลอดหญิงหลังคลอด)')
+    }
+
+    if (hasM6260 && hasU506 && missingPostpartumOps.length === 0 && row.labor_date) {
+      passes.push(`บริบาลหญิงหลังคลอด: ครบคู่ M6260 + U506, ครบ 5 รหัสหัตถการ และมีวันคลอดในบัญชี 2 (${row.labor_date})`)
+    }
+  } else if (hasM6260 && !hasU506) {
+    // ข้อ 5: M6260 + U อื่นๆ ถือว่าเป็น "โรคกล้ามเนื้ออื่นๆ"
+    const otherUDx = uniqueDx.filter((dx) => dx.startsWith('U') && dx !== 'U506')
+    const hasAllowedMuscleOp = ALLOWED_MUSCLE_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
+
+    if (otherUDx.length === 0) {
+      failures.push('รหัส M6260 ต้องมีรหัสวินิจฉัยแพทย์แผนไทย (รหัส U...) ร่วมด้วย')
+    }
+    if (!hasAllowedMuscleOp && count58101 === 0 && count58130 === 0 && count58301 === 0) {
+      failures.push('โรคกล้ามเนื้ออื่นๆ (M6260) ต้องมีรหัสหัตถการร่วมด้วย (872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00)')
+    }
+    if (otherUDx.length > 0 && (hasAllowedMuscleOp || count58101 > 0 || count58130 > 0 || count58301 > 0)) {
+      passes.push(`โรคกล้ามเนื้ออื่นๆ (M6260 + ${otherUDx.join(',')}): ผ่านเกณฑ์`)
     }
   }
 
   // -------------------------------------------------------------
-  // กฎข้อที่ 5: งานที่ 3 — งานนวด/ประคบทั่วไป ต้องมีทั้ง M... และ U...
+  // กฎข้อที่ 5 (ข้อ 2 จากผู้ใช้): โรคกล้ามเนื้อทั่วไป (M... + U...)
+  // เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
   // -------------------------------------------------------------
-  const hasAnyM = uniqueDx.some((dx) => dx.startsWith('M'))
-  const hasAnyU = uniqueDx.some((dx) => dx.startsWith('U'))
-  if ((count58101 > 0 || count58130 > 0) && !hasM179 && !isPostpartumService) {
-    if (!hasAnyM) failures.push('ค่านวด/ประคบ ต้องมีรหัสวินิจฉัยโรคกล้ามเนื้อ (รหัส M...)')
-    if (!hasAnyU) failures.push('ค่านวด/ประคบ ต้องมีรหัสวินิจฉัยแพทย์แผนไทย (รหัส U...) ร่วมด้วย')
-    if (hasAnyM && hasAnyU) {
-      passes.push('งานที่ 3: จับคู่รหัส M... และ U... ถูกต้อง')
+  const isKneeCase = hasM179 || hasU5753 || hasAnyKneeOp
+  const isPostpartumCase = hasU506 || isPostpartumService
+  const isM6260Handled = hasM6260 && !hasU506
+
+  if (!isKneeCase && !isPostpartumCase && !isM6260Handled) {
+    const hasAnyM = uniqueDx.some((dx) => dx.startsWith('M'))
+    const hasAnyU = uniqueDx.some((dx) => dx.startsWith('U'))
+    const hasAllowedMuscleOp = ALLOWED_MUSCLE_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
+
+    if (!hasAnyM) failures.push('ต้องมีรหัสวินิจฉัยโรคกล้ามเนื้อ (รหัส M...)')
+    if (!hasAnyU) failures.push('ต้องมีรหัสวินิจฉัยแพทย์แผนไทย (รหัส U...) ร่วมด้วย')
+    if (!hasAllowedMuscleOp && count58101 === 0 && count58130 === 0 && count58301 === 0) {
+      failures.push('รหัส M... และ U... ต้องมีรหัสหัตถการร่วมด้วย (872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00)')
+    }
+
+    if (hasAnyM && hasAnyU && (hasAllowedMuscleOp || count58101 > 0 || count58130 > 0 || count58301 > 0)) {
+      passes.push('จับคู่รหัส M... และ U... พร้อมหัตถการถูกต้อง')
     }
   }
 
@@ -170,6 +257,9 @@ export function evaluateHealthMedAudit(row) {
     has_m179: hasM179,
     has_u5753: hasU5753,
     age,
+    operations,
+    operation_codes: opCodesList,
+    labor_date: row.labor_date || null,
     service_items_count: {
       count_58101: count58101,
       count_58130: count58130,
@@ -179,3 +269,4 @@ export function evaluateHealthMedAudit(row) {
     },
   }
 }
+

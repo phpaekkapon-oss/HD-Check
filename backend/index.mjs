@@ -487,18 +487,69 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     const resultFilter = String(req.query.result ?? 'ALL').toUpperCase()
     const search = String(req.query.search ?? '').trim()
 
+    // 1. ดึงรายการ visit ที่มีค่าบริการ/หัตถการแพทย์แผนไทย (ไม่รวมรายการยา)
     const [rows] = await hosPool.query(HEALTH_MED_AUDIT_SQL, [startDate, endDate])
-    const evaluated = rows.map((r) => ({
-      ...r,
-      ...evaluateHealthMedAudit(r),
-    }))
+
+    // 2. ดึงรหัสหัตถการ ICD-10-TM ทั้งหมดในช่วงวันที่จาก health_med_service_operation
+    const [ops] = await hosPool.query(`
+      SELECT hms.vn, hmoi.icd10tm, hmoi.health_med_operation_item_name
+      FROM health_med_service hms
+      JOIN health_med_service_operation hso ON hso.health_med_service_id = hms.health_med_service_id
+      JOIN health_med_operation_item hmoi ON hmoi.health_med_operation_item_id = hso.health_med_operation_item_id
+      WHERE hms.service_date BETWEEN ? AND ?
+    `, [startDate, endDate])
+
+    const opsByVn = new Map()
+    for (const op of ops) {
+      if (!opsByVn.has(op.vn)) opsByVn.set(op.vn, [])
+      opsByVn.get(op.vn).push({
+        code: op.icd10tm,
+        name: op.health_med_operation_item_name,
+      })
+    }
+
+    // 3. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) สำหรับผู้ป่วยในกลุ่มนี้
+    const hns = [...new Set(rows.map((r) => r.hn).filter(Boolean))]
+    const laborDateByHn = new Map()
+    if (hns.length > 0) {
+      const [ancRows] = await hosPool.query(`
+        SELECT p.patient_hn, MAX(pa.labor_date) AS labor_date
+        FROM person p
+        JOIN person_anc pa ON pa.person_id = p.person_id
+        WHERE p.patient_hn IN (${hns.map(() => '?').join(',')})
+          AND pa.labor_date IS NOT NULL
+        GROUP BY p.patient_hn
+      `, hns)
+      for (const r of ancRows) {
+        laborDateByHn.set(r.patient_hn, r.labor_date)
+      }
+    }
+
+    // 4. ผูกข้อมูลหัตถการและวันคลอด และประเมินผลเกณฑ์แพทย์แผนไทย 5 ข้อ
+    const evaluated = rows.map((r) => {
+      const operations = opsByVn.get(r.vn) || []
+      const operation_codes = operations.map((o) => o.code).filter(Boolean)
+      const labor_date = laborDateByHn.get(r.hn) || null
+      const fullRow = {
+        ...r,
+        operations,
+        operation_codes,
+        labor_date,
+      }
+      return {
+        ...fullRow,
+        ...evaluateHealthMedAudit(fullRow),
+      }
+    })
 
     const filtered = evaluated.filter((r) => {
       if (resultFilter === 'PROBLEM' && r.audit_result === 'PASS') return false
       if (['PASS', 'FAIL'].includes(resultFilter) && r.audit_result !== resultFilter) return false
       if (search) {
         const s = search.toLowerCase()
-        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason}`.toLowerCase()
+        const opCodesText = r.operation_codes?.join(' ') ?? ''
+        const laborText = r.labor_date ?? ''
+        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText}`.toLowerCase()
         if (!text.includes(s)) return false
       }
       return true
@@ -510,7 +561,7 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       fail: evaluated.filter((r) => r.audit_result === 'FAIL').length,
       duplicateFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('ซ้ำ'))).length,
       kneeFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length,
-      postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด'))).length,
+      postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))).length,
       epFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('EP'))).length,
     }
     kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
