@@ -14,7 +14,7 @@ import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
 import { ExecutiveDashboardView } from '@/components/ExecutiveDashboardView'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
 import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useSyncHerbDx } from '@/hooks/useHerbDx'
-import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange } from '@/types/herbdx.types'
+import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange, DrugSummaryRecord, DxMapRecord } from '@/types/herbdx.types'
 import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
 import { canManageHerbDx } from '@/types/auth.types'
@@ -22,6 +22,11 @@ import { PinLockProvider } from '@/context/PinLockContext'
 import { LoginPage } from '@/components/LoginPage'
 import { LockScreenOverlay } from '@/components/LockScreenOverlay'
 import { PinSetupRequiredOverlay } from '@/components/PinSetupRequiredOverlay'
+
+// ค่าว่างตัวเดิมเสมอ (สร้าง [] ใหม่ทุก render ทำให้ตารางที่รับข้อมูลนี้ render วนจนหน้าค้าง)
+const NO_RECORDS: AuditRecord[] = []
+const NO_DRUGS: DrugSummaryRecord[] = []
+const NO_DX_MAP: DxMapRecord[] = []
 
 const VALID_PAGES: readonly ActivePage[] = [
   'dashboard',
@@ -168,8 +173,8 @@ const DashboardView: FC = () => {
 
   const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'FAIL' }
   const { data: mismatchResponse, isLoading: isMismatchLoading } = useAuditRecords(mismatchParams)
-  const { data: drugSummaries = [], isLoading: isDrugsLoading } = useDrugSummaries(range)
-  const { data: dxMap = [], isLoading: isDxMapLoading } = useDxMap()
+  const { data: drugSummaries = NO_DRUGS, isLoading: isDrugsLoading } = useDrugSummaries(range)
+  const { data: dxMap = NO_DX_MAP, isLoading: isDxMapLoading } = useDxMap()
   const { mutate: triggerSync, isPending: isSyncing, data: syncResult, error: syncErr } = useSyncHerbDx()
 
   const handleManualSync = () => {
@@ -237,7 +242,7 @@ const DashboardView: FC = () => {
       columns,
       rows,
       summary: [
-        { label: 'ใบสั่งยาทั้งหมด', value: filteredAuditData.length },
+        { label: 'รายการยาทั้งหมด', value: filteredAuditData.length },
         { label: 'ผ่าน', value: pass, tone: 'good' },
         { label: 'DX ไม่ตรง', value: count('FAIL'), tone: 'bad' },
         { label: 'ไม่มี DX', value: count('NO_DX'), tone: 'bad' },
@@ -265,7 +270,7 @@ const DashboardView: FC = () => {
       {activePage === 'dashboard' && (
         <ExecutiveDashboardView
           kpi={dashboardResponse?.kpi}
-          records={dashboardResponse?.data ?? []}
+          records={dashboardResponse?.data ?? NO_RECORDS}
           drugs={drugSummaries}
           status={status}
           range={range}
@@ -408,7 +413,7 @@ const DashboardView: FC = () => {
         <CodeReviewQueue
           drugs={drugSummaries}
           dxMap={dxMap}
-          mismatches={mismatchResponse?.data ?? []}
+          mismatches={mismatchResponse?.data ?? NO_RECORDS}
           canEdit={canManageHerbDx(user)}
           loading={isDrugsLoading || isDxMapLoading || isMismatchLoading}
         />
@@ -417,7 +422,7 @@ const DashboardView: FC = () => {
       {/* Page: Review a single service encounter before any HOSxP write-back */}
       {activePage === 'dxwriteback' && (
         <DxWritebackView
-          records={mismatchResponse?.data ?? []}
+          records={mismatchResponse?.data ?? NO_RECORDS}
           range={range}
           onRangeChange={handleRangeChange}
           latestVisitDate={status?.latestVisitDate ?? null}

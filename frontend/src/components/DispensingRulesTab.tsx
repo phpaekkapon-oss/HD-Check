@@ -63,8 +63,11 @@ interface SelectedDrugItem {
   drug_name: string
 }
 
+const NO_RULES: DispensingRule[] = []
+const NO_PTTYPES: PttypeItem[] = []
+
 export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit }) => {
-  const { data: rules = [], isLoading } = useDispensingRules()
+  const { data: rules = NO_RULES, isLoading } = useDispensingRules()
   const { mutate: saveRule, isPending: isSaving } = useSaveDispensingRule()
   const { mutate: toggleRule, isPending: isToggling } = useToggleDispensingRule()
   const { mutate: deleteRule, isPending: isDeleting } = useDeleteDispensingRule()
@@ -85,7 +88,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const [formError, setFormError] = useState<string | null>(null)
 
   const [drugSearchQuery, setDrugSearchQuery] = useState('')
-  const { data: pttypes = [], isLoading: isLoadingPttypes } = usePttypes()
+  const { data: pttypes = NO_PTTYPES, isLoading: isLoadingPttypes } = usePttypes()
   const [pttypeSearchQuery, setPttypeSearchQuery] = useState('')
 
   // Parsing current filter into tokens

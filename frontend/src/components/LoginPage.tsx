@@ -16,9 +16,12 @@ import {
   Building2,
   Smartphone,
   ArrowRight,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { useTheme } from '@/context/ThemeContext'
+import { OtpInput } from '@/components/OtpInput'
 import type { TotpSetupData } from '@/types/auth.types'
 
 type SsoKey = 'thaid' | 'providerid'
@@ -33,6 +36,8 @@ const SSO_META: Record<SsoKey, { icon: typeof Fingerprint; tone: string; iconCol
 }
 
 const VERIFY_TTL_MS = 5 * 60 * 1000
+const LOGIN_INPUT_CLASS =
+  'w-full h-12 pl-10 pr-4 rounded-xl border border-white/12 bg-white/[0.04] text-[15px] text-white placeholder-slate-500 transition focus:border-violet-400 focus:bg-white/[0.07] focus:outline-hidden focus:ring-4 focus:ring-violet-500/20'
 
 export const LoginPage: FC = () => {
   const { login, verify2FA, init2FASetup, confirm2FASetup } = useAuth()
@@ -41,6 +46,8 @@ export const LoginPage: FC = () => {
   const [step, setStep] = useState<'login' | 'verify_2fa' | 'setup_2fa' | 'backup_codes'>('login')
   const [loginname, setLoginname] = useState('')
   const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [capsLock, setCapsLock] = useState(false)
   const [otpCode, setOtpCode] = useState('')
   const [isBackupMode, setIsBackupMode] = useState(false)
   const [tempToken, setTempToken] = useState('')
@@ -147,6 +154,7 @@ export const LoginPage: FC = () => {
       const res = await verify2FA(tempToken, targetCode)
       if (!res.success) {
         setError(res.error || 'รหัส 2FA หรือรหัสกู้คืนไม่ถูกต้อง กรุณาลองใหม่อีกครั้ง')
+        if (!isBackupMode) setOtpCode('')
       }
     } catch (err) {
       setError((err as Error).message)
@@ -184,6 +192,7 @@ export const LoginPage: FC = () => {
       )
       if (!res.success) {
         setError(res.error || 'รหัส 6 หลักไม่ถูกต้อง')
+        setSetupVerifyCode('')
         return
       }
 
@@ -265,12 +274,10 @@ export const LoginPage: FC = () => {
         <div className="rounded-2xl bg-slate-900/85 backdrop-blur-2xl border border-white/15 p-4 sm:p-8 shadow-2xl relative ring-1 ring-white/10">
           {/* STEP 1: HOSxP LOGIN FORM */}
           {step === 'login' && (
-            <form onSubmit={handleLoginSubmit} className="space-y-4">
-              <div className="border-b border-white/10 pb-3 mb-2">
-                <div className="text-base font-bold text-white flex items-center gap-2">
-                  <Lock className="size-4 text-emerald-400" />
-                  เข้าสู่ระบบด้วยบัญชี HOSxP
-                </div>
+            <form onSubmit={handleLoginSubmit} className="space-y-5">
+              <div className="text-center">
+                <h2 className="text-xl font-bold tracking-tight text-white">เข้าสู่ระบบ</h2>
+                <p className="mt-1.5 text-sm text-slate-400">ใช้ชื่อผู้ใช้และรหัสผ่านเดียวกับ HOSxP</p>
               </div>
 
               {error && (
@@ -281,44 +288,68 @@ export const LoginPage: FC = () => {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  ชื่อผู้ใช้งาน HOSxP (Username)
+                <label htmlFor="login-username" className="mb-2 block text-sm font-medium text-slate-300">
+                  ชื่อผู้ใช้
                 </label>
                 <div className="relative">
-                  <User className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <User className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                   <input
+                    id="login-username"
+                    name="username"
                     type="text"
                     required
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    spellCheck={false}
                     value={loginname}
                     onChange={(e) => setLoginname(e.target.value)}
-                    placeholder="เช่น admin, doctor, phar"
+                    placeholder="ชื่อผู้ใช้ HOSxP"
                     autoFocus
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white placeholder-slate-400 text-sm focus:outline-hidden focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition shadow-inner"
+                    className={LOGIN_INPUT_CLASS}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  รหัสผ่าน (Password)
+                <label htmlFor="login-password" className="mb-2 block text-sm font-medium text-slate-300">
+                  รหัสผ่าน
                 </label>
                 <div className="relative">
-                  <KeyRound className="size-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-slate-500" />
                   <input
-                    type="password"
+                    id="login-password"
+                    name="password"
+                    type={showPassword ? 'text' : 'password'}
                     required
+                    autoComplete="current-password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-slate-800/80 border border-slate-700/80 text-white placeholder-slate-400 text-sm focus:outline-hidden focus:border-teal-400 focus:ring-2 focus:ring-teal-400/20 transition shadow-inner"
+                    onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
+                    onBlur={() => setCapsLock(false)}
+                    placeholder="รหัสผ่าน"
+                    className={`${LOGIN_INPUT_CLASS} pr-12`}
                   />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}
+                    aria-pressed={showPassword}
+                    className="absolute right-1.5 top-1/2 grid size-9 -translate-y-1/2 place-items-center rounded-lg text-slate-400 transition hover:bg-white/5 hover:text-white cursor-pointer"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
                 </div>
+                {capsLock && (
+                  <p className="mt-2 flex items-center gap-1.5 text-xs text-amber-300">
+                    <AlertCircle className="size-3.5" /> เปิด Caps Lock อยู่
+                  </p>
+                )}
               </div>
 
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer mt-2 disabled:opacity-50"
+                className="w-full py-3 rounded-xl text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.99] transition cursor-pointer disabled:opacity-50"
                 style={{
                   background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.titleBarHex} 100%)`,
                   boxShadow: `0 4px 18px ${accent.glow}`,
@@ -361,10 +392,10 @@ export const LoginPage: FC = () => {
                           <span className={`size-7 grid place-items-center rounded-lg bg-gradient-to-br ${meta.tone} shadow-sm`}>
                             <Icon className={`size-4 ${meta.iconColor}`} />
                           </span>
-                          <span>{sp.label}</span>
+                          <span className="whitespace-nowrap">{sp.label}</span>
                           {sp.demo && (
-                            <span className="absolute -top-2 -right-1.5 px-1.5 py-0.5 rounded-md bg-amber-400 text-[10px] font-black text-slate-900 shadow">
-                              DEMO
+                            <span className="hidden sm:inline rounded-full border border-amber-400/30 bg-amber-400/10 px-1.5 py-px text-[10px] font-semibold text-amber-300">
+                              ทดลอง
                             </span>
                           )}
                         </button>
@@ -423,131 +454,177 @@ export const LoginPage: FC = () => {
 
           {/* STEP 2: 2FA VERIFY STEP */}
           {step === 'verify_2fa' && (
-            <form onSubmit={handleVerify2FASubmit} className="space-y-4 animate-fade-in">
-              <div className="border-b border-white/10 pb-3 mb-2 text-center">
-                <div className="inline-grid place-items-center size-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 mb-2">
-                  <Smartphone className="size-6" />
-                </div>
-                <h2 className="text-base font-bold text-white">
-                  ยืนยันตัวตน 2 ขั้นตอน (2FA)
-                </h2>
-                <p className="text-xs text-slate-300 mt-1">
-                  สวัสดีคุณ <strong className="text-white">{tempUser?.name || loginname}</strong> ({tempUser?.groupname})
-                </p>
-                <p className="text-[11.5px] text-slate-400 mt-0.5">
-                  {isBackupMode
-                    ? 'กรุณากรอกรหัสกู้คืนฉุกเฉิน (Backup Code 8 หลัก)'
-                    : 'เปิดแอป Authenticator (Google / Microsoft) แล้วกรอกรหัส 6 หลัก'}
-                </p>
-              </div>
-
-              {error && (
-                <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2.5 animate-shake">
-                  <AlertCircle className="size-4 shrink-0 text-rose-400" />
-                  <span className="flex-1">
-                    {error}
-                    {error.includes('หมดอายุ') && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStep('login')
-                          setError(null)
-                        }}
-                        className="underline font-bold text-white hover:text-amber-300 ml-1 cursor-pointer"
-                      >
-                        (คลิกเพื่อเข้าสู่ระบบใหม่)
-                      </button>
-                    )}
+            <form onSubmit={handleVerify2FASubmit} className="animate-fade-in">
+              {/* Header */}
+              <div className="text-center">
+                <div className="relative mx-auto mb-4 grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-emerald-400/20 to-teal-500/10 text-emerald-300 ring-1 ring-emerald-400/30">
+                  {isBackupMode ? <KeyRound className="size-7" /> : <ShieldCheck className="size-7" />}
+                  <span className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-slate-900 ring-2 ring-slate-900">
+                    <Lock className="size-3.5 text-emerald-300" />
                   </span>
                 </div>
-              )}
-
-              <div>
-                <input
-                  type="text"
-                  inputMode={isBackupMode ? 'text' : 'numeric'}
-                  autoComplete="one-time-code"
-                  maxLength={isBackupMode ? 9 : 6}
-                  autoFocus
-                  aria-label={isBackupMode ? 'รหัสกู้คืนฉุกเฉิน' : 'รหัสยืนยัน 6 หลัก'}
-                  disabled={isSubmitting || verifyExpired}
-                  value={otpCode}
-                  onChange={(e) => {
-                    const rawVal = e.target.value
-                    if (isBackupMode) {
-                      setOtpCode(rawVal.toUpperCase())
-                    } else {
-                      const digits = rawVal.replace(/\D/g, '').slice(0, 6)
-                      setOtpCode(digits)
-                      if (digits.length === 6 && !isSubmitting && !verifyExpired) {
-                        handleVerify2FASubmit(undefined, digits)
-                      }
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleVerify2FASubmit()
-                    }
-                  }}
-                  placeholder={isBackupMode ? 'เช่น A8F2-9X1B' : '000000'}
-                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-3 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition disabled:opacity-60"
-                />
-                {verifyExpiresAt > 0 && (
-                  <p className={`mt-2 text-center text-[11px] ${verifyExpired ? 'text-rose-300' : verifySecondsLeft <= 60 ? 'text-amber-300' : 'text-slate-400'}`}>
-                    {verifyExpired
-                      ? 'หมดเวลายืนยันตัวตน กรุณากลับไปหน้าเข้าสู่ระบบแล้วลองใหม่'
-                      : `รหัสในแอปเปลี่ยนทุก 30 วินาที · เหลือเวลา ${Math.floor(verifySecondsLeft / 60)}:${String(verifySecondsLeft % 60).padStart(2, '0')} นาที`}
-                  </p>
-                )}
+                <h2 className="text-xl font-bold tracking-tight text-white">
+                  {isBackupMode ? 'ใช้รหัสกู้คืนฉุกเฉิน' : 'ยืนยันตัวตนสองขั้นตอน'}
+                </h2>
+                <p className="mx-auto mt-1.5 max-w-xs text-sm leading-relaxed text-slate-400">
+                  {isBackupMode
+                    ? 'กรอกรหัสกู้คืน 8 หลักที่ได้รับตอนเปิดใช้งาน 2FA (ใช้ได้ครั้งเดียว)'
+                    : 'กรอกรหัส 6 หลักจากแอป Google หรือ Microsoft Authenticator'}
+                </p>
               </div>
 
-              <button
-                type="submit"
-                disabled={isSubmitting || !otpComplete || verifyExpired}
-                className="w-full py-2.5 rounded-xl text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-98 transition cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                style={{
-                  background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.titleBarHex} 100%)`,
-                  boxShadow: `0 4px 18px ${accent.glow}`,
-                }}
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 className="size-4 animate-spin" />
-                    <span>กำลังตรวจสอบรหัส…</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="size-4" />
-                    <span>ยืนยันรหัสเข้าใช้งาน</span>
-                  </>
-                )}
-              </button>
-
-              <div className="flex flex-wrap items-center justify-between gap-x-3 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsBackupMode(!isBackupMode)
-                    setOtpCode('')
-                    setError(null)
-                  }}
-                  className="min-h-10 text-slate-400 hover:text-white transition cursor-pointer"
-                >
-                  {isBackupMode ? '← ใช้รหัสจาก Authenticator' : 'ทำโทรศัพท์หาย? ใช้รหัสกู้คืนฉุกเฉิน'}
-                </button>
-
+              {/* Signed-in account */}
+              <div className="mt-5 flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5">
+                <div className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-violet-500 to-indigo-600 text-sm font-bold text-white">
+                  {(tempUser?.name || loginname || '?').replace(/^(นาย|นางสาว|นาง|น\.ส\.)/, '').trim().charAt(0)}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-white">{tempUser?.name || loginname}</div>
+                  <div className="truncate text-xs text-slate-400">
+                    {tempUser?.loginname || loginname}
+                    {tempUser?.groupname ? ` · ${tempUser.groupname}` : ''}
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setStep('login')
+                    setOtpCode('')
                     setError(null)
                   }}
-                  className="min-h-10 text-slate-400 hover:text-amber-400 transition cursor-pointer"
+                  className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-slate-400 transition hover:bg-white/5 hover:text-white cursor-pointer"
                 >
-                  ← กลับไปหน้าเข้าสู่ระบบ
+                  ไม่ใช่คุณ?
                 </button>
               </div>
+
+              {/* Code entry */}
+              <div className="mt-6">
+                {isBackupMode ? (
+                  <input
+                    type="text"
+                    autoComplete="one-time-code"
+                    maxLength={9}
+                    autoFocus
+                    aria-label="รหัสกู้คืนฉุกเฉิน"
+                    disabled={isSubmitting || verifyExpired}
+                    value={otpCode}
+                    onChange={(e) => setOtpCode(e.target.value.toUpperCase())}
+                    placeholder="XXXX-XXXX"
+                    className="w-full rounded-xl border border-white/12 bg-white/[0.04] py-3 text-center font-mono text-xl font-semibold tracking-[0.3em] text-white placeholder-slate-600 transition focus:border-violet-400 focus:bg-white/[0.08] focus:outline-hidden focus:ring-4 focus:ring-violet-500/20 disabled:opacity-50"
+                  />
+                ) : (
+                  <OtpInput
+                    value={otpCode}
+                    onChange={(v) => {
+                      setOtpCode(v)
+                      if (error) setError(null)
+                    }}
+                    onComplete={(code) => {
+                      if (!isSubmitting && !verifyExpired) handleVerify2FASubmit(undefined, code)
+                    }}
+                    autoFocus
+                    invalid={Boolean(error)}
+                    disabled={isSubmitting || verifyExpired}
+                    label="รหัสยืนยัน 6 หลัก"
+                  />
+                )}
+
+                {error && (
+                  <p role="alert" className="mt-3 flex items-start justify-center gap-1.5 text-center text-sm text-rose-300">
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                    <span>{error}</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Session timer */}
+              {verifyExpiresAt > 0 && (
+                <div className="mt-5">
+                  <div className="h-1 w-full overflow-hidden rounded-full bg-white/[0.06]">
+                    <div
+                      className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${verifySecondsLeft <= 60 ? 'bg-amber-400' : 'bg-emerald-400/80'}`}
+                      style={{ width: `${(verifySecondsLeft / (VERIFY_TTL_MS / 1000)) * 100}%` }}
+                    />
+                  </div>
+                  <p className={`mt-2 text-center text-xs ${verifyExpired ? 'text-rose-300' : verifySecondsLeft <= 60 ? 'text-amber-300' : 'text-slate-500'}`}>
+                    {verifyExpired
+                      ? 'หมดเวลายืนยันตัวตน กรุณาเข้าสู่ระบบใหม่อีกครั้ง'
+                      : `ต้องยืนยันภายใน ${Math.floor(verifySecondsLeft / 60)}:${String(verifySecondsLeft % 60).padStart(2, '0')} นาที`}
+                  </p>
+                </div>
+              )}
+
+              {/* Primary action */}
+              {verifyExpired ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep('login')
+                    setOtpCode('')
+                    setError(null)
+                  }}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/[0.06] py-3 text-sm font-semibold text-white transition hover:bg-white/10 cursor-pointer"
+                >
+                  <ArrowRight className="size-4 rotate-180" />
+                  กลับไปเข้าสู่ระบบใหม่
+                </button>
+              ) : (
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !otpComplete}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl py-3 text-sm font-semibold text-white shadow-lg transition active:scale-[0.99] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.titleBarHex} 100%)`,
+                    boxShadow: otpComplete ? `0 6px 20px ${accent.glow}` : 'none',
+                  }}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="size-4 animate-spin" />
+                      กำลังตรวจสอบ…
+                    </>
+                  ) : (
+                    <>
+                      ยืนยันและเข้าสู่ระบบ
+                      <ArrowRight className="size-4" />
+                    </>
+                  )}
+                </button>
+              )}
+
+              {/* Alternatives */}
+              <div className="mt-6 flex items-center gap-3 text-xs text-slate-500">
+                <span className="h-px flex-1 bg-white/10" />
+                หรือ
+                <span className="h-px flex-1 bg-white/10" />
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsBackupMode(!isBackupMode)
+                  setOtpCode('')
+                  setError(null)
+                }}
+                className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-medium text-slate-300 transition hover:bg-white/[0.05] hover:text-white cursor-pointer"
+              >
+                {isBackupMode ? (
+                  <>
+                    <Smartphone className="size-4" />
+                    ใช้รหัสจากแอป Authenticator
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="size-4" />
+                    ไม่มีโทรศัพท์? ใช้รหัสกู้คืนฉุกเฉิน
+                  </>
+                )}
+              </button>
+
+              <p className="mt-5 flex items-center justify-center gap-1.5 border-t border-white/[0.06] pt-4 text-[11px] text-slate-500">
+                <Lock className="size-3" />
+                รหัสแต่ละชุดใช้ได้ครั้งเดียวและเปลี่ยนทุก 30 วินาที
+              </p>
             </form>
           )}
 
@@ -608,32 +685,19 @@ export const LoginPage: FC = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5 text-center">
-                  กรอกรหัส 6 หลักจากแอปเพื่อยืนยันการเปิดใช้งาน:
+                <label className="block text-sm font-medium text-slate-300 mb-2.5 text-center">
+                  กรอกรหัส 6 หลักจากแอปเพื่อยืนยันการเปิดใช้งาน
                 </label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  autoComplete="one-time-code"
-                  maxLength={6}
-                  autoFocus
-                  disabled={isSubmitting || setupExpired}
+                <OtpInput
                   value={setupVerifyCode}
-                  onChange={(e) => {
-                    const digits = e.target.value.replace(/\D/g, '').slice(0, 6)
-                    setSetupVerifyCode(digits)
-                    if (digits.length === 6 && !isSubmitting) {
-                      handleSetupConfirmSubmit(undefined, digits)
-                    }
+                  onChange={setSetupVerifyCode}
+                  onComplete={(code) => {
+                    if (!isSubmitting) handleSetupConfirmSubmit(undefined, code)
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault()
-                      handleSetupConfirmSubmit()
-                    }
-                  }}
-                  placeholder="000000"
-                  className="w-full text-center tracking-[0.35em] font-mono text-2xl font-bold py-2.5 rounded-xl bg-white/[0.06] border border-white/15 text-white placeholder-slate-600 focus:outline-hidden focus:border-white/30 focus:ring-2 focus:ring-white/15 transition disabled:opacity-60"
+                  autoFocus
+                  invalid={Boolean(error)}
+                  disabled={isSubmitting || setupExpired}
+                  label="รหัสยืนยัน 6 หลัก"
                 />
               </div>
 

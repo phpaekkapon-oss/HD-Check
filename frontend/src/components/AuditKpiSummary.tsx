@@ -29,7 +29,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
   }[] = [
     {
       id: 'ALL',
-      label: 'รายการสั่งยาทั้งหมด',
+      label: 'รายการสั่งจ่ายทั้งหมด',
       value: kpi.total,
       sub: `${fmtNum(kpi.uniquePatients)} ราย · ${fmtNum(kpi.totalQty)} หน่วย`,
       icon: ClipboardList,
@@ -43,7 +43,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
     },
     {
       id: 'PASS',
-      label: 'ผ่าน (DX ตรงข้อบ่งใช้)',
+      label: 'ผ่านเกณฑ์ (รหัสโรคตรงข้อบ่งใช้)',
       value: kpi.pass,
       sub: `${kpi.passRate}% ของทั้งหมด`,
       icon: CheckCircle2,
@@ -58,7 +58,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
     },
     {
       id: 'FAIL',
-      label: 'DX ไม่ตรงข้อบ่งใช้',
+      label: 'รหัสโรคไม่ตรงข้อบ่งใช้',
       value: kpi.fail,
       sub: 'ต้องแก้ไขรหัสวินิจฉัย',
       icon: AlertTriangle,
@@ -86,7 +86,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
     },
     {
       id: 'NO_MAP',
-      label: 'ยังไม่ตั้งค่า ICD',
+      label: 'ยังไม่กำหนดเกณฑ์ ICD-10',
       value: kpi.noMap,
       sub: 'กำหนดในเมนูตั้งค่า',
       icon: Settings2,
@@ -115,7 +115,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
             onClick={() => onSelect(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
             className={cn(
               'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
-              'border-2 flex flex-col justify-between min-h-[120px]',
+              'border-2 flex flex-col justify-between min-h-[132px]',
               'backdrop-blur-md',
               isSelected
                 ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5')
@@ -130,11 +130,11 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
             {/* Top row: Label & Icon */}
             <div>
               <div className="flex items-center justify-between gap-1 mb-2">
-                <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+                <span className="text-[13px] font-semibold text-slate-700 dark:text-slate-200 truncate">
                   {card.label}
                 </span>
-                <div className={cn('size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
-                  <Icon className="size-3.5" />
+                <div className={cn('size-8 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border', card.iconBg)}>
+                  <Icon className="size-4" />
                 </div>
               </div>
 
@@ -144,7 +144,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
                   <AnimatedNumber value={card.value} />
                 </span>
                 {card.rate !== undefined && (
-                  <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                  <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
                     {card.rate}%
                   </span>
                 )}
@@ -152,12 +152,12 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
             </div>
 
             {/* Bottom row: Subtext or Active Badge */}
-            <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+            <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs gap-1">
               <span className={cn('truncate font-medium', card.subColor)}>
                 {card.sub}
               </span>
               {isSelected && (
-                <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                <span className="shrink-0 flex items-center gap-1 font-bold text-[10.5px] px-2 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                   <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
                   เลือก
                 </span>

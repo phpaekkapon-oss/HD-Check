@@ -1,5 +1,5 @@
 import type { AuditResult, DateRange } from '@/types/herbdx.types'
-import type { CellRichTextValue, Fill, Font, RichText } from 'exceljs'
+import type { CellRichTextValue, Fill, Font, RichText, Workbook } from 'exceljs'
 
 const pad = (n: number): string => String(n).padStart(2, '0')
 
@@ -133,6 +133,8 @@ export interface ExcelReport {
   /** Column whose cell is coloured by rowTones (e.g. audit result) */
   readonly statusColumn?: number
   readonly rowTones?: readonly (ExcelTone | undefined)[]
+  /** Additional worksheets in the same file (e.g. OPD / IPD split), styled like the first */
+  readonly extraSheets?: readonly Omit<ExcelReport, 'filename' | 'extraSheets'>[]
 }
 
 const HOSPITAL_LINE = 'โรงพยาบาลพังโคน จ.สกลนคร • กลุ่มงานการแพทย์แผนไทยและการแพทย์ทางเลือก'
@@ -176,12 +178,31 @@ const nowThai = (): string => {
 export async function downloadExcel(report: ExcelReport): Promise<void> {
   try {
     const { default: ExcelJS } = await import('exceljs')
-    const { columns, rows } = report
-    const colCount = columns.length
-
     const wb = new ExcelJS.Workbook()
     wb.creator = 'SMART-HOSCHECK'
     wb.created = new Date()
+    for (const sheet of [report, ...(report.extraSheets ?? [])]) addReportSheet(wb, sheet)
+
+    const buffer = await wb.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = report.filename.endsWith('.xlsx') ? report.filename : `${report.filename}.xlsx`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 1000)
+  } catch (err) {
+    console.error('[EXCEL EXPORT]', err)
+    window.alert('ส่งออกไฟล์ Excel ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+  }
+}
+
+function addReportSheet(wb: Workbook, report: Omit<ExcelReport, 'filename' | 'extraSheets'>): void {
+    const { columns, rows } = report
+    const colCount = columns.length
+
     const ws = wb.addWorksheet(report.sheetName.replace(/[\\/?*[\]:]/g, ' ').substring(0, 31), {
       views: [{ showGridLines: false }],
       properties: { defaultRowHeight: 20 },
@@ -390,21 +411,6 @@ export async function downloadExcel(report: ExcelReport): Promise<void> {
       ws.autoFilter = { from: { row: headerRowNo, column: 1 }, to: { row: lastDataRow, column: colCount } }
     }
     ws.pageSetup.printTitlesRow = `${headerRowNo}:${headerRowNo}`
-
-    const buffer = await wb.xlsx.writeBuffer()
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = report.filename.endsWith('.xlsx') ? report.filename : `${report.filename}.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(url), 1000)
-  } catch (err) {
-    console.error('[EXCEL EXPORT]', err)
-    window.alert('ส่งออกไฟล์ Excel ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
-  }
 }
 
 /** Download rows as UTF-8 CSV with BOM (opens correctly in Thai Excel) */

@@ -47,10 +47,13 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
   )
 }
 
+// ค่าว่างต้องเป็นอาร์เรย์ตัวเดิมเสมอ: ถ้าสร้าง [] ใหม่ทุก render ตาราง (TanStack) จะ reset แล้ว render วนไม่จบจนหน้าเว็บค้าง
+const NO_DX_MAP: DxMapRecord[] = []
+
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
   const { user } = useAuth()
   const canEdit = canManageHerbDx(user)
-  const { data: dxMap = [], isLoading } = useDxMap()
+  const { data: dxMap = NO_DX_MAP, isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
   const [activeTab, setActiveTab] = useState<'dxmap' | 'interval' | 'healthmed'>('dxmap')

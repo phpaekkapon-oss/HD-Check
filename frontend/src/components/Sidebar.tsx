@@ -1,4 +1,4 @@
-import { useState, type FC } from 'react'
+import { useEffect, useState, type FC } from 'react'
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -71,6 +71,22 @@ export const Sidebar: FC<SidebarProps> = ({
   const [securityModalOpen, setSecurityModalOpen] = useState(false)
   const [securityInitialTab, setSecurityInitialTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'>('my_profile')
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
+  // ป้ายชื่อเมนูลอยด้านขวาเมื่อย่อแถบเมนู (แทน title ของเบราว์เซอร์ที่ขึ้นช้าและถูกบัง)
+  const [tip, setTip] = useState<{ label: string; hint?: string; top: number; left: number } | null>(null)
+
+  useEffect(() => {
+    setTip(null)
+  }, [collapsed, active])
+
+  const tipProps = (isCollapsedView: boolean, label: string, hint?: string) => {
+    if (!isCollapsedView) return {}
+    const show = (e: { currentTarget: HTMLElement }) => {
+      const r = e.currentTarget.getBoundingClientRect()
+      setTip({ label, hint, top: r.top + r.height / 2, left: r.right + 10 })
+    }
+    const hide = () => setTip(null)
+    return { 'aria-label': hint ? `${label} — ${hint}` : label, onMouseEnter: show, onFocus: show, onMouseLeave: hide, onBlur: hide }
+  }
 
   const content = (isMobileView: boolean, isCollapsedView: boolean) => (
     <div
@@ -94,7 +110,8 @@ export const Sidebar: FC<SidebarProps> = ({
               background: `linear-gradient(135deg, ${accent.hex} 0%, ${accent.darkText} 100%)`,
               boxShadow: `0 4px 16px ${accent.glow}`,
             }}
-            title={isCollapsedView ? 'คลิกเพื่อขยายแถบเมนู (Expand)' : 'SMART-HOSCHECK ตรวจสอบยาสมุนไพร โรงพยาบาลพังโคน'}
+            title={isCollapsedView ? undefined : 'SMART-HOSCHECK ตรวจสอบยาสมุนไพร โรงพยาบาลพังโคน'}
+            {...tipProps(isCollapsedView, 'ขยายแถบเมนู', 'SMART-HOSCHECK')}
           >
             <Leaf className="size-5 text-white drop-shadow-md stroke-[2.4]" />
           </button>
@@ -159,7 +176,8 @@ export const Sidebar: FC<SidebarProps> = ({
                 onChange(id)
                 if (isMobileView && onMobileClose) onMobileClose()
               }}
-              title={isCollapsedView ? `${label} (${hint})` : hint}
+              title={isCollapsedView ? undefined : hint}
+              {...tipProps(isCollapsedView, label, hint)}
               className={cn(
                 'group w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer relative',
                 isCollapsedView
@@ -231,7 +249,7 @@ export const Sidebar: FC<SidebarProps> = ({
             onChange('dxmap')
             if (isMobileView && onMobileClose) onMobileClose()
           }}
-          title={isCollapsedView ? 'ตั้งค่ายาสมุนไพร ↔ ICD-10' : undefined}
+          {...tipProps(isCollapsedView, 'การตั้งค่า', 'ตั้งค่ายาสมุนไพร ↔ ICD-10')}
           className={cn(
             'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
             isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
@@ -251,7 +269,7 @@ export const Sidebar: FC<SidebarProps> = ({
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
-            title={isCollapsedView ? 'บัญชีผู้ใช้ HOSxP และความปลอดภัย 2FA & PIN' : undefined}
+            {...tipProps(isCollapsedView, 'บัญชีผู้ใช้ HOSxP / 2FA & PIN', user?.two_factor_enabled ? '2FA เปิดใช้งาน' : '2FA ปิดอยู่')}
             className={cn(
               'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
               isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
@@ -289,7 +307,7 @@ export const Sidebar: FC<SidebarProps> = ({
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
-            title={isCollapsedView ? 'จัดการระบบ & เวอร์ชัน (เฉพาะ Admin)' : undefined}
+            {...tipProps(isCollapsedView, 'จัดการระบบ & เวอร์ชัน', 'เฉพาะผู้ดูแลระบบ')}
             className={cn(
               'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
               isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
@@ -320,7 +338,8 @@ export const Sidebar: FC<SidebarProps> = ({
             'w-full flex items-center rounded-xl p-2 text-left hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer group',
             isCollapsedView ? 'justify-center' : 'gap-2.5'
           )}
-          title="ข้อมูลโรงพยาบาลและผู้พัฒนาระบบ (คลิกเพื่อดูรายละเอียด)"
+          title={isCollapsedView ? undefined : 'ข้อมูลโรงพยาบาลและผู้พัฒนาระบบ (คลิกเพื่อดูรายละเอียด)'}
+          {...tipProps(isCollapsedView, 'โรงพยาบาลพังโคน', `เกี่ยวกับระบบ • v${__APP_VERSION__}`)}
         >
           <div className="size-8 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0 group-hover:scale-105 transition-transform">
             <Building2 className="size-4" />
@@ -367,6 +386,21 @@ export const Sidebar: FC<SidebarProps> = ({
       >
         {content(false, collapsed)}
       </aside>
+
+      {/* Flyout label for the collapsed rail (fixed, so the nav's overflow never clips it) */}
+      {collapsed && tip && (
+        <div
+          role="tooltip"
+          className="pointer-events-none fixed z-[100] hidden lg:block -translate-y-1/2"
+          style={{ top: tip.top, left: tip.left }}
+        >
+          <div className="relative rounded-lg bg-slate-900 px-3 py-2 text-white shadow-xl ring-1 ring-white/10 dark:bg-slate-800 animate-in fade-in slide-in-from-left-1 duration-100">
+            <span className="absolute -left-1 top-1/2 size-2 -translate-y-1/2 rotate-45 bg-slate-900 dark:bg-slate-800" />
+            <div className="whitespace-nowrap text-sm font-semibold">{tip.label}</div>
+            {tip.hint && <div className="mt-0.5 whitespace-nowrap text-xs text-slate-300">{tip.hint}</div>}
+          </div>
+        </div>
+      )}
 
       {/* Mobile Slide-over Drawer with Backdrop */}
       {mobileOpen && (
