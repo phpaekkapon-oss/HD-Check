@@ -81,13 +81,19 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
   // Fullscreen state
   const [isFullscreen, setIsFullscreen] = useState(false)
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(Boolean(document.fullscreenElement))
+    }
+    document.addEventListener('fullscreenchange', handleFsChange)
+    return () => document.removeEventListener('fullscreenchange', handleFsChange)
+  }, [])
+
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch(() => {})
-      setIsFullscreen(true)
     } else {
       document.exitFullscreen().catch(() => {})
-      setIsFullscreen(false)
     }
   }
 
