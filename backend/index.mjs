@@ -12,6 +12,7 @@ import {
   saveDuplicateRules,
 } from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
+import { analyzeHerbRecord } from './herb-advice.mjs'
 import {
   initDispensingRulesTable,
   getDispensingRules,
@@ -762,6 +763,115 @@ app.post('/api/healthmed/settings', requireHerbDxManager, async (req, res) => {
 
 // AI Cache to avoid redundant external API calls
 const aiAdvisorCache = new Map()
+const herbAdviceCache = new Map()
+
+/** Ask Gemini for a JSON answer, trying fallback models in order. Returns { data, model } or null. */
+async function askGeminiJson(prompt) {
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (!geminiKey) return null
+  const candidateModels = [
+    process.env.GEMINI_MODEL,
+    'gemini-flash-lite-latest',
+    'gemini-3.8-flash',
+    'gemini-flash-latest',
+    'gemini-3.5-flash-lite',
+  ].filter(Boolean)
+  for (const model of candidateModels) {
+    try {
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 9000)
+      const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: { responseMimeType: 'application/json' },
+        }),
+      })
+      clearTimeout(timer)
+      if (apiRes.ok) {
+        const json = await apiRes.json()
+        const text = json.candidates?.[0]?.content?.parts?.[0]?.text
+        if (text) return { data: JSON.parse(text), model }
+      }
+    } catch {
+      // try next model
+    }
+  }
+  return null
+}
+
+const putCache = (cache, key, value) => {
+  cache.set(key, value)
+  if (cache.size > 500) cache.delete(cache.keys().next().value)
+}
+
+// วิเคราะห์รายการจ่ายยาสมุนไพร: ขาดรหัสอะไร, จุดที่อาจคีย์ผิด, แก้ที่ไหนใน HOSxP (+ AI ถ้าขอ)
+app.post('/api/audit/advice', requireSession, async (req, res) => {
+  try {
+    const record = req.body?.record
+    const mode = req.body?.mode === 'ai' ? 'ai' : 'rule'
+    if (!record || typeof record !== 'object' || !record.drug_icode) {
+      return res.status(400).json({ success: false, error: 'ไม่พบข้อมูลรายการยา' })
+    }
+    // เกณฑ์ ICD อ่านจากฐานข้อมูลเสมอ ไม่เชื่อค่าที่ส่งมาจากหน้าเว็บ
+    const [mapRows] = await dwPool.query(
+      'SELECT dx_prefixes, indication FROM dw_hd_check_drug_dx_map WHERE icode = ? LIMIT 1',
+      [String(record.drug_icode)]
+    )
+    const allowed = String(mapRows[0]?.dx_prefixes ?? '').split(',').filter(Boolean)
+    const indication = String(mapRows[0]?.indication ?? '')
+    const analysis = analyzeHerbRecord(record, allowed, indication)
+    if (mode === 'rule' || record.audit_result === 'PASS') {
+      return res.json({ success: true, analysis, advice: null })
+    }
+
+    const cacheKey = `${record.id}:${record.audit_result}:${analysis.dx.join(',')}:${allowed.join(',')}`
+    if (herbAdviceCache.has(cacheKey)) {
+      return res.json({ success: true, analysis, advice: herbAdviceCache.get(cacheKey), source: 'cache' })
+    }
+
+    const list = (items) => (items.length ? items.map((s) => `- ${s}`).join('\n') : '- ไม่มี')
+    const prompt = `คุณคือผู้เชี่ยวชาญตรวจเวชระเบียนการจ่ายยาสมุนไพร (แพทย์แผนไทย) และการเบิก สปสช. ของโรงพยาบาลที่ใช้ HOSxP
+ข้อมูลรายการ:
+- ${analysis.isIpd ? `ผู้ป่วยใน AN ${String(record.vn).slice(3)}` : `ผู้ป่วยนอก VN ${record.vn}`} วันที่ ${record.visit_date ?? '-'} HN ${record.hn ?? '-'}
+- แผนก: ${record.department_name ?? '-'} | แพทย์: ${record.doctor_name ?? '-'} | สิทธิ: ${record.pttype_name ?? '-'}
+- ยา: ${record.drug_name} (${record.drug_icode}) จำนวน ${record.drug_qty ?? '-'} ${record.drug_units ?? ''}
+- รหัสวินิจฉัยในเคส: ${analysis.dx.join(', ') || 'ไม่มี'}
+- เกณฑ์ ICD ของยา: แผนปัจจุบัน ${analysis.criteria.modern.join(', ') || '-'} | แผนไทย ${analysis.criteria.u.join(', ') || '-'} | ข้อบ่งใช้ ${indication || '-'}
+- ${analysis.isThaiMed ? 'แผนกแพทย์แผนไทย: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ + รหัส U ตัวใดก็ได้' : 'แพทย์แผนปัจจุบัน: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์'}
+- ผลตรวจ: ${record.audit_result} — ${record.audit_reason ?? ''}
+ผลวิเคราะห์เบื้องต้นจากระบบ:
+สิ่งที่ขาด:
+${list(analysis.missing)}
+จุดที่อาจคีย์ผิด:
+${list(analysis.keyErrors)}
+
+ตอบสั้น กระชับ ตรงจุด ห้ามแต่งรหัสที่ไม่อยู่ในเกณฑ์หรือในเคส ตอบเป็น JSON:
+{
+  "summary": "สรุปสาเหตุที่ไม่ผ่าน 1-2 ประโยค",
+  "keyingError": "ถ้าน่าจะคีย์ผิดใน HOSxP ให้บอกว่าคีย์อะไรผิด ควรเป็นอะไร ถ้าไม่พบให้เป็นค่าว่าง",
+  "hosxpAction": "ขั้นตอนแก้ไขใน HOSxP เป็นข้อๆ ขึ้นบรรทัดใหม่แต่ละข้อ",
+  "caution": "ข้อควรระวังในการเบิก"
+}`
+
+    const ai = await askGeminiJson(prompt)
+    const advice = ai
+      ? { ...ai.data, aiModel: `Google Gemini (${ai.model})` }
+      : {
+          summary: analysis.summary,
+          keyingError: analysis.keyErrors.join('\n'),
+          hosxpAction: analysis.hosxpSteps.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+          caution: analysis.cautions.join('\n'),
+          aiModel: 'Smart Rule Engine (AI Offline Mode)',
+        }
+    if (ai) putCache(herbAdviceCache, cacheKey, advice)
+    res.json({ success: true, analysis, advice, source: ai ? 'gemini-ai' : 'rule-engine' })
+  } catch (err) {
+    fail(res, err)
+  }
+})
 
 function generateRuleBasedAdvice({ failures, age_y, pdx, dxList, ops, labor_date }) {
   const failList = failures || []
@@ -851,14 +961,6 @@ app.post('/api/healthmed/ai-advisor', requireSession, async (req, res) => {
     let advice = null
 
     if (geminiKey) {
-      const candidateModels = [
-        process.env.GEMINI_MODEL,
-        'gemini-flash-lite-latest',
-        'gemini-3.8-flash',
-        'gemini-flash-latest',
-        'gemini-3.5-flash-lite',
-      ].filter(Boolean)
-
       const prompt = `คุณคือ AI ผู้เชี่ยวชาญการตรวจสอบเวชระเบียนและการเบิกจ่ายกองทุนการแพทย์แผนไทย (สปสช.) สำหรับโรงพยาบาล
 กรณีผู้ป่วย:
 - ชื่อ: ${patient_name || 'ผู้รับบริการ'} (HN: ${hn || '-'}, อายุ: ${age_y || '-'} ปี)
@@ -878,33 +980,8 @@ app.post('/api/healthmed/ai-advisor', requireSession, async (req, res) => {
   "caution": "ข้อควรระวังในการเบิกชดเชยค่าบริการ"
 }`
 
-      for (const model of candidateModels) {
-        try {
-          const controller = new AbortController()
-          const timer = setTimeout(() => controller.abort(), 9000)
-          const apiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            signal: controller.signal,
-            body: JSON.stringify({
-              contents: [{ parts: [{ text: prompt }] }],
-              generationConfig: { responseMimeType: 'application/json' },
-            }),
-          })
-          clearTimeout(timer)
-          if (apiRes.ok) {
-            const json = await apiRes.json()
-            const text = json.candidates?.[0]?.content?.parts?.[0]?.text
-            if (text) {
-              advice = JSON.parse(text)
-              advice.aiModel = `Google Gemini (${model})`
-              break
-            }
-          }
-        } catch {
-          // try next model
-        }
-      }
+      const ai = await askGeminiJson(prompt)
+      if (ai) advice = { ...ai.data, aiModel: `Google Gemini (${ai.model})` }
     }
 
     if (!advice) {

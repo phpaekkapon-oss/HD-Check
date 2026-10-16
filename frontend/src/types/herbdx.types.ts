@@ -82,6 +82,28 @@ export interface AuditKpiMetrics {
   readonly uniquePatients: number
 }
 
+/** ผลวิเคราะห์รายการจ่ายยาจาก /api/audit/advice (rule-based) */
+export interface HerbAuditAnalysis {
+  readonly summary: string
+  readonly isIpd: boolean
+  readonly isThaiMed: boolean
+  readonly dx: readonly string[]
+  readonly criteria: { readonly modern: readonly string[]; readonly u: readonly string[] }
+  readonly indication: string
+  readonly missing: readonly string[]
+  readonly keyErrors: readonly string[]
+  readonly hosxpSteps: readonly string[]
+  readonly cautions: readonly string[]
+}
+
+export interface HerbAuditAiAdvice {
+  readonly summary: string
+  readonly keyingError?: string
+  readonly hosxpAction: string
+  readonly caution?: string
+  readonly aiModel?: string
+}
+
 export interface PrescriptionResponse {
   readonly success: true
   readonly data: readonly AuditRecord[]

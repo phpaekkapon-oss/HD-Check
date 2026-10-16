@@ -109,6 +109,7 @@ test('HealthMed - M179 + U5753 age >= 40 with all 4 knee operations passes', () 
     pdx: 'M179',
     dx0: 'U5753',
     age_y: 45,
+    pttype_hipdata: 'UCS',
     operation_codes: ['872-78-11', '873-78-11', '874-78-11', '873-78-35'],
     count_58130: 1,
   })
@@ -120,6 +121,7 @@ test('HealthMed - M179 + U5753 fails if missing any of the 4 knee operations', (
     pdx: 'M179',
     dx0: 'U5753',
     age_y: 45,
+    pttype_hipdata: 'UCS',
     operation_codes: ['872-78-11', '873-78-11', '874-78-11'], // missing 873-78-35
     count_58130: 1,
   })
@@ -132,6 +134,7 @@ test('HealthMed - M179 + U5753 fails if age < 40', () => {
     pdx: 'M179',
     dx0: 'U5753',
     age_y: 39,
+    pttype_hipdata: 'UCS',
     operation_codes: ['872-78-11', '873-78-11', '874-78-11', '873-78-35'],
     count_58130: 1,
   })
@@ -333,3 +336,59 @@ test('HealthMed duplicate - coexistence of (นวดและประคบ + 
 })
 
 
+
+const { analyzeHerbRecord } = await import('./herb-advice.mjs')
+
+test('Herb advice - drug-specific U present but modern code missing is flagged as a keying slip', () => {
+  // ยาธรณีสัณฑฆาต (K59, U6984) แต่เคสมี M7911, R14, U5733, U6984
+  const a = analyzeHerbRecord(
+    { vn: '691014084', drug_name: 'ยาธรณีสัณฑฆาต', department_name: 'แพทย์แผนไทย', audit_result: 'FAIL',
+      pdx: 'M7911', dx0: 'R14', dx1: 'U5733', dx2: 'U6984' },
+    ['K59', 'U6984'],
+  )
+  assert.match(a.missing.join(), /K59/)
+  assert.match(a.keyErrors.join(), /U6984.*ลืมคีย์รหัสแผนปัจจุบัน/)
+  assert.match(a.hosxpSteps.join(), /VN 691014084/)
+})
+
+test('Herb advice - malformed code (letter O for zero) and near-miss code are detected', () => {
+  const a = analyzeHerbRecord(
+    { vn: 'AN:690001', drug_name: 'ยาทดสอบ', department_name: 'IPD: ตึกเด็ก', audit_result: 'FAIL', pdx: 'K03', dx0: 'U504O' },
+    ['K30'],
+  )
+  assert.equal(a.isIpd, true)
+  assert.match(a.keyErrors.join(), /U504O รูปแบบไม่ถูกต้อง/)
+  assert.match(a.keyErrors.join(), /K03 ใกล้เคียงกับรหัสตามเกณฑ์ K30/)
+  assert.match(a.hosxpSteps.join(), /AN 690001/)
+
+  // ต่างหมวด (O924 กับ N92) ไม่ใช่การคีย์ผิด และเกณฑ์ "U" กว้างๆ ไม่นับเป็นรหัส U เจาะจงของยา
+  const b = analyzeHerbRecord(
+    { vn: '2', drug_name: 'ยาประสะไพล', department_name: 'แพทย์แผนไทย', audit_result: 'FAIL', pdx: 'M6260', dx0: 'O924', dx1: 'U771' },
+    ['N94', 'N92', 'U'],
+  )
+  assert.doesNotMatch(b.keyErrors.join(), /O924/)
+  assert.doesNotMatch(b.keyErrors.join(), /ลืมคีย์/)
+})
+
+test('Herb advice - interval fail explains previous dispensing date', () => {
+  const a = analyzeHerbRecord(
+    { vn: '1', hn: '000132293', drug_name: 'ยาธาตุอบเชย', department_name: 'แพทย์แผนไทย', audit_result: 'FAIL',
+      pdx: 'M7911', dx0: 'K259', dx1: 'U6680', is_interval_fail: true, interval_prev_date: '2026-10-08', interval_days_diff: 4,
+      interval_rule_info: { drug_name: 'ยาธาตุอบเชย', pttype_label: 'สิทธิ UC', min_days: 7 } },
+    ['K259', 'U6680'],
+  )
+  assert.match(a.summary, /จ่ายซ้ำไม่ครบ 7 วัน/)
+  assert.doesNotMatch(a.summary, /รหัสวินิจฉัยไม่ตรง/)
+  assert.match(a.missing.join(), /2026-10-08/)
+})
+
+test('HealthMed - knee rule applies only to UC (hipdata UCS, incl. elderly right) not other rights', () => {
+  const kneeIncomplete = { pdx: 'M179', dx0: 'U5753', age_y: 70, operation_codes: ['872-78-11', '900-78-20'], count_58130: 1 }
+  // ผู้สูงอายุ (pttype 77) เป็น UCS -> ใช้เกณฑ์พอกเข่า -> ไม่ครบ 4 รหัส ไม่ผ่าน
+  const uc = evaluateHealthMedAudit({ ...kneeIncomplete, pttype: '77', pttype_name: 'ผู้สูงอายุ', pttype_hipdata: 'UCS' })
+  assert.equal(uc.audit_result, 'FAIL')
+  assert.match(uc.audit_reason, /873-78-35/)
+  // ข้าราชการ (OFC) -> ไม่ใช้เกณฑ์พอกเข่า ตรวจด้วย M + U + หัตถการ -> ผ่าน
+  const ofc = evaluateHealthMedAudit({ ...kneeIncomplete, pttype: '23', pttype_name: 'สิทธิเบิกกรมบัญชีกลาง', pttype_hipdata: 'OFC' })
+  assert.equal(ofc.audit_result, 'PASS')
+})

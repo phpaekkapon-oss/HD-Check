@@ -1,4 +1,7 @@
 import type {
+  AuditRecord,
+  HerbAuditAnalysis,
+  HerbAuditAiAdvice,
   AuditFilterParams,
   DateRange,
   DbStatus,
@@ -105,6 +108,17 @@ export const herbDxApi = {
     }>('/api/healthmed/ai-advisor', {
       method: 'POST',
       body: JSON.stringify(record),
+    }),
+
+  herbAuditAdvice: (record: AuditRecord, mode: 'rule' | 'ai') =>
+    request<{
+      success: true
+      analysis: HerbAuditAnalysis
+      advice: HerbAuditAiAdvice | null
+      source?: string
+    }>('/api/audit/advice', {
+      method: 'POST',
+      body: JSON.stringify({ record, mode }),
     }),
 
   aiChat: (message: string, history?: Array<{ role: 'user' | 'model'; content: string }>) =>

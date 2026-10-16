@@ -54,6 +54,7 @@ export const HEALTH_MED_AUDIT_SQL = `
       TIMESTAMPDIFF(YEAR, pt.birthday, o.vstdate) AS age_y,
       ps.name AS pttype_name,
       ps.pttype,
+      ps.hipdata_code AS pttype_hipdata,
       o.doctor AS doctor_code,
       doc.name AS doctor_name,
       sp.name AS department_name,
@@ -92,14 +93,14 @@ export const HEALTH_MED_AUDIT_SQL = `
       OR nd.icode IS NOT NULL
     )
   GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
-           ps.name, ps.pttype, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
+           ps.name, ps.pttype, ps.hipdata_code, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
   ORDER BY o.vstdate DESC, o.vsttime DESC
 `
 
 /**
  * ประเมินผลการให้บริการแพทย์แผนไทยตามเกณฑ์ปรับปรุงใหม่:
  * 1. M179 + U5753 อายุ >= 40 ปี จับคู่ (872-78-11, 873-78-11, 874-78-11, 873-78-35) ถ้าไม่ครบ 4 รหัส ไม่ผ่าน
- *    (ใช้เฉพาะเคสที่ลงรหัสพอกเข่าอย่างน้อย 1 รหัส เคสนวดอย่างเดียวตรวจด้วยข้อ 2)
+ *    (เฉพาะสิทธิ UC ที่ลงรหัสพอกเข่าอย่างน้อย 1 รหัส; นวดอย่างเดียว/สิทธิอื่นตรวจด้วยข้อ 2)
  * 2. เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
  * 3. ไม่เอายาสมุนไพร/รหัสยาเข้ามาตรวจในระบบหัตถการ
  * 4. M6260 + U506 เท่านั้น จับคู่กับ 900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30 ไม่ครบ 5 รหัส ไม่ผ่าน
@@ -116,7 +117,12 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const uniqueDx = [...new Set(dxList)]
   const age = Number(row.age_y ?? 0)
   const pttypeName = String(row.pttype_name ?? '')
-  const isUc = pttypeName.includes('ประกันสุขภาพ') || pttypeName.includes('บัตรทอง') || pttypeName.includes('UC') || String(row.pttype ?? '').startsWith('U')
+  // สิทธิ UC ทุกประเภทย่อย (ผู้สูงอายุ, อสม., ผู้พิการ, ฯลฯ) มี hipdata_code = 'UCS' ใน HOSxP
+  // ชื่อสิทธิใช้เป็นตัวสำรองเมื่อไม่มี hipdata_code เท่านั้น
+  const hipdata = String(row.pttype_hipdata ?? '').trim().toUpperCase()
+  const isUc = hipdata
+    ? hipdata === 'UCS'
+    : pttypeName.includes('ประกันสุขภาพ') || pttypeName.includes('บัตรทอง') || pttypeName.includes('UC')
 
   const count58130 = Number(row.count_58130 ?? row.count_both ?? 0)
   const count58101 = Number(row.count_58101 ?? row.count_massage ?? 0)
@@ -196,9 +202,10 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const hasU5753 = uniqueDx.includes('U5753')
   const hasAnyKneeOp = REQUIRED_KNEE_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
 
-  // ใช้เกณฑ์พอกเข่าเฉพาะเคสที่ลงรหัสพอกเข่าอย่างน้อย 1 ใน 4 รหัส
-  // เคส M179 + U5753 ที่นวดอย่างเดียว (ไม่มีรหัสพอกเข่า) ตรวจด้วยเกณฑ์โรคกล้ามเนื้อทั่วไป (M + U + หัตถการ)
-  if (hasAnyKneeOp) {
+  // ใช้เกณฑ์พอกเข่าเฉพาะสิทธิ UC ที่ลงรหัสพอกเข่าอย่างน้อย 1 ใน 4 รหัส
+  // เคสนวดอย่างเดียว หรือสิทธิอื่น (ข้าราชการ, ประกันสังคม ฯลฯ) ตรวจด้วยเกณฑ์โรคกล้ามเนื้อทั่วไป (M + U + หัตถการ)
+  const isKneeCase = hasAnyKneeOp && isUc
+  if (isKneeCase) {
     if (!hasM179 || !hasU5753) {
       failures.push('โรคข้อเข่าเสื่อม/พอกเข่า ต้องจับคู่รหัสทั้ง M179 และ U5753 ร่วมกัน')
     }
@@ -264,7 +271,6 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   // กฎข้อที่ 5 (ข้อ 2 จากผู้ใช้): โรคกล้ามเนื้อทั่วไป (M... + U...)
   // เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
   // -------------------------------------------------------------
-  const isKneeCase = hasAnyKneeOp
   const isPostpartumCase = hasU506 || isPostpartumService
   const isM6260Handled = hasM6260 && !hasU506
 

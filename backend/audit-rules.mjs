@@ -1,6 +1,19 @@
 // Pure herbal-drug audit rule (no DB access) so it can be unit-tested: node --test
 import { MIN_QTY_EXEMPT_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U, normalizeIcdCode } from './config.mjs'
 
+/** แผนกแพทย์แผนไทย / แพทย์แผนไทย ต้องมีรหัส U ควบคู่กับรหัสแผนปัจจุบัน */
+export function isThaiMedRow(row) {
+  const deptName = String(row.department_name ?? '').trim()
+  const doctorName = String(row.doctor_name ?? '').trim()
+  return (
+    deptName.includes('แพทย์แผนไทย') ||
+    deptName.includes('แผนไทย') ||
+    THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name)) ||
+    doctorName.includes('พท.') ||
+    doctorName.includes('แพทย์แผนไทย')
+  )
+}
+
 export function evaluate(row, dxMap, minQtyMap) {
   const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
   const qty = Number(row.drug_qty ?? 0)
@@ -17,14 +30,7 @@ export function evaluate(row, dxMap, minQtyMap) {
   const unique = [...new Set(dxList)]
 
   // 2. ตรวจสอบประเภทแผนก/แพทย์: แผนกแพทย์แผนไทย หรือ แพทย์แผนปัจจุบัน
-  const deptName = String(row.department_name ?? '').trim()
-  const doctorName = String(row.doctor_name ?? '').trim()
-  const isThaiMed =
-    deptName.includes('แพทย์แผนไทย') ||
-    deptName.includes('แผนไทย') ||
-    THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name)) ||
-    doctorName.includes('พท.') ||
-    doctorName.includes('แพทย์แผนไทย')
+  const isThaiMed = isThaiMedRow(row)
 
   const uDxList = unique.filter((dx) => dx.startsWith('U'))
   const hasUDx = uDxList.length > 0

@@ -9,7 +9,8 @@ import {
   type VisibilityState,
   flexRender,
 } from '@tanstack/react-table'
-import { CheckCircle2, AlertCircle, FileQuestion, HelpCircle, Maximize2, Minimize2, Settings2 } from 'lucide-react'
+import { CheckCircle2, AlertCircle, Eye, FileQuestion, HelpCircle, Maximize2, Minimize2, Settings2 } from 'lucide-react'
+import { HerbAuditDetailModal } from '@/components/HerbAuditDetailModal'
 import type { AuditRecord } from '@/types/herbdx.types'
 import { cleanDrugUnit } from '@/types/herbdx.types'
 import {
@@ -140,15 +141,17 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
     doctor_code: true,
   })
   const [expanded, setExpanded] = useState(false)
+  const [detailRecord, setDetailRecord] = useState<AuditRecord | null>(null)
 
   useEffect(() => {
-    if (!expanded) return
+    // Esc ปิด popup รายละเอียดก่อน ไม่ย่อตารางไปพร้อมกัน
+    if (!expanded || detailRecord) return
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setExpanded(false)
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [expanded])
+  }, [expanded, detailRecord])
 
   // Define Shadcn Data Table columns with strict types
   const columns = useMemo<ColumnDef<AuditRecord>[]>(
@@ -165,6 +168,23 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             </div>
           )
         },
+        enableSorting: false,
+        enableHiding: false,
+      },
+      {
+        id: 'view',
+        header: () => <span className="sr-only">ดูรายละเอียด</span>,
+        cell: ({ row }) => (
+          <button
+            type="button"
+            onClick={() => setDetailRecord(row.original)}
+            className="grid size-7 place-items-center rounded-lg text-slate-400 transition hover:bg-violet-100 hover:text-violet-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 dark:hover:bg-violet-500/15 dark:hover:text-violet-300"
+            title="ดูรายละเอียด / วิเคราะห์ว่าขาดรหัสอะไร"
+            aria-label={`ดูรายละเอียด ${row.original.drug_name} ของ ${row.original.patient_name}`}
+          >
+            <Eye className="size-4" />
+          </button>
+        ),
         enableSorting: false,
         enableHiding: false,
       },
@@ -619,7 +639,15 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
               )
 
               return (
-                <TableRow key={row.id} className={rowClass}>
+                <TableRow
+                  key={row.id}
+                  className={cn(rowClass, 'cursor-pointer')}
+                  onClick={(event) => {
+                    // ปุ่มในแถว (คัดลอก, ตั้งค่า, ดูรายละเอียด) ทำงานของตัวเอง
+                    if ((event.target as HTMLElement).closest('button, a, input')) return
+                    setDetailRecord(row.original)
+                  }}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -634,6 +662,14 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
 
       {/* Shadcn Data Table Pagination */}
       <DataTablePagination table={table} pageSizeOptions={[15, 25, 50, 100, 200]} />
+
+      {detailRecord && (
+        <HerbAuditDetailModal
+          record={detailRecord}
+          onClose={() => setDetailRecord(null)}
+          onConfigureDrug={onConfigureDrug}
+        />
+      )}
     </div>
   )
 }
