@@ -209,6 +209,8 @@ export interface HealthMedRecord {
   readonly count_58301: number
   readonly count_58220: number
   readonly count_58131: number
+  readonly count_compress?: number
+  readonly is_duplicate_fail?: boolean
   readonly audit_result: 'PASS' | 'FAIL'
   readonly audit_reason: string
   readonly failures: readonly string[]
@@ -238,5 +240,14 @@ export interface DispensingRule {
   readonly is_active: boolean
   readonly created_at?: string
   readonly updated_at?: string
+}
+
+export interface ThaiMedDuplicateRules {
+  readonly block_coexist: boolean
+  readonly block_both_multiple: boolean
+  readonly block_single_multiple: boolean
+  readonly massage_and_compress_codes?: readonly string[]
+  readonly massage_only_codes?: readonly string[]
+  readonly compress_only_codes?: readonly string[]
 }
 

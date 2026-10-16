@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { herbDxApi } from '@/api/herbdx.api'
-import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule } from '@/types/herbdx.types'
+import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule, ThaiMedDuplicateRules } from '@/types/herbdx.types'
 
 export const herbDxKeys = {
   all: ['herbdx'] as const,
@@ -9,6 +9,7 @@ export const herbDxKeys = {
   drugs: (r: DateRange) => [...herbDxKeys.all, 'drugs', r] as const,
   dxMap: () => [...herbDxKeys.all, 'dx-map'] as const,
   dispensingRules: () => [...herbDxKeys.all, 'dispensing-rules'] as const,
+  healthMedSettings: () => [...herbDxKeys.all, 'healthmed-settings'] as const,
 }
 
 export function useDbStatus() {
@@ -117,6 +118,25 @@ export function useDeleteDispensingRule() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
       await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+    },
+  })
+}
+
+export function useHealthMedSettings() {
+  return useQuery({
+    queryKey: herbDxKeys.healthMedSettings(),
+    queryFn: herbDxApi.healthMedSettings,
+    select: (r) => r.data,
+  })
+}
+
+export function useSaveHealthMedSettings() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rules: ThaiMedDuplicateRules) => herbDxApi.saveHealthMedSettings(rules),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.healthMedSettings() })
+      await qc.invalidateQueries({ queryKey: ['healthmed'] })
     },
   })
 }

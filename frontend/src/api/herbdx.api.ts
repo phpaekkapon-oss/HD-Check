@@ -11,6 +11,7 @@ import type {
   HealthMedRecord,
   HealthMedKpi,
   DispensingRule,
+  ThaiMedDuplicateRules,
 } from '@/types/herbdx.types'
 
 export class ApiError extends Error {
@@ -135,5 +136,14 @@ export const herbDxApi = {
   deleteDispensingRule: (id: number) =>
     request<{ success: true }>(`/api/dispensing-rules/${id}`, {
       method: 'DELETE',
+    }),
+
+  healthMedSettings: () =>
+    request<{ success: true; data: ThaiMedDuplicateRules }>('/api/healthmed/settings'),
+
+  saveHealthMedSettings: (rules: ThaiMedDuplicateRules) =>
+    request<{ success: true; data: ThaiMedDuplicateRules }>('/api/healthmed/settings', {
+      method: 'POST',
+      body: JSON.stringify(rules),
     }),
 }

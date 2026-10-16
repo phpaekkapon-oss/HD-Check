@@ -224,4 +224,67 @@ test('Custom dispensing interval rule (e.g. SSS 14 days) fails when within inter
   assert.match(r.audit_reason, /ห่างกันเพียง 5 วัน/)
 })
 
+test('HealthMed duplicate - massage & compress 2 times fails', () => {
+  const r = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 2,
+  })
+  assert.equal(r.audit_result, 'FAIL')
+  assert.equal(r.is_duplicate_fail, true)
+  assert.match(r.audit_reason, /พบค่านวดและประคบ 2 ครั้ง/)
+})
+
+test('HealthMed duplicate - coexistence of (นวดและประคบ + นวด + ประคบ) fails', () => {
+  // Test both + massage
+  const r1 = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 1,
+    count_58101: 1,
+  })
+  assert.equal(r1.audit_result, 'FAIL')
+  assert.equal(r1.is_duplicate_fail, true)
+  assert.match(r1.audit_reason, /ค่านวดและประคบ ร่วมกับ ค่านวด/)
+
+  // Test both + compress
+  const r2 = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 1,
+    count_compress: 1,
+  })
+  assert.equal(r2.audit_result, 'FAIL')
+  assert.equal(r2.is_duplicate_fail, true)
+  assert.match(r2.audit_reason, /ค่านวดและประคบ ร่วมกับ ค่าประคบ/)
+
+  // Test massage + compress
+  const r3 = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58101: 1,
+    count_compress: 1,
+  })
+  assert.equal(r3.audit_result, 'FAIL')
+  assert.equal(r3.is_duplicate_fail, true)
+  assert.match(r3.audit_reason, /ค่านวด ร่วมกับ ค่าประคบ/)
+
+  // Test all 3
+  const r4 = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 1,
+    count_58101: 1,
+    count_compress: 1,
+  })
+  assert.equal(r4.audit_result, 'FAIL')
+  assert.equal(r4.is_duplicate_fail, true)
+  assert.match(r4.audit_reason, /ค่านวดและประคบ ร่วมกับ ค่านวด ร่วมกับ ค่าประคบ/)
+})
+
 

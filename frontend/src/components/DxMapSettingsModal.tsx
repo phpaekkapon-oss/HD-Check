@@ -8,8 +8,9 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers } from 'lucide-react'
 import { DispensingRulesTab } from '@/components/DispensingRulesTab'
+import { ThaiMedRulesTab } from '@/components/ThaiMedRulesTab'
 import { herbDxApi } from '@/api/herbdx.api'
 import { useAuth } from '@/context/AuthContext'
 import { useDxMap, useUpdateDxMap } from '@/hooks/useHerbDx'
@@ -52,7 +53,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const { data: dxMap = [], isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
-  const [activeTab, setActiveTab] = useState<'dxmap' | 'interval'>('dxmap')
+  const [activeTab, setActiveTab] = useState<'dxmap' | 'interval' | 'healthmed'>('dxmap')
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
   const [prefixes, setPrefixes] = useState('')
   const [minQty, setMinQty] = useState<number>(0)
@@ -454,10 +455,29 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             สปสช. / สิทธิ UC 7 วัน
           </span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('healthmed')}
+          className={cn(
+            'flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer',
+            activeTab === 'healthmed'
+              ? 'bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shadow-xs'
+              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/5'
+          )}
+        >
+          <Layers className="size-4 text-amber-500" />
+          <span>เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30">
+            คิดค่าบริการซ้ำ
+          </span>
+        </button>
       </div>
 
       {activeTab === 'interval' ? (
         <DispensingRulesTab dxMap={dxMap} canEdit={canEdit} />
+      ) : activeTab === 'healthmed' ? (
+        <ThaiMedRulesTab canEdit={canEdit} />
       ) : (
         <>
           {/* Informational Banner with Hospital Gradient */}

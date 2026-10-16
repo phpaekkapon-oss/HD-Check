@@ -121,7 +121,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       // 1. KPI Category Filter
       if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
-      if (kpiFilter === 'DUPLICATE' && !r.failures?.some((f) => f.includes('ซ้ำ'))) return false
+      if (kpiFilter === 'DUPLICATE' && !r.is_duplicate_fail && !r.failures?.some((f) => f.includes('ซ้ำ'))) return false
       if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า') || f.includes('พอกเข่า'))) return false
       if (kpiFilter === 'MUSCLE' && !r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))) return false
       if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) return false
@@ -263,14 +263,18 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const parsed = items.map((s) => {
             const [code, name, qty, price] = s.split(':')
             const isThaiMed =
-              Boolean(code && ['58101', '58130', '58131', '58220', '58301'].includes(code)) ||
+              Boolean(code && ['58101', '58102', '58130', '58131', '58201', '58220', '58301', '56001'].includes(code)) ||
               Boolean(name?.includes('นวด')) ||
               Boolean(name?.includes('ประคบ')) ||
               Boolean(name?.includes('ทับหม้อเกลือ')) ||
               Boolean(name?.includes('อบไอน้ำ'))
             const isDup =
               (code === '58130' && row.original.count_58130 >= 2) ||
-              (code === '58101' && row.original.count_58101 >= 2)
+              (code === '58131' && row.original.count_58131 >= 2) ||
+              (code === '58101' && row.original.count_58101 >= 2) ||
+              (code === '58201' && (row.original.count_compress ?? 0) >= 2) ||
+              (code === '56001' && (row.original.count_compress ?? 0) >= 2) ||
+              (Boolean(row.original.is_duplicate_fail && code) && ['58130', '58131', '58101', '58102', '58201', '56001'].includes(code!))
             return { code, name, qty, price, isThaiMed, isDup }
           })
 
@@ -432,6 +436,11 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
                     <XCircle className="size-3.5 text-rose-500" /> ไม่ผ่าน
                   </span>
+                  {Boolean(row.original.is_duplicate_fail || row.original.failures?.some((f) => f.includes('ซ้ำ'))) && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30">
+                      ⚠️ คิดค่าบริการซ้ำ
+                    </span>
+                  )}
                   <p className="text-[10px] leading-snug text-rose-600 dark:text-rose-300/90 font-sans mt-0.5 font-medium">
                     {row.original.audit_reason}
                   </p>

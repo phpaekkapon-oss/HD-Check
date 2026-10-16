@@ -63,8 +63,9 @@ export const HEALTH_MED_AUDIT_SQL = `
       GROUP_CONCAT(DISTINCT CONCAT(COALESCE(nd.nhso_adp_code, nd.icode), ':', COALESCE(nd.name, ''), ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
       GROUP_CONCAT(DISTINCT COALESCE(nd.nhso_adp_code, nd.icode)) AS service_codes,
       -- รวมจำนวนครั้งค่าบริการ
-      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58130' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%บำบัด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
-      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58101' OR (COALESCE(nd.name, '') LIKE '%ค่านวด%' AND COALESCE(nd.name, '') NOT LIKE '%ประคบ%') THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) IN ('58130', '58131') OR nd.name LIKE '%นวดและประคบ%' OR nd.name LIKE '%นวดประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
+      SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102') OR nd.name LIKE '%ค่านวด%') AND nd.name NOT LIKE '%ประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
+      SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) IN ('58201', '56001') OR nd.name LIKE '%ค่าประคบ%') AND nd.name NOT LIKE '%นวด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_compress,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58301' OR COALESCE(nd.name, '') LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58220' OR COALESCE(nd.name, '') LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58131' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
@@ -75,7 +76,7 @@ export const HEALTH_MED_AUDIT_SQL = `
   LEFT JOIN opitemrece op ON o.vn = op.vn
   LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
       AND (
-        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58130', '58131', '58220', '58301')
+        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301', '56001')
         OR nd.name LIKE '%ค่านวด%'
         OR nd.name LIKE '%ค่าประคบ%'
         OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
@@ -95,15 +96,18 @@ export const HEALTH_MED_AUDIT_SQL = `
 `
 
 /**
- * ประเมินผลการให้บริการแพทย์แผนไทยตามเกณฑ์ปรับปรุงใหม่ 5 ข้อ:
+ * ประเมินผลการให้บริการแพทย์แผนไทยตามเกณฑ์ปรับปรุงใหม่:
  * 1. M179 + U5753 อายุ >= 40 ปี จับคู่ (872-78-11, 873-78-11, 874-78-11, 873-78-35) ถ้าไม่ครบ 4 รหัส ไม่ผ่าน
  * 2. เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
  * 3. ไม่เอายาสมุนไพร/รหัสยาเข้ามาตรวจในระบบหัตถการ
  * 4. M6260 + U506 เท่านั้น จับคู่กับ 900-77-12, 900-77-13, 900-77-14, 900-77-16, 900-77-30 ไม่ครบ 5 รหัส ไม่ผ่าน
  *    เชื่อมกับ วันคลอด ในระบบงานบัญชี 2 ถ้าไม่มีวันคลอด ไม่ผ่าน
  * 5. รหัส M6260 + U อื่นๆ จับคู่หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ถือว่าเป็น โรคกล้ามเนื้ออื่นๆ ผ่านเกณฑ์
+ * 6. ตรวจสอบคิดค่าบริการซ้ำซ้อน:
+ *    - ค่านวดและประคบ, ค่านวด, ค่าประคบ (3 ค่านี้ถ้าอยู่ด้วยกันไม่ผ่าน)
+ *    - ค่านวดและประคบ 2 ครั้งไม่ผ่าน
  */
-export function evaluateHealthMedAudit(row) {
+export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
     .map(normalizeIcdCode)
     .filter(Boolean)
@@ -112,13 +116,23 @@ export function evaluateHealthMedAudit(row) {
   const pttypeName = String(row.pttype_name ?? '')
   const isUc = pttypeName.includes('ประกันสุขภาพ') || pttypeName.includes('บัตรทอง') || pttypeName.includes('UC') || String(row.pttype ?? '').startsWith('U')
 
-  const count58130 = Number(row.count_58130 ?? 0)
-  const count58101 = Number(row.count_58101 ?? 0)
+  const count58130 = Number(row.count_58130 ?? row.count_both ?? 0)
+  const count58101 = Number(row.count_58101 ?? row.count_massage ?? 0)
+  const countCompress = Number(row.count_compress ?? row.count_58201 ?? 0)
   const count58301 = Number(row.count_58301 ?? 0)
   const count58220 = Number(row.count_58220 ?? 0)
   const count58131 = Number(row.count_58131 ?? 0)
 
   const rawServices = String(row.service_items_raw ?? '')
+
+  // Fallback checks from raw services string if count columns did not capture
+  const hasBothFromRaw = rawServices.includes('58130') || rawServices.includes('58131') || rawServices.includes('นวดและประคบ') || rawServices.includes('นวดประคบ')
+  const hasMassageFromRaw = (rawServices.includes('58101') || rawServices.includes('58102') || rawServices.includes('ค่านวด')) && !rawServices.includes('นวดและประคบ')
+  const hasCompressFromRaw = (rawServices.includes('58201') || rawServices.includes('56001') || rawServices.includes('ค่าประคบ')) && !rawServices.includes('นวดและประคบ')
+
+  const effectiveCountBoth = Math.max(count58130, hasBothFromRaw ? 1 : 0)
+  const effectiveCountMassage = Math.max(count58101, hasMassageFromRaw ? 1 : 0)
+  const effectiveCountCompress = Math.max(countCompress, hasCompressFromRaw ? 1 : 0)
 
   // Normalized operation codes set
   const operations = Array.isArray(row.operations) ? row.operations : []
@@ -130,15 +144,38 @@ export function evaluateHealthMedAudit(row) {
 
   // -------------------------------------------------------------
   // กฎข้อที่ 1: ตรวจสอบการคิดค่าบริการซ้ำซ้อน (Duplicate Billing)
+  // 1. ค่านวดและประคบ  2. ค่านวด  3. ค่าประคบ (3 ค่านี้อยู่ด้วยกันไม่ผ่าน)
+  // 4. นวดและประคบ 2 ครั้งไม่ผ่าน
   // -------------------------------------------------------------
-  if (count58130 >= 2) {
-    failures.push('ค่านวดและประคบ (58130) ซ้ำกัน 2 ครั้งในครั้งเดียว')
+  const blockCoexist = duplicateRuleConfig?.block_coexist !== false
+  const blockBothMultiple = duplicateRuleConfig?.block_both_multiple !== false
+  const blockSingleMultiple = duplicateRuleConfig?.block_single_multiple !== false
+
+  // 4. นวดและประคบ 2 ครั้งไม่ผ่าน
+  if (blockBothMultiple && effectiveCountBoth >= 2) {
+    failures.push('คิดค่าบริการซ้ำ: พบค่านวดและประคบ 2 ครั้งในครั้งเดียว (ไม่อนุญาตให้คิด 2 ครั้ง)')
   }
-  if (count58101 >= 2) {
-    failures.push('ค่านวดเพื่อการบำบัดรักษาโรค (58101) ซ้ำกัน 2 ครั้งในครั้งเดียว')
+
+  // 1, 2, 3. สามค่านี้ (ค่านวดและประคบ, ค่านวด, ค่าประคบ) ถ้าอยู่ด้วยกันไม่ผ่าน
+  if (blockCoexist) {
+    const presentCategories = []
+    if (effectiveCountBoth > 0) presentCategories.push('ค่านวดและประคบ')
+    if (effectiveCountMassage > 0) presentCategories.push('ค่านวด')
+    if (effectiveCountCompress > 0) presentCategories.push('ค่าประคบ')
+
+    if (presentCategories.length >= 2) {
+      failures.push(`คิดค่าบริการซ้ำ: พบ ${presentCategories.join(' ร่วมกับ ')} ในครั้งเดียวกัน (ห้ามคิดค่าบริการซ้ำซ้อนร่วมกัน)`)
+    }
   }
-  if (count58130 >= 1 && count58101 >= 1) {
-    failures.push('คิดทั้งค่านวดและประคบ (58130) และค่านวดเดี่ยว (58101) ซ้ำซ้อนกัน')
+
+  // นวดเดี่ยว หรือ ประคบเดี่ยว ซ้ำ 2 ครั้ง
+  if (blockSingleMultiple) {
+    if (effectiveCountMassage >= 2) {
+      failures.push('คิดค่าบริการซ้ำ: พบค่านวดเพื่อการบำบัดรักษาโรค (58101) 2 ครั้งในครั้งเดียว')
+    }
+    if (effectiveCountCompress >= 2) {
+      failures.push('คิดค่าบริการซ้ำ: พบค่าประคบสมุนไพรเพื่อการบำบัดรักษาโรค (58201) 2 ครั้งในครั้งเดียว')
+    }
   }
 
   // -------------------------------------------------------------
@@ -260,13 +297,46 @@ export function evaluateHealthMedAudit(row) {
     operations,
     operation_codes: opCodesList,
     labor_date: row.labor_date || null,
+    is_duplicate_fail: failures.some((f) => f.includes('ซ้ำ')),
     service_items_count: {
       count_58101: count58101,
       count_58130: count58130,
       count_58131: count58131,
       count_58220: count58220,
       count_58301: count58301,
+      count_compress: countCompress,
     },
   }
+}
+
+export const DEFAULT_DUPLICATE_RULES = {
+  block_coexist: true,
+  block_both_multiple: true,
+  block_single_multiple: true,
+}
+
+export async function getDuplicateRules(dwPool) {
+  try {
+    const [rows] = await dwPool.query(
+      "SELECT setting_value FROM dw_hd_check_system_settings WHERE setting_key = 'thai_med_duplicate_rules' LIMIT 1"
+    )
+    if (rows.length > 0 && rows[0].setting_value) {
+      return { ...DEFAULT_DUPLICATE_RULES, ...JSON.parse(rows[0].setting_value) }
+    }
+  } catch (err) {
+    console.error('Error reading thai_med_duplicate_rules:', err)
+  }
+  return DEFAULT_DUPLICATE_RULES
+}
+
+export async function saveDuplicateRules(dwPool, rules) {
+  const merged = { ...DEFAULT_DUPLICATE_RULES, ...rules }
+  await dwPool.query(
+    `INSERT INTO dw_hd_check_system_settings (setting_key, setting_value)
+     VALUES ('thai_med_duplicate_rules', ?)
+     ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_at = NOW()`,
+    [JSON.stringify(merged)]
+  )
+  return { success: true, data: merged }
 }
 

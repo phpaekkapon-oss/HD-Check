@@ -5,7 +5,12 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
 import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
-import { HEALTH_MED_AUDIT_SQL, evaluateHealthMedAudit } from './healthmed.mjs'
+import {
+  HEALTH_MED_AUDIT_SQL,
+  evaluateHealthMedAudit,
+  getDuplicateRules,
+  saveDuplicateRules,
+} from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
 import {
   initDispensingRulesTable,
@@ -652,7 +657,8 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       }
     }
 
-    // 5. ผูกข้อมูลหัตถการและวันคลอด และประเมินผลเกณฑ์แพทย์แผนไทย 5 ข้อ
+    // 5. โหลดเกณฑ์การคิดค่าบริการซ้ำ และประเมินผลเกณฑ์แพทย์แผนไทย
+    const duplicateRules = await getDuplicateRules(dwPool)
     const evaluated = validRows.map((r) => {
       const operations = opsByVn.get(r.vn) || []
       const operation_codes = operations.map((o) => o.code).filter(Boolean)
@@ -671,7 +677,7 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
       }
       return {
         ...fullRow,
-        ...evaluateHealthMedAudit(fullRow),
+        ...evaluateHealthMedAudit(fullRow, duplicateRules),
       }
     })
 
@@ -701,6 +707,24 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
 
     res.json({ success: true, data: filtered, kpi, meta: { total: filtered.length, startDate, endDate } })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.get('/api/healthmed/settings', requireSession, async (_req, res) => {
+  try {
+    const rules = await getDuplicateRules(dwPool)
+    res.json({ success: true, data: rules })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/healthmed/settings', requireHerbDxManager, async (req, res) => {
+  try {
+    const result = await saveDuplicateRules(dwPool, req.body)
+    res.json(result)
   } catch (err) {
     fail(res, err)
   }
