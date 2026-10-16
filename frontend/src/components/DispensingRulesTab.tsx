@@ -17,8 +17,9 @@ import {
   useSaveDispensingRule,
   useToggleDispensingRule,
   useDeleteDispensingRule,
+  usePttypes,
 } from '@/hooks/useHerbDx'
-import type { DispensingRule, DxMapRecord } from '@/types/herbdx.types'
+import type { DispensingRule, DxMapRecord, PttypeItem } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 
 interface DispensingRulesTabProps {
@@ -78,6 +79,103 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const [formError, setFormError] = useState<string | null>(null)
 
   const [drugSearchQuery, setDrugSearchQuery] = useState('')
+  const { data: pttypes = [], isLoading: isLoadingPttypes } = usePttypes()
+  const [pttypeSearchQuery, setPttypeSearchQuery] = useState('')
+
+  // Parsing current filter into tokens
+  const selectedPttypeTokens = useMemo(() => {
+    return formPttypeFilter
+      .split(',')
+      .map((k) => k.trim())
+      .filter(Boolean)
+  }, [formPttypeFilter])
+
+  // Check if a specific pttype item is selected
+  const isPttypeSelected = (p: PttypeItem) => {
+    const code = p.pttype.toLowerCase()
+    const name = p.name.toLowerCase()
+    return selectedPttypeTokens.some((token) => {
+      const t = token.toLowerCase()
+      if (t === 'all') return true
+      if (t === 'uc' || t === 'ucs') {
+        return name.includes('บัตรทอง') || name.includes('uc') || name.includes('ประกันสุขภาพ') || code.startsWith('u')
+      }
+      if (t === 'sss') {
+        return name.includes('ประกันสังคม') || code.startsWith('s')
+      }
+      if (t === 'ofc') {
+        return name.includes('ข้าราชการ') || name.includes('เบิกตรง') || name.includes('กรมบัญชีกลาง') || code.startsWith('o')
+      }
+      return code === t || name.includes(t)
+    })
+  }
+
+  // Toggle selection for a pttype
+  const handleTogglePttype = (p: PttypeItem) => {
+    const code = p.pttype
+    const isCurrentlySelected = isPttypeSelected(p)
+    let newTokens: string[]
+    if (isCurrentlySelected) {
+      newTokens = selectedPttypeTokens.filter((t) => {
+        const lower = t.toLowerCase()
+        if (lower === code.toLowerCase()) return false
+        if (lower === 'uc' || lower === 'ucs' || lower === 'sss' || lower === 'ofc' || lower === 'all') {
+          return false
+        }
+        return true
+      })
+    } else {
+      const cleaned = selectedPttypeTokens.filter((t) => t.toUpperCase() !== 'ALL')
+      newTokens = Array.from(new Set([...cleaned, code]))
+    }
+    const newFilter = newTokens.join(', ')
+    setFormPttypeFilter(newFilter)
+
+    if (newTokens.length === 0) {
+      setFormPttypeLabel('ทุกสิทธิการรักษา (ALL)')
+    } else if (newTokens.length === 1) {
+      const match = pttypes.find((item) => item.pttype === newTokens[0])
+      setFormPttypeLabel(match ? `[${match.pttype}] ${match.name}` : `สิทธิรหัส ${newTokens[0]}`)
+    } else if (newTokens.length <= 3) {
+      const matchedNames = newTokens
+        .map((t) => {
+          const m = pttypes.find((item) => item.pttype === t)
+          return m ? `[${m.pttype}] ${m.name.slice(0, 15)}` : t
+        })
+        .join(', ')
+      setFormPttypeLabel(matchedNames)
+    } else {
+      setFormPttypeLabel(`สิทธิที่เลือก (${newTokens.length} สิทธิ)`)
+    }
+  }
+
+  // Filter pttypes by search query
+  const filteredPttypes = useMemo(() => {
+    if (!pttypeSearchQuery.trim()) return pttypes
+    const q = pttypeSearchQuery.trim().toLowerCase()
+    return pttypes.filter((p) => {
+      return (
+        p.pttype.toLowerCase().includes(q) ||
+        p.name.toLowerCase().includes(q) ||
+        Boolean(p.pcode && p.pcode.toLowerCase().includes(q))
+      )
+    })
+  }, [pttypes, pttypeSearchQuery])
+
+  // Select all filtered pttypes
+  const handleSelectAllFiltered = () => {
+    const codes = filteredPttypes.map((p) => p.pttype)
+    const cleaned = selectedPttypeTokens.filter((t) => t.toUpperCase() !== 'ALL')
+    const combined = Array.from(new Set([...cleaned, ...codes]))
+    setFormPttypeFilter(combined.join(', '))
+    setFormPttypeLabel(`สิทธิที่เลือก (${combined.length} สิทธิ)`)
+  }
+
+  // Clear all selected pttypes
+  const handleClearAllSelected = () => {
+    setFormPttypeFilter('')
+    setFormPttypeLabel('ทุกสิทธิการรักษา (ALL)')
+  }
 
   // Open modal for creating new rule
   const handleOpenAddModal = () => {
@@ -331,7 +429,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           </span>
                           {rule.pttype_filter !== 'ALL' && (
                             <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate max-w-[200px]" title={rule.pttype_filter}>
-                              คีย์เวิร์ด: {rule.pttype_filter}
+                              รหัสสิทธิ/คีย์เวิร์ด: {rule.pttype_filter}
                             </div>
                           )}
                         </div>
@@ -485,14 +583,21 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                 </div>
               </div>
 
-              {/* Rights / Benefits Preset Chips */}
-              <div className="space-y-1.5">
-                <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
-                  2. เลือกสิทธิการรักษา <span className="text-rose-500">*</span>
-                </label>
+              {/* Rights / Benefits Preset Chips & Multi-select */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
+                    2. เลือกสิทธิการรักษา <span className="text-rose-500">*</span>
+                  </label>
+                  <span className="text-[11px] text-slate-400 font-medium">
+                    (ค้นหาและเลือกได้หลายสิทธิ พร้อมแสดงรหัสสิทธิ)
+                  </span>
+                </div>
+
+                {/* Preset Chips */}
                 <div className="flex flex-wrap gap-1.5">
                   {RIGHT_PRESETS.map((p) => {
-                    const isSelected = formPttypeLabel === p.label
+                    const isSelected = formPttypeLabel === p.label || formPttypeFilter === p.filter
                     return (
                       <button
                         key={p.label}
@@ -510,25 +615,120 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                     )
                   })}
                 </div>
-                <div className="grid grid-cols-2 gap-2 mt-2">
+
+                {/* HOSxP Pttype Search & Multi-select Box */}
+                <div className="rounded-xl border border-slate-200 dark:border-[#34304a] bg-slate-50/50 dark:bg-[#101326] p-2.5 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={pttypeSearchQuery}
+                        onChange={(e) => setPttypeSearchQuery(e.target.value)}
+                        placeholder="ค้นหารหัสสิทธิ หรือชื่อสิทธิการรักษา (เช่น 89, 10, 23, บัตรทอง, จ่ายตรง)..."
+                        className="w-full rounded-lg bg-white dark:bg-[#181c30] ring-1 border-0 ring-slate-200 dark:ring-[#34304a] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      />
+                    </div>
+                    {filteredPttypes.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleSelectAllFiltered}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
+                      >
+                        เลือกที่ค้นพบ ({filteredPttypes.length})
+                      </button>
+                    )}
+                    {selectedPttypeTokens.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={handleClearAllSelected}
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
+                      >
+                        ล้างที่เลือก
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable list of pttypes with code and name */}
+                  <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
+                    {isLoadingPttypes ? (
+                      <div className="py-6 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
+                        <Loader2 className="size-4 animate-spin text-emerald-500" />
+                        <span>กำลังโหลดรหัสสิทธิการรักษาจาก HOSxP…</span>
+                      </div>
+                    ) : filteredPttypes.length === 0 ? (
+                      <div className="py-6 text-center text-xs text-slate-400">
+                        ไม่พบรหัสสิทธิที่ตรงกับ "{pttypeSearchQuery}"
+                      </div>
+                    ) : (
+                      filteredPttypes.map((p) => {
+                        const checked = isPttypeSelected(p)
+                        return (
+                          <div
+                            key={p.pttype}
+                            onClick={() => handleTogglePttype(p)}
+                            className={cn(
+                              'px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 cursor-pointer transition-colors select-none',
+                              checked
+                                ? 'bg-emerald-500/15 text-emerald-900 dark:text-emerald-200 font-medium'
+                                : 'hover:bg-slate-50 dark:hover:bg-white/5 text-slate-700 dark:text-slate-300'
+                            )}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {}}
+                                onClick={(e) => e.stopPropagation()}
+                                className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 size-3.5 cursor-pointer shrink-0"
+                              />
+                              <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-white/10 shrink-0">
+                                [{p.pttype}]
+                              </span>
+                              <span className="truncate text-xs">{p.name}</span>
+                            </div>
+                            {p.pcode && (
+                              <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                กลุ่ม {p.pcode}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })
+                    )}
+                  </div>
+
+                  {/* Selected count info & preview */}
+                  <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                    <span>
+                      เลือกแล้ว: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedPttypeTokens.length}</strong> สิทธิ/คีย์เวิร์ด
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      รหัสสิทธิทั้งหมดใน HOSxP: {pttypes.length} รายการ
+                    </span>
+                  </div>
+                </div>
+
+                {/* Display Label and Raw Filter Code Fields */}
+                <div className="grid grid-cols-2 gap-2 mt-1">
                   <div>
-                    <span className="text-[10px] text-slate-400 block mb-0.5">ชื่อแสดงของสิทธิ:</span>
+                    <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">ชื่อแสดงของสิทธิ:</span>
                     <input
                       type="text"
                       value={formPttypeLabel}
                       onChange={(e) => setFormPttypeLabel(e.target.value)}
-                      placeholder="เช่น สิทธิ UC / บัตรทอง"
+                      placeholder="เช่น สิทธิ UC / บัตรทอง หรือ [89] UC ทั่วไป"
                       className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                       required
                     />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block mb-0.5">คีย์เวิร์ดกรองสิทธิ (คั่นด้วยจุลภาค):</span>
+                    <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">รหัสสิทธิ/คีย์เวิร์ดกรอง (คั่นด้วยจุลภาค):</span>
                     <input
                       type="text"
                       value={formPttypeFilter}
                       onChange={(e) => setFormPttypeFilter(e.target.value)}
-                      placeholder="เช่น UC, บัตรทอง, ประกันสุขภาพ"
+                      placeholder="เช่น 89, 02, UC, บัตรทอง"
                       className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                       required
                     />

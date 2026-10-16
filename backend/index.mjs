@@ -1271,6 +1271,26 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
   }
 })
 
+app.get('/api/pttypes', requireSession, async (_req, res) => {
+  try {
+    const [rows] = await hosPool.query(`
+      SELECT pttype, name, pcode
+      FROM pttype
+      ORDER BY pttype
+    `)
+    res.json({
+      success: true,
+      data: rows.map((r) => ({
+        pttype: String(r.pttype ?? ''),
+        name: r.name ? String(r.name) : String(r.pttype),
+        pcode: r.pcode ? String(r.pcode) : '',
+      })),
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 /* ---------------- Dispensing Interval & Benefit Rules ---------------- */
 app.get('/api/dispensing-rules', requireSession, async (_req, res) => {
   try {

@@ -12,6 +12,7 @@ import type {
   HealthMedKpi,
   DispensingRule,
   ThaiMedDuplicateRules,
+  PttypeItem,
 } from '@/types/herbdx.types'
 
 export class ApiError extends Error {
@@ -146,4 +147,7 @@ export const herbDxApi = {
       method: 'POST',
       body: JSON.stringify(rules),
     }),
+
+  pttypes: () =>
+    request<{ success: true; data: readonly PttypeItem[] }>('/api/pttypes'),
 }

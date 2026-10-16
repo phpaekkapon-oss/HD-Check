@@ -10,6 +10,7 @@ export const herbDxKeys = {
   dxMap: () => [...herbDxKeys.all, 'dx-map'] as const,
   dispensingRules: () => [...herbDxKeys.all, 'dispensing-rules'] as const,
   healthMedSettings: () => [...herbDxKeys.all, 'healthmed-settings'] as const,
+  pttypes: () => [...herbDxKeys.all, 'pttypes'] as const,
 }
 
 export function useDbStatus() {
@@ -140,4 +141,14 @@ export function useSaveHealthMedSettings() {
     },
   })
 }
+
+export function usePttypes() {
+  return useQuery({
+    queryKey: herbDxKeys.pttypes(),
+    queryFn: herbDxApi.pttypes,
+    select: (r) => r.data,
+    staleTime: 5 * 60 * 1000,
+  })
+}
+
 

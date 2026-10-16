@@ -34,7 +34,7 @@ export function matchesPttype(patientPttypeName, pttypeCode, filter) {
         code.startsWith('o')
       )
     }
-    return name.includes(k) || code.includes(k)
+    return name.includes(k) || code === k
   })
 }
 

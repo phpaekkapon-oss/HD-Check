@@ -251,3 +251,10 @@ export interface ThaiMedDuplicateRules {
   readonly compress_only_codes?: readonly string[]
 }
 
+export interface PttypeItem {
+  readonly pttype: string
+  readonly name: string
+  readonly pcode?: string
+}
+
+
