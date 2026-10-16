@@ -344,7 +344,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       },
       {
         id: 'diagnoses',
-        header: 'รหัสวินิจฉัย (PDX, DX0–DX5)',
+        header: 'รหัสวินิจฉัย (รหัสหลัก / รหัสรอง)',
         cell: ({ row }) => {
           const rawDxs = [
             row.original.pdx ? { code: row.original.pdx, isPdx: true } : null,
@@ -357,40 +357,60 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           ].filter(Boolean) as { code: string; isPdx: boolean }[]
 
           const seen = new Set<string>()
-          const dxs = rawDxs.filter((d) => {
-            if (seen.has(d.code)) return false
-            seen.add(d.code)
+          // คัดเฉพาะรหัสหลักและรหัสรองแพทย์แผนไทย (รหัสกลุ่ม M, U และ EP) ตามที่แผนกแพทย์แผนไทยกำหนด
+          // ตัดรหัสโรคทั่วไป เช่น E119, I10, E789, J209, R21, Z713 ออก (เนื่องจากตรวจสอบที่หน้าตรวจจ่ายยาสมุนไพร)
+          const thaiMedDxs = rawDxs.filter((d) => {
+            const code = d.code.toUpperCase()
+            const isRelevant = code.startsWith('M') || code.startsWith('U') || code.startsWith('EP')
+            if (!isRelevant) return false
+            if (seen.has(code)) return false
+            seen.add(code)
             return true
           })
 
-          if (dxs.length === 0) {
-            return <span className="text-rose-400 font-semibold text-[11px] italic">ไม่มีรหัส DX</span>
+          // จัดเรียง: รหัสหลัก (M...) ขึ้นก่อน ตามด้วยรหัสรองแพทย์แผนไทย (U...)
+          thaiMedDxs.sort((a, b) => {
+            const aIsM = a.code.startsWith('M')
+            const bIsM = b.code.startsWith('M')
+            if (aIsM && !bIsM) return -1
+            if (!aIsM && bIsM) return 1
+            return a.code.localeCompare(b.code)
+          })
+
+          if (thaiMedDxs.length === 0) {
+            return (
+              <span className="text-amber-500 font-medium text-[11px] italic">
+                ไม่มีรหัสแผนไทย (M/U)
+              </span>
+            )
           }
 
           return (
             <div className="flex flex-wrap gap-1 max-w-[200px]">
-              {dxs.map((item, idx) => {
+              {thaiMedDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
                 const isEP = item.code.startsWith('EP')
-                const isOorZ = item.code.startsWith('O') || item.code.startsWith('Z')
                 return (
                   <span
                     key={idx}
                     className={cn(
                       'px-1.5 py-0.5 rounded-md text-[10.5px] font-mono font-bold border transition shadow-2xs',
-                      item.isPdx && 'ring-1 ring-offset-0',
-                      isU
-                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300/60 ring-emerald-400/50'
-                        : isM
-                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-blue-400/50'
-                        : isOorZ
-                        ? 'bg-purple-50 text-purple-700 dark:bg-purple-950/40 dark:text-purple-300 border-purple-300/60 ring-purple-400/50'
+                      isM
+                        ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-1 ring-blue-400/50'
+                        : isU
+                        ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border-emerald-300/60 ring-1 ring-emerald-400/50'
                         : isEP
-                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-400 ring-rose-400/50'
-                        : 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300 border-slate-200 dark:border-white/10'
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border-rose-400 ring-1 ring-rose-400/50'
+                        : 'bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-slate-300 border-slate-200'
                     )}
-                    title={item.isPdx ? `PDX (รหัสโรคหลัก): ${item.code}` : `DX: ${item.code}`}
+                    title={
+                      isM
+                        ? `รหัสหลัก (ICD-10): ${item.code}`
+                        : isU
+                        ? `รหัสรองแพทย์แผนไทย (ICD-10-TM): ${item.code}`
+                        : `รหัสปิดสิทธิ: ${item.code}`
+                    }
                   >
                     {item.code}
                   </span>
@@ -868,12 +888,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             </div>
 
             {/* Diagnoses Section */}
+            {/* Diagnoses Section */}
             <div className="space-y-1.5">
               <h4 className="text-xs font-bold text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
-                <FileText className="size-3.5 text-teal-500" /> รหัสการวินิจฉัยโรค (ICD-10 & ICD-10-TM)
+                <FileText className="size-3.5 text-teal-500" /> รหัสการวินิจฉัยโรคทางการแพทย์แผนไทย (รหัสหลัก / รหัสรอง)
               </h4>
-              <div className="flex flex-wrap gap-1.5 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
-                {[
+              {(() => {
+                const allDxs = [
                   selectedRecord.pdx,
                   selectedRecord.dx0,
                   selectedRecord.dx1,
@@ -881,24 +902,49 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   selectedRecord.dx3,
                   selectedRecord.dx4,
                   selectedRecord.dx5,
-                ]
-                  .filter((dx): dx is string => Boolean(dx))
-                  .map((dx, idx) => (
-                    <span
-                      key={idx}
-                      className={cn(
-                        'px-2 py-1 rounded-md text-xs font-mono font-bold border',
-                        dx.startsWith('U')
-                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300'
-                          : dx.startsWith('M')
-                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300'
-                          : 'bg-slate-200 text-slate-800 dark:bg-white/10 dark:text-slate-200 border-slate-300'
+                ].filter((dx): dx is string => Boolean(dx))
+
+                const thaiMedList = allDxs.filter((dx) => dx.startsWith('M') || dx.startsWith('U') || dx.startsWith('EP'))
+                const otherList = allDxs.filter((dx) => !dx.startsWith('M') && !dx.startsWith('U') && !dx.startsWith('EP'))
+
+                return (
+                  <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">รหัสแผนไทย:</span>
+                      {thaiMedList.length > 0 ? (
+                        thaiMedList.map((dx, idx) => (
+                          <span
+                            key={idx}
+                            className={cn(
+                              'px-2 py-0.5 rounded-md text-xs font-mono font-bold border',
+                              dx.startsWith('U')
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300'
+                                : dx.startsWith('M')
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300'
+                                : 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-rose-300'
+                            )}
+                          >
+                            {dx.startsWith('M') ? `รหัสหลัก: ${dx}` : dx.startsWith('U') ? `รหัสรอง: ${dx}` : dx}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-xs text-amber-500 italic">ไม่มีรหัสแผนไทย (M/U)</span>
                       )}
-                    >
-                      {idx === 0 ? `PDX: ${dx}` : `DX${idx}: ${dx}`}
-                    </span>
-                  ))}
-              </div>
+                    </div>
+
+                    {otherList.length > 0 && (
+                      <div className="pt-1.5 border-t border-slate-200/50 dark:border-white/5 flex flex-wrap gap-1 items-center text-[11px] text-slate-400">
+                        <span className="mr-1">รหัสโรคทั่วไป (ตรวจในหน้าจ่ายยาสมุนไพร):</span>
+                        {otherList.map((dx, idx) => (
+                          <span key={idx} className="font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px]">
+                            {dx}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
             </div>
 
             {/* Service Items Section */}
