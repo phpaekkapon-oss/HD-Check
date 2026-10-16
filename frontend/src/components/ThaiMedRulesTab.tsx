@@ -24,7 +24,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
     block_single_multiple: true,
     massage_and_compress_codes: ['58130', '58131'],
     massage_only_codes: ['58101', '58102'],
-    compress_only_codes: ['58201', '56001'],
+    compress_only_codes: ['58201'],
   })
 
   const [savedSuccess, setSavedSuccess] = useState(false)
@@ -44,7 +44,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
           : ['58101', '58102'],
         compress_only_codes: remoteSettings.compress_only_codes?.length
           ? remoteSettings.compress_only_codes
-          : ['58201', '56001'],
+          : ['58201'],
       })
     }
   }, [remoteSettings])
@@ -171,7 +171,6 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
               </div>
               <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
                 <div>• รหัส ADP: <code className="font-mono font-bold text-emerald-600 dark:text-emerald-400">58201</code> (ประคบสมุนไพร 150.-)</div>
-                <div>• รหัส ADP: <code className="font-mono font-bold text-emerald-600 dark:text-emerald-400">56001</code> (ประคบความร้อน 60.-)</div>
               </div>
             </div>
           </div>
@@ -223,7 +222,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
               </div>
               <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
                 ป้องกันการคิดค่านวดเพื่อการบำบัดโรค (<code className="font-mono font-bold text-blue-600 dark:text-blue-400">58101</code>) ≥ 2 ครั้ง
-                หรือค่าประคบสมุนไพร (<code className="font-mono font-bold text-emerald-600 dark:text-emerald-400">58201 / 56001</code>) ≥ 2 ครั้งในวันเดียวกัน
+                หรือค่าประคบสมุนไพร (<code className="font-mono font-bold text-emerald-600 dark:text-emerald-400">58201</code>) ≥ 2 ครั้งในวันเดียวกัน
               </p>
             </div>
 

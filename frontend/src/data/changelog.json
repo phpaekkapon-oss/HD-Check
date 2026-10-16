@@ -1,5 +1,22 @@
 [
   {
+    "version": "1.1.35",
+    "date": "2026-10-16",
+    "title": "อัปเดตระบบตรวจหัตถการแพทย์แผนไทย (HealthMed Audit Engine)",
+    "type": "patch",
+    "highlights": [
+      "ปรับปรุงระบบตรวจสอบรหัสหัตถการแพทย์แผนไทยและเกณฑ์ประเมิน (HealthMed Audit Engine)",
+      "ปรับปรุงระบบ Build, Git Release และ Automated Deployment"
+    ],
+    "categories": {
+      "features": [
+        "ปรับปรุงระบบตรวจสอบรหัสหัตถการแพทย์แผนไทยและเกณฑ์ประเมิน (HealthMed Audit Engine)",
+        "ปรับปรุงระบบ Build, Git Release และ Automated Deployment"
+      ],
+      "improvements": []
+    }
+  },
+  {
     "version": "1.1.34",
     "date": "2026-10-16",
     "title": "ปรับปรุงหน้าจอการใช้งานและการแสดงผลตัวอักษรไทยให้คมชัดยิ่งขึ้น",

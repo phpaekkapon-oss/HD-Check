@@ -65,7 +65,7 @@ export const HEALTH_MED_AUDIT_SQL = `
       -- รวมจำนวนครั้งค่าบริการ
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) IN ('58130', '58131') OR nd.name LIKE '%นวดและประคบ%' OR nd.name LIKE '%นวดประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
       SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102') OR nd.name LIKE '%ค่านวด%') AND nd.name NOT LIKE '%ประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
-      SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) IN ('58201', '56001') OR nd.name LIKE '%ค่าประคบ%') AND nd.name NOT LIKE '%นวด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_compress,
+      SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) = '58201' OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')) AND nd.name NOT LIKE '%นวด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_compress,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58301' OR COALESCE(nd.name, '') LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58220' OR COALESCE(nd.name, '') LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58131' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
@@ -76,9 +76,10 @@ export const HEALTH_MED_AUDIT_SQL = `
   LEFT JOIN opitemrece op ON o.vn = op.vn
   LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
       AND (
-        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301', '56001')
-        OR nd.name LIKE '%ค่านวด%'
-        OR nd.name LIKE '%ค่าประคบ%'
+        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301')
+        OR (nd.nhso_adp_code LIKE '58%')
+        OR (nd.name LIKE '%ค่านวด%' AND nd.name NOT LIKE '%กายภาพ%')
+        OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')
         OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
         OR nd.name LIKE '%ค่าอบไอน้ำ%'
       )
@@ -128,7 +129,7 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   // Fallback checks from raw services string if count columns did not capture
   const hasBothFromRaw = rawServices.includes('58130') || rawServices.includes('58131') || rawServices.includes('นวดและประคบ') || rawServices.includes('นวดประคบ')
   const hasMassageFromRaw = (rawServices.includes('58101') || rawServices.includes('58102') || rawServices.includes('ค่านวด')) && !rawServices.includes('นวดและประคบ')
-  const hasCompressFromRaw = (rawServices.includes('58201') || rawServices.includes('56001') || rawServices.includes('ค่าประคบ')) && !rawServices.includes('นวดและประคบ')
+  const hasCompressFromRaw = (rawServices.includes('58201') || (rawServices.includes('ประคบ') && !rawServices.includes('ความร้อน') && !rawServices.includes('ประคบร้อน') && !rawServices.includes('กายภาพ'))) && !rawServices.includes('นวดและประคบ')
 
   const effectiveCountBoth = Math.max(count58130, hasBothFromRaw ? 1 : 0)
   const effectiveCountMassage = Math.max(count58101, hasMassageFromRaw ? 1 : 0)

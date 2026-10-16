@@ -28,11 +28,11 @@ import {
   User,
   FileText,
   Bot,
-  Copy,
-  Check,
   ChevronDown,
   ChevronUp,
   SlidersHorizontal,
+  Check,
+  Copy,
 } from 'lucide-react'
 import { useHealthMedAudit } from '@/hooks/useHerbDx'
 import { herbDxApi } from '@/api/herbdx.api'
@@ -56,6 +56,72 @@ interface HealthMedAuditViewProps {
 }
 
 type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'DUPLICATE' | 'KNEE' | 'MUSCLE' | 'POSTPARTUM' | 'EP'
+
+const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber' | 'rose' | 'purple' }[] => {
+  const tags: { label: string; color: 'amber' | 'rose' | 'purple' }[] = []
+  const text = (record.failures?.join(' ') || record.audit_reason || '').toLowerCase()
+
+  // 1. ตรวจค่าบริการซ้ำ
+  if (record.is_duplicate_fail || text.includes('ซ้ำ')) {
+    if (text.includes('58201') || text.includes('ประคบ')) {
+      tags.push({ label: 'คิดค่าประคบซ้ำ (58201)', color: 'amber' })
+    } else if (text.includes('58101') || text.includes('นวดเพื่อ')) {
+      tags.push({ label: 'คิดค่านวดซ้ำ (58101)', color: 'amber' })
+    } else if (text.includes('58130') || text.includes('นวดและประคบ')) {
+      tags.push({ label: 'ค่านวด+ประคบซ้ำ (58130)', color: 'amber' })
+    } else {
+      tags.push({ label: 'คิดค่าบริการซ้ำ', color: 'amber' })
+    }
+  }
+
+  // 2. ขาดรหัส U
+  if (text.includes('ขาดรหัส u') || text.includes('รหัส u...') || text.includes('แพทย์แผนไทย (รหัส u')) {
+    tags.push({ label: 'ขาดรหัสแผนไทย (U..)', color: 'rose' })
+  }
+
+  // 3. ขาดรหัส M
+  if (text.includes('ขาดรหัส m') || text.includes('โรคกล้ามเนื้อ (รหัส m')) {
+    tags.push({ label: 'ขาดรหัสกล้ามเนื้อ (M..)', color: 'rose' })
+  }
+
+  // 4. ขาดหัตถการ ICD-10-TM
+  if (text.includes('ต้องมีรหัสหัตถการ') || text.includes('ขาดรหัส: 87') || text.includes('ขาดรหัสหัตถการ') || text.includes('872-78-11')) {
+    tags.push({ label: 'ขาดหัตถการ ICD-10-TM', color: 'rose' })
+  }
+
+  // 5. ปิดสิทธิ EP
+  if (text.includes('ep') || text.includes('ปิดสิทธิ')) {
+    tags.push({ label: 'ติดรหัสปิดสิทธิ (EP)', color: 'rose' })
+  }
+
+  // 6. เกณฑ์พอกเข่า
+  if (text.includes('พอกเข่า') || text.includes('m179') || text.includes('u5753')) {
+    if (text.includes('อายุ 40') || record.age_y < 40) {
+      tags.push({ label: `อายุ < 40 ปี (${record.age_y} ปี)`, color: 'rose' })
+    }
+    if (!tags.some((t) => t.label.includes('พอกเข่า'))) {
+      tags.push({ label: 'เกณฑ์พอกเข่าไม่ครบ', color: 'rose' })
+    }
+  }
+
+  // 7. หลังคลอด / บัญชี 2
+  if (text.includes('หลังคลอด') || text.includes('วันคลอด') || text.includes('บัญชี 2')) {
+    if (text.includes('ไม่มีวันคลอด') || !record.labor_date) {
+      tags.push({ label: 'ไม่มีวันคลอดในบัญชี 2', color: 'purple' })
+    } else {
+      tags.push({ label: 'บริบาลหลังคลอดไม่ครบ', color: 'purple' })
+    }
+  }
+
+  // Fallback
+  if (tags.length === 0) {
+    const raw = ((record.audit_reason || 'เวชระเบียนไม่ผ่านเกณฑ์').split('•')[0] ?? '').trim()
+    const clean = raw.length > 24 ? `${raw.slice(0, 24)}...` : raw
+    tags.push({ label: clean || 'เวชระเบียนไม่ผ่านเกณฑ์', color: 'rose' })
+  }
+
+  return tags
+}
 
 export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
   const [kpiFilter, setKpiFilter] = useState<KpiFilterType>('ALL')
@@ -153,20 +219,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.getState().pagination
           return (
-            <span className="font-mono text-slate-400 dark:text-slate-500 font-bold text-center block w-8 mx-auto text-xs sm:text-[13px]">
+            <span className="font-mono text-slate-400 dark:text-slate-500 font-bold text-center block w-6 mx-auto text-xs sm:text-[13px]">
               {pageIndex * pageSize + row.index + 1}
             </span>
           )
         },
-        size: 45,
+        size: 38,
       },
       {
         accessorKey: 'visit_date',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="วันที่ / เวลา" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="วันที่ / เวลา" className="justify-center" />,
         cell: ({ row }) => (
-          <div className="font-mono whitespace-nowrap min-w-[90px]">
-            <div className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px]">{row.original.visit_date}</div>
-            <div className="text-[11px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5 font-medium">
+          <div className="font-mono whitespace-nowrap text-center">
+            <div className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px] leading-tight">{row.original.visit_date}</div>
+            <div className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1 mt-0.5 font-medium leading-tight">
               <Clock className="size-3 text-slate-400 shrink-0" />
               <span>{row.original.visit_time ? `${row.original.visit_time.substring(0, 5)} น.` : '—'}</span>
             </div>
@@ -177,7 +243,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'patient_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้รับบริการ / HN" />,
         cell: ({ row }) => (
-          <div className="whitespace-nowrap min-w-[160px] max-w-[225px]">
+          <div className="whitespace-nowrap min-w-[160px] max-w-[240px]">
             <div className="flex items-center gap-1 group">
               <button
                 type="button"
@@ -192,7 +258,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 text={row.original.patient_name}
                 title="คัดลอกชื่อผู้รับบริการ"
                 iconSize="size-3.5"
-                className="opacity-50 hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
+                className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
               />
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-[11px]">
@@ -201,7 +267,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 <CopyButton
                   text={row.original.hn}
                   title="คัดลอก HN"
-                  iconSize="size-3"
+                  iconSize="size-2.5"
                   className="p-0.5 hover:bg-teal-500/25 text-teal-600 dark:text-teal-300 rounded cursor-pointer transition"
                 />
               </span>
@@ -227,10 +293,10 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const age = row.original.age_y
           const isKneeIssue = age < 40 && (row.original.pdx === 'M179' || row.original.dx0 === 'M179')
           return (
-            <div className="flex justify-center whitespace-nowrap min-w-[65px]">
+            <div className="flex justify-center whitespace-nowrap">
               <span
                 className={cn(
-                  'px-2.5 py-0.5 rounded-full text-xs sm:text-[13px] font-mono font-bold inline-flex items-center gap-1 border shrink-0',
+                  'px-2 py-0.5 rounded-full text-xs sm:text-[13px] font-mono font-bold inline-flex items-center gap-1 border shrink-0',
                   isKneeIssue
                     ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse'
                     : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10'
@@ -242,15 +308,15 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             </div>
           )
         },
-        size: 70,
+        size: 58,
       },
       {
         accessorKey: 'pttype_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="สิทธิการรักษา" />,
         cell: ({ row }) => (
-          <div className="min-w-[170px] max-w-[220px]">
+          <div className="max-w-[160px] min-w-[95px]">
             <span
-              className="text-xs sm:text-[12.5px] px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
+              className="text-xs sm:text-[12.5px] px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10 text-slate-700 dark:text-slate-300 font-medium truncate block text-center shadow-2xs"
               title={row.original.pttype_name || undefined}
             >
               {row.original.pttype_name || '—'}
@@ -260,13 +326,11 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       },
       {
         accessorKey: 'doctor_name',
-        header: ({ column }) => <DataTableColumnHeader column={column} title="แพทย์ / ผู้ให้บริการ" />,
+        header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้ให้บริการ" />,
         cell: ({ row }) => (
-          <div className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap min-w-[140px] max-w-[180px] flex items-center gap-1.5">
-            <div className="size-6 rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0">
-              <User className="size-3.5" />
-            </div>
-            <span className="truncate max-w-[150px]" title={row.original.doctor_name || undefined}>
+          <div className="text-xs sm:text-[13px] text-slate-800 dark:text-slate-200 font-medium whitespace-nowrap max-w-[140px] flex items-center gap-1.5">
+            <User className="size-3.5 text-teal-500 shrink-0" />
+            <span className="truncate" title={row.original.doctor_name || undefined}>
               {row.original.doctor_name || <span className="text-slate-400 italic">— ไม่ระบุ —</span>}
             </span>
           </div>
@@ -274,7 +338,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       },
       {
         id: 'services',
-        header: 'รายการค่าบริการ / หัตถการ',
+        header: 'ค่าบริการ / หัตถการ',
         cell: ({ row }) => {
           const raw = String(row.original.service_items_raw || '')
           const items = raw.split('||').filter(Boolean)
@@ -290,9 +354,10 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           const parsed = items.map((s) => {
             const [code, name, qty, price] = s.split(':')
             const isThaiMed =
-              Boolean(code && ['58101', '58102', '58130', '58131', '58201', '58220', '58301', '56001'].includes(code)) ||
-              Boolean(name?.includes('นวด')) ||
-              Boolean(name?.includes('ประคบ')) ||
+              Boolean(code && ['58101', '58102', '58130', '58131', '58201', '58220', '58301'].includes(code)) ||
+              Boolean(code?.startsWith('58')) ||
+              Boolean(name?.includes('นวด') && !name?.includes('กายภาพ')) ||
+              Boolean(name?.includes('ประคบ') && !name?.includes('ความร้อน') && !name?.includes('ประคบร้อน') && !name?.includes('ประคบเย็น') && !name?.includes('กายภาพ')) ||
               Boolean(name?.includes('ทับหม้อเกลือ')) ||
               Boolean(name?.includes('อบไอน้ำ'))
             const isDup =
@@ -300,46 +365,48 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               (code === '58131' && row.original.count_58131 >= 2) ||
               (code === '58101' && row.original.count_58101 >= 2) ||
               (code === '58201' && (row.original.count_compress ?? 0) >= 2) ||
-              (code === '56001' && (row.original.count_compress ?? 0) >= 2) ||
-              (Boolean(row.original.is_duplicate_fail && code) && ['58130', '58131', '58101', '58102', '58201', '56001'].includes(code!))
+              (Boolean(row.original.is_duplicate_fail && code) && ['58130', '58131', '58101', '58102', '58201'].includes(code!))
             return { code, name, qty, price, isThaiMed, isDup }
           })
 
           const thaiMedItems = parsed.filter((p) => p.isThaiMed)
 
           return (
-            <div className="space-y-1 min-w-[240px] max-w-[340px]">
+            <div className="space-y-1 max-w-[285px] min-w-[230px]">
               {/* รายการค่าบริการ 58xxx */}
               {thaiMedItems.length > 0 && (
                 <div className="flex flex-wrap gap-1">
-                  {thaiMedItems.map((p, idx) => (
-                    <span
-                      key={idx}
-                      className={cn(
-                        'text-[11px] sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-md border transition shadow-2xs',
-                        p.isDup
-                          ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40 font-semibold'
-                          : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30 font-medium'
-                      )}
-                      title={`${p.name} (${p.code}) x${p.qty} ราคา ${Number(p.price || 0).toLocaleString()} บ.`}
-                    >
-                      <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
-                        [{p.code}]
-                      </strong>
-                      <span className="truncate max-w-[145px]">{p.name}</span>
-                      <span className="font-mono text-[10.5px] opacity-80 shrink-0 font-bold">x{p.qty}</span>
-                    </span>
-                  ))}
+                  {thaiMedItems.map((p, idx) => {
+                    const cleanName = (p.name || '').replace(/\s*\(\d+\)\s*$/, '').trim()
+                    return (
+                      <span
+                        key={idx}
+                        className={cn(
+                          'text-[11px] sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-md border transition shadow-2xs leading-tight',
+                          p.isDup
+                            ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40 font-semibold'
+                            : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30 font-medium'
+                        )}
+                        title={`${cleanName} (${p.code}) x${p.qty} ราคา ${Number(p.price || 0).toLocaleString()} บ.`}
+                      >
+                        <strong className="font-mono font-bold text-teal-600 dark:text-teal-400 shrink-0">
+                          [{p.code}]
+                        </strong>
+                        <span className="truncate max-w-[160px]">{cleanName}</span>
+                        <span className="font-mono text-[10.5px] opacity-80 shrink-0 font-bold">x{p.qty}</span>
+                      </span>
+                    )
+                  })}
                 </div>
               )}
 
-              {/* รายการรหัสหัตถการ ICD-10-TM */}
+              {/* รายการรหัสหัตถการ ICD-10-TM (จัดวางแถวละ 3 รายการเพื่อประหยัดพื้นที่แนวตั้ง) */}
               {operations.length > 0 && (
-                <div className="flex flex-wrap gap-1">
+                <div className="flex flex-wrap gap-1 max-w-[280px]">
                   {operations.map((op, idx) => (
                     <span
                       key={idx}
-                      className="px-2 py-0.5 rounded text-[11px] sm:text-xs font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap"
+                      className="px-1.5 py-0.5 rounded text-[10.5px] sm:text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap text-center"
                       title={`${op.code}: ${op.name}`}
                     >
                       {op.code}
@@ -348,7 +415,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 </div>
               )}
 
-              {/* วันคลอดในระบบงานบัญชี 2 (แสดงเฉพาะกรณีบริบาลหญิงหลังคลอดเท่านั้น) */}
+              {/* วันคลอดในระบบงานบัญชี 2 */}
               {isPostpartum && (
                 laborDate ? (
                   <div className="text-[11px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-bold">
@@ -365,7 +432,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
               {thaiMedItems.length === 0 && operations.length === 0 && (
                 <div className="text-xs text-slate-400 italic">
-                  ไม่มีรหัสหัตถการ/ค่าบริการ
+                  ไม่มีหัตถการ/ค่าบริการ
                 </div>
               )}
             </div>
@@ -374,7 +441,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       },
       {
         id: 'diagnoses',
-        header: 'รหัสวินิจฉัย (รหัสหลัก / รหัสรอง)',
+        header: 'รหัสโรค (DX)',
         cell: ({ row }) => {
           const rawDxs = [
             row.original.pdx ? { code: row.original.pdx, isPdx: true } : null,
@@ -387,7 +454,6 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           ].filter(Boolean) as { code: string; isPdx: boolean }[]
 
           const seen = new Set<string>()
-          // คัดเฉพาะรหัสหลักและรหัสรองแพทย์แผนไทย (รหัสกลุ่ม M, U และ EP) ตามที่แผนกแพทย์แผนไทยกำหนด
           const thaiMedDxs = rawDxs.filter((d) => {
             const code = d.code.toUpperCase()
             const isRelevant = code.startsWith('M') || code.startsWith('U') || code.startsWith('EP')
@@ -397,7 +463,6 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             return true
           })
 
-          // จัดเรียง: รหัสหลัก (M...) ขึ้นก่อน ตามด้วยรหัสรองแพทย์แผนไทย (U...)
           thaiMedDxs.sort((a, b) => {
             const aIsM = a.code.startsWith('M')
             const bIsM = b.code.startsWith('M')
@@ -409,13 +474,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           if (thaiMedDxs.length === 0) {
             return (
               <span className="text-amber-500 font-semibold text-xs italic">
-                ไม่มีรหัสแผนไทย (M/U)
+                ไม่มีรหัส M/U
               </span>
             )
           }
 
           return (
-            <div className="flex flex-wrap gap-1.5 min-w-[200px] max-w-[270px]">
+            <div className="flex flex-wrap gap-1 max-w-[145px]">
               {thaiMedDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
@@ -424,7 +489,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span
                     key={idx}
                     className={cn(
-                      'px-2 py-0.5 rounded-md text-xs font-mono font-bold border transition shadow-2xs whitespace-nowrap',
+                      'px-2 py-0.5 rounded-md text-xs sm:text-[12.5px] font-mono font-bold border transition shadow-2xs whitespace-nowrap leading-tight',
                       isM
                         ? 'bg-blue-50 text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border-blue-300/60 ring-1 ring-blue-400/50'
                         : isU
@@ -454,45 +519,78 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         header: ({ column }) => <DataTableColumnHeader column={column} title="ผลการตรวจ" className="justify-center" />,
         cell: ({ row }) => {
           const isFail = row.original.audit_result === 'FAIL'
-          return (
-            <div className="flex flex-col items-center justify-center gap-1 min-w-[150px] max-w-[240px] mx-auto text-center">
-              {isFail ? (
-                <>
-                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
-                      <XCircle className="size-3.5 text-rose-500" /> ไม่ผ่าน
-                    </span>
-                    {Boolean(row.original.is_duplicate_fail || row.original.failures?.some((f) => f.includes('ซ้ำ'))) && (
-                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0">
-                        ⚠️ ซ้ำ
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setSelectedRecord(row.original)
-                        handleAskAi(row.original)
-                      }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer group shrink-0"
-                      title="ถาม AI ช่วยวิเคราะห์สาเหตุและวิธีแก้ไขใน HOSxP"
-                    >
-                      <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
-                      <span>AI</span>
-                    </button>
-                  </div>
-                  <p
-                    className="text-[11px] sm:text-xs leading-tight text-rose-600 dark:text-rose-300/90 font-sans font-medium truncate max-w-[210px] cursor-help mt-0.5"
-                    title={row.original.audit_reason}
-                  >
-                    {row.original.audit_reason}
-                  </p>
-                </>
-              ) : (
+          if (!isFail) {
+            return (
+              <div className="flex justify-center">
                 <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 shadow-2xs">
                   <CheckCircle2 className="size-3.5 text-emerald-500" /> ผ่านเกณฑ์
                 </span>
-              )}
+              </div>
+            )
+          }
+
+          const tags = parseAuditTags(row.original)
+          const isDup = Boolean(
+            row.original.is_duplicate_fail ||
+            row.original.failures?.some((f) => f.includes('ซ้ำ')) ||
+            row.original.audit_reason?.includes('ซ้ำ')
+          )
+
+          return (
+            <div className="flex flex-col items-center justify-center gap-1 max-w-[210px] mx-auto text-center">
+              {/* บรรทัดบน: สถานะหลัก (ไม่ผ่าน) + ปุ่ม AI สไตล์โมเดิร์น */}
+              <div className="flex items-center justify-center gap-1.5 w-full">
+                <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
+                  <XCircle className="size-3.5 text-rose-500 shrink-0" />
+                  <span>ไม่ผ่านเกณฑ์</span>
+                  {isDup && (
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-300 text-[10px] font-bold">
+                      ซ้ำ
+                    </span>
+                  )}
+                </span>
+
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    setSelectedRecord(row.original)
+                    handleAskAi(row.original)
+                  }}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition-all cursor-pointer group shrink-0 hover:scale-105 active:scale-95 shadow-2xs"
+                  title="คลิกให้ AI ช่วยวิเคราะห์สาเหตุและวิธีแก้ไขใน HOSxP"
+                >
+                  <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
+                  <span>AI</span>
+                </button>
+              </div>
+
+              {/* บรรทัดล่าง: ป้ายแท็กสรุปสาเหตุสั้นๆ กระชับ ชัดเจน พร้อม Tooltip แสดงข้อความเต็มเมื่อชี้เมาส์ */}
+              <div
+                className="flex flex-wrap items-center justify-center gap-1 cursor-help"
+                title={`[รายละเอียดสาเหตุที่ไม่ผ่าน]\n${row.original.failures?.join('\n') || row.original.audit_reason}`}
+              >
+                {tags.slice(0, 2).map((t, idx) => (
+                  <span
+                    key={idx}
+                    className={cn(
+                      'text-[10.5px] font-medium px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs transition-colors',
+                      t.color === 'amber'
+                        ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-300/80 dark:border-amber-500/30 font-semibold'
+                        : t.color === 'purple'
+                        ? 'bg-purple-50 dark:bg-purple-950/40 text-purple-800 dark:text-purple-200 border-purple-300/80 dark:border-purple-500/30 font-medium'
+                        : 'bg-rose-50/80 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border-rose-200/80 dark:border-rose-500/30'
+                    )}
+                  >
+                    <span>{t.label}</span>
+                  </span>
+                ))}
+                {tags.length > 2 && (
+                  <span className="text-[10px] text-slate-400 font-mono font-bold">
+                    +{tags.length - 2}
+                  </span>
+                )}
+              </div>
             </div>
           )
         },
@@ -504,18 +602,19 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           <button
             type="button"
             onClick={() => setSelectedRecord(row.original)}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 hover:bg-teal-500/10 transition cursor-pointer border border-transparent hover:border-teal-500/20"
+            className="p-1.5 rounded-xl text-slate-400 hover:text-teal-600 dark:hover:text-teal-300 hover:bg-teal-500/10 transition cursor-pointer"
             title="ดูรายละเอียดการรับบริการ"
           >
             <Eye className="size-4" />
           </button>
         ),
-        size: 40,
+        size: 36,
       },
     ],
     []
   )
 
+  // oxlint-disable-next-line react/incompatible-library
   const table = useReactTable({
     data: filteredRecords,
     columns,
@@ -852,7 +951,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       {/* Main DataTable Container */}
       <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-themed-card shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <Table>
+          <Table className="w-full table-auto">
             <TableHeader className="bg-slate-50 dark:bg-slate-900/70 border-b border-slate-200 dark:border-white/10">
               {table.getHeaderGroups().map((headerGroup) => (
                 <TableRow key={headerGroup.id} className="hover:bg-transparent border-slate-200 dark:border-white/10">
@@ -861,7 +960,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       key={header.id}
                       className={cn(
                         'text-slate-600 dark:text-slate-300 font-bold whitespace-nowrap',
-                        density === 'compact' ? 'py-2.5 px-3 text-xs sm:text-[13px]' : 'py-3.5 px-3.5 text-xs sm:text-sm'
+                        density === 'compact' ? 'py-2 px-2.5 sm:px-3 text-xs sm:text-[13px]' : 'py-3 px-3.5 text-xs sm:text-sm'
                       )}
                     >
                       {header.isPlaceholder
@@ -902,7 +1001,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                           key={cell.id}
                           className={cn(
                             'align-middle',
-                            density === 'compact' ? 'py-2 px-3 text-xs sm:text-[13px]' : 'py-3.5 px-3.5 text-xs sm:text-sm'
+                            density === 'compact' ? 'py-1.5 px-2.5 sm:px-3 text-xs sm:text-[13px]' : 'py-2.5 px-3.5 text-xs sm:text-sm'
                           )}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}

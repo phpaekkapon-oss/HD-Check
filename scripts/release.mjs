@@ -304,16 +304,53 @@ async function main() {
   }
 
   const args = process.argv.slice(2)
-  const isForce = args.includes('--force') || args.includes('-f')
+  let isForce = args.includes('--force') || args.includes('-f')
   if (!hasGitChanges && !isForce) {
     console.log('\n====================================================================')
     console.log('  ⚠️  [แจ้งเตือน] ไม่พบการแก้ไขโค้ดใหม่ (No Code Changes Detected)')
     console.log('====================================================================')
     console.log(`  - โค้ดปัจจุบันตรงกับเวอร์ชันล่าสุด v${currentVersion} อยู่แล้ว`)
-    console.log('  - ไม่มีไฟล์ที่ถูกแก้ไข และไม่มี Commit ใหม่')
-    console.log('  - ระบบจะระงับการสร้างเวอร์ชันใหม่โดยอัตโนมัติ เพื่อป้องกันการเพิ่มเลขเวอร์ชันและ Changelog ซ้ำซ้อน')
-    console.log('  - (หากต้องการ Release ซ้ำ ให้ระบุ flag --force)\n')
-    process.exit(0)
+    console.log('  - ไม่มีไฟล์ที่ถูกแก้ไข และไม่มี Commit ใหม่\n')
+
+    const choice = await ask(
+      `กรุณาเลือกการดำเนินการที่ต้องการ:\n  [1] บังคับปล่อยเวอร์ชันใหม่แล้วอัปโหลดขึ้นเซิร์ฟเวอร์ (Force New Release & Deploy)\n  [2] อัปโหลด/Deploy โค้ดปัจจุบันขึ้นเซิร์ฟเวอร์ทันที (Deploy Current Version)\n  [3] ยกเลิก (Exit)\nกรุณาเลือก (1/2/3)`,
+      '1'
+    )
+
+    if (choice === '2') {
+      console.log('\n[*] กำลังคอมไพล์ Frontend และสร้างแพ็กเกจ HD-Check.zip...')
+      const frontDir = path.join(rootDir, 'frontend')
+      run('npm run build', frontDir)
+      const targetDir = path.join(rootDir, 'HD-Check')
+      const targetBackend = path.join(targetDir, 'backend')
+      fs.mkdirSync(targetBackend, { recursive: true })
+      fs.copyFileSync(ROOT_PKG, path.join(targetDir, 'package.json'))
+      if (fs.existsSync(path.join(rootDir, '.env'))) {
+        fs.copyFileSync(path.join(rootDir, '.env'), path.join(targetDir, '.env'))
+      }
+      if (fs.existsSync(path.join(rootDir, 'ecosystem.config.cjs'))) {
+        fs.copyFileSync(path.join(rootDir, 'ecosystem.config.cjs'), path.join(targetDir, 'ecosystem.config.cjs'))
+      }
+      try {
+        execSync('robocopy "backend" "HD-Check\\backend" /E /XD "node_modules"', { cwd: rootDir, stdio: 'ignore' })
+      } catch {}
+      const zipFile = path.join(rootDir, 'HD-Check.zip')
+      if (fs.existsSync(zipFile)) fs.unlinkSync(zipFile)
+      run(`powershell -NoProfile -Command "Compress-Archive -Path 'HD-Check\\*' -DestinationPath 'HD-Check.zip' -Force"`, rootDir)
+      console.log('[+] สร้างแพ็กเกจ HD-Check.zip สำเร็จ!')
+      console.log('\n[*] กำลังนำขึ้นเซิร์ฟเวอร์ปลายทาง (192.168.1.241)...')
+      const deploySuccess = run('node backend/deploy.mjs')
+      if (deploySuccess) {
+        console.log(`\n[SUCCESS] Deploy เวอร์ชันปัจจุบัน v${currentVersion} ขึ้นเซิร์ฟเวอร์สำเร็จเรียบร้อย!\n`)
+      }
+      process.exit(0)
+    } else if (choice === '1' || choice.toLowerCase() === 'y') {
+      isForce = true
+      console.log('\n[+] ยืนยันการบังคับสร้างเวอร์ชันใหม่และเริ่มกระบวนการ Release & Deploy...')
+    } else {
+      console.log('\n[*] ยกเลิกเรียบร้อย - ไม่มีการอัปโหลดใดๆ\n')
+      process.exit(0)
+    }
   }
 
   // Parse arguments or prompt
