@@ -11,6 +11,7 @@ import {
   ChevronRight,
   Maximize2,
   Minimize2,
+  Clock,
 } from 'lucide-react'
 import { herbDxApi } from '@/api/herbdx.api'
 import { cn } from '@/lib/utils'
@@ -21,6 +22,7 @@ interface ChatMessage {
   content: string
   modelName?: string
   timestamp: string
+  createdAt?: number
 }
 
 const QUICK_PROMPTS = [
@@ -97,24 +99,58 @@ function formatInlineMarkdown(text: string): string {
   return escaped
 }
 
+// 7-day retention constants (Auto-purges any messages older than 7 days)
+const CHAT_RETENTION_MS = 7 * 24 * 60 * 60 * 1000
+const CHAT_STORAGE_KEY = 'smart_hoscheck_ai_chat_history_v1'
+
+const getWelcomeMessage = (): ChatMessage => ({
+  id: 'welcome',
+  role: 'model',
+  content: `สวัสดีครับ! ผมคือ **AI Smart Copilot** ผู้ช่วยอัจฉริยะประจำระบบ SMART-HOSCHECK โรงพยาบาลพังโคน 
+
+ยินดีช่วยตอบข้อสงสัยเกี่ยวกับการตรวจประเมินเวชระเบียน (Audit), รหัสหัตถการ ICD-10-TM, รหัสปิดสิทธิ EP และเกณฑ์เบิกจ่าย สปสช. ครับ 
+
+คลิกหัวข้อด้านล่างหรือพิมพ์คำถามได้เลยครับ!`,
+  modelName: 'Google Gemini AI',
+  timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+  createdAt: Date.now(),
+})
+
+function loadSavedChatMessages(): ChatMessage[] {
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY)
+    if (!raw) return [getWelcomeMessage()]
+    const parsed: ChatMessage[] = JSON.parse(raw)
+    const now = Date.now()
+    // Auto purge messages older than 7 days
+    const valid = parsed.filter((m) => {
+      if (m.id === 'welcome') return true
+      if (!m.createdAt) return true
+      return now - m.createdAt < CHAT_RETENTION_MS
+    })
+    return valid.length > 0 ? valid : [getWelcomeMessage()]
+  } catch {
+    return [getWelcomeMessage()]
+  }
+}
+
 export const AiChatCopilot: FC = () => {
   const [isOpen, setIsOpen] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const [messages, setMessages] = useState<ChatMessage[]>(() => [
-    {
-      id: 'welcome',
-      role: 'model',
-      content: `สวัสดีครับ! ผมคือ **AI Smart Copilot** ผู้ช่วยอัจฉริยะประจำระบบ SMART-HOSCHECK โรงพยาบาลพังโคน 
+  const [messages, setMessages] = useState<ChatMessage[]>(loadSavedChatMessages)
 
-ยินดีช่วยตอบข้อสงสัยเกี่ยวกับการตรวจประเมินเวชระเบียน (Audit), รหัสหัตถการ ICD-10-TM, รหัสปิดสิทธิ EP และเกณฑ์เบิกจ่าย สปสช. ครับ 
-
-คลิกหัวข้อด้านล่างหรือพิมพ์คำถามได้เลยครับ!`,
-      modelName: 'Google Gemini AI',
-      timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-    },
-  ])
+  // Auto-save messages to localStorage with 7-day retention filter
+  useEffect(() => {
+    try {
+      const now = Date.now()
+      const valid = messages.filter((m) => !m.createdAt || now - m.createdAt < CHAT_RETENTION_MS)
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(valid))
+    } catch (err) {
+      console.warn('Unable to persist AI chat history:', err)
+    }
+  }, [messages])
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -147,6 +183,7 @@ export const AiChatCopilot: FC = () => {
       role: 'user',
       content: textToSend,
       timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      createdAt: Date.now(),
     }
 
     setMessages((prev) => [...prev, userMsg])
@@ -169,6 +206,7 @@ export const AiChatCopilot: FC = () => {
         content: res.reply || 'ขออภัย ไม่สามารถประมวลผลคำตอบได้ในขณะนี้',
         modelName: res.model || 'Google Gemini AI',
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+        createdAt: Date.now(),
       }
 
       setMessages((prev) => [...prev, botMsg])
@@ -179,6 +217,7 @@ export const AiChatCopilot: FC = () => {
         content: `⚠️ เกิดข้อผิดพลาดในการเชื่อมต่อ AI: ${(err as Error)?.message || 'โปรดลองใหม่อีกครั้ง'}`,
         modelName: 'System Error',
         timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+        createdAt: Date.now(),
       }
       setMessages((prev) => [...prev, errorMsg])
     } finally {
@@ -194,15 +233,11 @@ export const AiChatCopilot: FC = () => {
   }
 
   const clearMessages = () => {
-    setMessages([
-      {
-        id: 'welcome',
-        role: 'model',
-        content: `เริ่มต้นการสนทนาใหม่แล้วครับ สามารถสอบถามเกณฑ์การแพทย์แผนไทยและระบบ HOSxP ได้เลยครับ`,
-        modelName: 'Google Gemini AI',
-        timestamp: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      },
-    ])
+    const reset = [getWelcomeMessage()]
+    setMessages(reset)
+    try {
+      localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(reset))
+    } catch (_) {}
   }
 
   return (
@@ -418,36 +453,39 @@ export const AiChatCopilot: FC = () => {
             </button>
           </div>
 
-          {/* Input Box */}
-          <div className="p-3 bg-white dark:bg-[#1a2035] border-t border-themed shrink-0">
-            <div className="flex items-end gap-2 bg-slate-50 dark:bg-[#121624] border border-slate-300 dark:border-white/15 rounded-xl p-1.5 focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-500 transition">
+          {/* Input Box: Spacious & Comfortable Design */}
+          <div className="p-3 sm:p-3.5 bg-white dark:bg-[#1a2035] border-t border-themed shrink-0">
+            <div className="flex items-end gap-2.5 bg-slate-50 dark:bg-[#121624] border border-slate-300 dark:border-white/15 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-500 transition shadow-inner">
               <textarea
                 ref={inputRef}
                 value={input}
                 onChange={(e) => {
                   setInput(e.target.value)
                   e.target.style.height = 'auto'
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 120)}px`
+                  e.target.style.height = `${Math.min(e.target.scrollHeight, 140)}px`
                 }}
                 onKeyDown={handleKeyDown}
-                placeholder="ถามข้อสงสัยเกณฑ์ สปสช., รหัส ICD-10 หรือ HOSxP (กด Enter เพื่อส่ง)..."
-                rows={1}
+                placeholder="พิมพ์คำถามเกณฑ์ สปสช., รหัสหัตถการ หรือระบบ HOSxP..."
+                rows={2}
                 disabled={loading}
-                className="flex-1 bg-transparent border-0 resize-none text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2.5 py-1.5 focus:outline-none min-h-[38px] max-h-28 disabled:opacity-50 chat-scrollbar leading-relaxed"
+                className="flex-1 bg-transparent border-0 resize-none text-xs sm:text-[13px] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 px-2 py-1 focus:outline-none min-h-[52px] max-h-36 disabled:opacity-50 chat-scrollbar leading-relaxed"
               />
               <button
                 type="button"
                 onClick={() => handleSend()}
                 disabled={!input.trim() || loading}
-                title="ส่งคำถาม"
-                className="size-8 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white flex items-center justify-center shrink-0 disabled:opacity-40 disabled:cursor-not-allowed transition shadow-sm cursor-pointer"
+                title="ส่งคำถาม (Enter)"
+                className="size-9 sm:size-10 rounded-xl bg-gradient-to-r from-violet-600 via-indigo-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white flex items-center justify-center shrink-0 disabled:opacity-30 disabled:cursor-not-allowed transition-all shadow-md active:scale-95 cursor-pointer mb-0.5"
               >
-                {loading ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+                {loading ? <Loader2 className="size-4.5 animate-spin" /> : <Send className="size-4.5" />}
               </button>
             </div>
-            <div className="mt-1.5 flex items-center justify-between text-[10px] text-slate-400 dark:text-slate-500 px-1">
-              <span>Google Gemini AI • ข้อมูลอ้างอิงเกณฑ์ สปสช.</span>
-              <span>กด Shift+Enter ขึ้นบรรทัดใหม่</span>
+            <div className="mt-2 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500 px-1">
+              <span className="flex items-center gap-1 font-medium text-violet-600 dark:text-violet-400">
+                <Clock className="size-3 text-violet-400" />
+                <span>จำประวัติ 7 วัน (ลบอัตโนมัติ)</span>
+              </span>
+              <span>กด Enter เพื่อส่ง • Shift+Enter ขึ้นบรรทัดใหม่</span>
             </div>
           </div>
         </div>
