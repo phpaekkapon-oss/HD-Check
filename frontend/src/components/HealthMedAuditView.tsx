@@ -444,6 +444,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         id: 'diagnoses',
         header: 'รหัสโรค (DX)',
         cell: ({ row }) => {
+          const allExtra = Array.isArray((row.original as any).all_dx) ? ((row.original as any).all_dx as string[]) : []
           const rawDxs = [
             row.original.pdx ? { code: row.original.pdx, isPdx: true } : null,
             row.original.dx0 ? { code: row.original.dx0, isPdx: false } : null,
@@ -452,6 +453,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             row.original.dx3 ? { code: row.original.dx3, isPdx: false } : null,
             row.original.dx4 ? { code: row.original.dx4, isPdx: false } : null,
             row.original.dx5 ? { code: row.original.dx5, isPdx: false } : null,
+            ...allExtra.map((c) => ({ code: c, isPdx: false })),
           ].filter(Boolean) as { code: string; isPdx: boolean }[]
 
           const seen = new Set<string>()
@@ -1125,15 +1127,19 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 <FileText className="size-3.5 text-teal-500" /> รหัสการวินิจฉัยโรคทางการแพทย์แผนไทย (รหัสหลัก / รหัสรอง)
               </h4>
               {(() => {
+                const allExtra = Array.isArray((selectedRecord as any).all_dx) ? ((selectedRecord as any).all_dx as string[]) : []
                 const allDxs = [
-                  selectedRecord.pdx,
-                  selectedRecord.dx0,
-                  selectedRecord.dx1,
-                  selectedRecord.dx2,
-                  selectedRecord.dx3,
-                  selectedRecord.dx4,
-                  selectedRecord.dx5,
-                ].filter((dx): dx is string => Boolean(dx))
+                  ...new Set([
+                    selectedRecord.pdx,
+                    selectedRecord.dx0,
+                    selectedRecord.dx1,
+                    selectedRecord.dx2,
+                    selectedRecord.dx3,
+                    selectedRecord.dx4,
+                    selectedRecord.dx5,
+                    ...allExtra,
+                  ].filter((dx): dx is string => Boolean(dx)))
+                ]
 
                 const thaiMedList = allDxs.filter((dx) => dx.startsWith('M') || dx.startsWith('U') || dx.startsWith('EP'))
                 const otherList = allDxs.filter((dx) => !dx.startsWith('M') && !dx.startsWith('U') && !dx.startsWith('EP'))

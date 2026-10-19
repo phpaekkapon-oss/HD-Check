@@ -625,9 +625,9 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     // 1. ดึงรายการ visit ที่มีค่าบริการ/หัตถการแพทย์แผนไทย (ไม่รวมรายการยา)
     const [rows] = await hosPool.query(HEALTH_MED_AUDIT_SQL, [startDate, endDate])
 
-    // 2. ดึงรหัสหัตถการ ICD-10-TM ทั้งหมดในช่วงวันที่จาก health_med_service_operation
+    // 2. ดึงรหัสหัตถการ ICD-10-TM ทั้งหมดในช่วงวันที่จาก health_med_service_operation (เก็บทั้งตาม vn และตาม hn__service_date)
     const [ops] = await hosPool.query(`
-      SELECT hms.vn, hmoi.icd10tm, hmoi.health_med_operation_item_name
+      SELECT hms.vn, hms.hn, DATE_FORMAT(hms.service_date, '%Y-%m-%d') AS service_date, hmoi.icd10tm, hmoi.health_med_operation_item_name
       FROM health_med_service hms
       JOIN health_med_service_operation hso ON hso.health_med_service_id = hms.health_med_service_id
       JOIN health_med_operation_item hmoi ON hmoi.health_med_operation_item_id = hso.health_med_operation_item_id
@@ -635,29 +635,124 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     `, [startDate, endDate])
 
     const opsByVn = new Map()
+    const opsByHnDate = new Map()
     for (const op of ops) {
+      const item = { code: op.icd10tm, name: op.health_med_operation_item_name }
       if (!opsByVn.has(op.vn)) opsByVn.set(op.vn, [])
-      opsByVn.get(op.vn).push({
-        code: op.icd10tm,
-        name: op.health_med_operation_item_name,
-      })
+      opsByVn.get(op.vn).push(item)
+
+      const dayKey = `${op.hn}__${op.service_date}`
+      if (!opsByHnDate.has(dayKey)) opsByHnDate.set(dayKey, [])
+      opsByHnDate.get(dayKey).push(item)
+    }
+
+    // 2.1 ดึงรหัสวินิจฉัยทั้งหมดของผู้ป่วยในวันเดียวกันจาก ovstdiag (รวมทุก visit เช่น visit คัดกรอง/หมอตรวจ + visit แผนกแพทย์แผนไทย)
+    const [allDayDiags] = await hosPool.query(`
+      SELECT o2.hn, DATE_FORMAT(o2.vstdate, '%Y-%m-%d') AS vstdate,
+             GROUP_CONCAT(DISTINCT od.icd10 ORDER BY (od.icd10 LIKE 'M%' OR od.icd10 LIKE 'U%') DESC, od.diagtype, od.icd10 SEPARATOR ',') AS codes
+      FROM ovstdiag od
+      JOIN ovst o2 ON od.vn = o2.vn
+      WHERE o2.vstdate BETWEEN ? AND ?
+        AND od.icd10 IS NOT NULL AND od.icd10 <> ''
+      GROUP BY o2.hn, o2.vstdate
+    `, [startDate, endDate])
+
+    const dayDiagsMap = new Map()
+    for (const d of allDayDiags) {
+      const key = `${d.hn}__${d.vstdate}`
+      dayDiagsMap.set(key, String(d.codes ?? '').split(',').map((c) => c.trim()).filter(Boolean))
+    }
+
+    // 2.2 ดึงรหัสวินิจฉัยจาก vn_stat ของทุก visit ในวันเดียวกัน (กรณีแพทย์บันทึกในหน้าจอตรวจโรคแล้วบันทึกใน vn_stat)
+    const [allVnStats] = await hosPool.query(`
+      SELECT o2.hn, DATE_FORMAT(o2.vstdate, '%Y-%m-%d') AS vstdate,
+             GROUP_CONCAT(DISTINCT CONCAT_WS(',', vs.pdx, vs.dx0, vs.dx1, vs.dx2, vs.dx3, vs.dx4, vs.dx5) SEPARATOR ',') AS vs_codes
+      FROM vn_stat vs
+      JOIN ovst o2 ON vs.vn = o2.vn
+      WHERE o2.vstdate BETWEEN ? AND ?
+      GROUP BY o2.hn, o2.vstdate
+    `, [startDate, endDate])
+
+    for (const vs of allVnStats) {
+      const key = `${vs.hn}__${vs.vstdate}`
+      const existing = dayDiagsMap.get(key) || []
+      const extra = String(vs.vs_codes ?? '').split(',').map((c) => c.trim()).filter(Boolean)
+      dayDiagsMap.set(key, [...new Set([...existing, ...extra])])
+    }
+
+    // 2.3 ดึงรหัสวินิจฉัยแพทย์แผนไทย (รหัส U) จาก health_med_service_diagnosis
+    // (สำหรับเคสร่วมกับแพทย์ หรือบันทึกผ่านทะเบียนงานให้บริการแพทย์แผนไทย HealthMedServiceDetailForm ใน HOSxP)
+    const [hmsDiags] = await hosPool.query(`
+      SELECT hms.hn, DATE_FORMAT(hms.service_date, '%Y-%m-%d') AS service_date,
+             GROUP_CONCAT(DISTINCT hmd.icd10 ORDER BY hmd.icd10 SEPARATOR ',') AS u_codes
+      FROM health_med_service_diagnosis hmd
+      JOIN health_med_service hms ON hms.health_med_service_id = hmd.health_med_service_id
+      WHERE hms.service_date BETWEEN ? AND ?
+        AND hmd.icd10 IS NOT NULL AND hmd.icd10 <> ''
+      GROUP BY hms.hn, hms.service_date
+    `, [startDate, endDate])
+
+    for (const hd of hmsDiags) {
+      const key = `${hd.hn}__${hd.service_date}`
+      const existing = dayDiagsMap.get(key) || []
+      const extra = String(hd.u_codes ?? '').split(',').map((c) => c.trim()).filter(Boolean)
+      dayDiagsMap.set(key, [...new Set([...existing, ...extra])])
     }
 
     // 3. กรองเฉพาะเคสที่มีรหัสหัตถการ (health_med_service_operation) หรือมีรายการค่าบริการแพทย์แผนไทย (nondrugitems)
-    // ตัดเคสที่ไม่มีทั้งหัตถการและค่าบริการออก (เนื่องจากเป็นเคสรับยาสมุนไพรอย่างเดียว ซึ่งตรวจสอบในเมนูตรวจสอบการจ่ายยาสมุนไพร)
-    const validRows = rows.filter((r) => {
-      const ops = opsByVn.get(r.vn) || []
-      const hasOps = ops.length > 0
+    const rawValidRows = rows.filter((r) => {
+      const dayKey = `${r.hn}__${r.visit_date}`
+      const hasOps = (opsByVn.get(r.vn)?.length ?? 0) > 0 || (opsByHnDate.get(dayKey)?.length ?? 0) > 0
       const hasServices = Boolean(r.service_items_raw && r.service_items_raw.trim())
       return hasOps || hasServices
     })
 
+    // รวมข้อมูลของผู้ป่วยคนเดียวกันในวันเดียวกัน (แก้ปัญหาเคส 2 Visit เช่น เช้าตรวจอายุรกรรม บ่ายส่งทำหัตถการแผนไทย เพื่อไม่ให้แยกเป็นแถวที่ไม่มีค่าบริการ)
+    const rowsByPatientDay = new Map()
+    for (const r of rawValidRows) {
+      const dayKey = `${r.hn}__${r.visit_date}`
+      if (!rowsByPatientDay.has(dayKey)) rowsByPatientDay.set(dayKey, [])
+      rowsByPatientDay.get(dayKey).push(r)
+    }
+
+    const validRows = []
+    for (const group of rowsByPatientDay.values()) {
+      if (group.length === 1) {
+        validRows.push(group[0])
+        continue
+      }
+      // หากมีหลาย visit: เลือกรอบที่เป็นแพทย์แผนไทย หรือรอบที่มีค่าบริการ 58xxx เป็นหลัก
+      const thaiMedVisit = group.find((r) => String(r.department_name).includes('แผนไทย') || String(r.doctor_name).includes('พท.'))
+      const serviceVisit = group.find((r) => Boolean(r.service_items_raw && r.service_items_raw.trim()))
+      const primary = thaiMedVisit || serviceVisit || group[group.length - 1]
+
+      // รวมรายการค่าบริการทั้งหมดในวันนั้น
+      const allServices = [...new Set(group.map((r) => r.service_items_raw).filter(Boolean))].join('||')
+      const allCodes = [...new Set(group.map((r) => r.service_codes).filter(Boolean).flatMap((s) => s.split(',')))].join(',')
+
+      validRows.push({
+        ...primary,
+        service_items_raw: allServices,
+        service_codes: allCodes,
+        count_58130: group.reduce((s, r) => s + Number(r.count_58130 || 0), 0),
+        count_58101: group.reduce((s, r) => s + Number(r.count_58101 || 0), 0),
+        count_compress: group.reduce((s, r) => s + Number(r.count_compress || 0), 0),
+        count_58301: group.reduce((s, r) => s + Number(r.count_58301 || 0), 0),
+        count_58220: group.reduce((s, r) => s + Number(r.count_58220 || 0), 0),
+        count_58131: group.reduce((s, r) => s + Number(r.count_58131 || 0), 0),
+      })
+    }
+
     // 4. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) เฉพาะผู้ป่วยที่เป็นเคสบริบาลหลังคลอด
     const postpartumRows = validRows.filter((r) => {
-      const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]
-      const ops = opsByVn.get(r.vn) || []
+      const dayKey = `${r.hn}__${r.visit_date}`
+      const dayCodes = dayDiagsMap.get(dayKey) || []
+      const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5, ...dayCodes]
+      const vnOps = opsByVn.get(r.vn) || []
+      const dayOps = opsByHnDate.get(dayKey) || []
+      const allOps = [...vnOps, ...dayOps]
       const hasU506 = dxs.includes('U506')
-      const hasPostpartumOp = ops.some((o) => String(o.code).startsWith('900-77'))
+      const hasPostpartumOp = allOps.some((o) => String(o.code).startsWith('900-77'))
       const hasPostpartumService = Number(r.count_58220 ?? 0) > 0 || Number(r.count_58131 ?? 0) > 0
       return hasU506 || hasPostpartumOp || hasPostpartumService
     })
@@ -692,17 +787,51 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
     // 5. โหลดเกณฑ์การคิดค่าบริการซ้ำ และประเมินผลเกณฑ์แพทย์แผนไทย
     const duplicateRules = await getDuplicateRules(dwPool)
     const evaluated = validRows.map((r) => {
-      const operations = opsByVn.get(r.vn) || []
+      const dayKey = `${r.hn}__${r.visit_date}`
+      const vnOps = opsByVn.get(r.vn) || []
+      const dayOps = opsByHnDate.get(dayKey) || []
+      // ถ้า visit ปัจจุบัน (r.vn) มีการบันทึกรหัสหัตถการเฉพาะของตนเอง ให้ใช้ตาม visit นั้นเป็นหลัก
+      // เพื่อป้องกันไม่ให้นำหัตถการจาก visit อื่น (เช่น หัตถการพอกเข่ารอบเช้าที่ไม่ได้คิดเงิน) มาปนกับ visit บ่าย (นวดประคบบ่า)
+      const operations = vnOps.length > 0 ? vnOps : dayOps
       const operation_codes = operations.map((o) => o.code).filter(Boolean)
-      const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5]
+
+      // รวมรหัสโรคจาก vn_stat ของ visit และจาก ovstdiag ทุก visit ของวันนั้น
+      const dayCodes = dayDiagsMap.get(dayKey) || []
+      const existingDxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5].filter(Boolean)
+      const combinedDxs = [...new Set([...existingDxs, ...dayCodes])].filter(Boolean)
+
+      // เรียงให้รหัส M... และ U... ขึ้นมาก่อนใน dx0..dx5 เพื่อให้ UI แสดงผลรหัสของแพทย์และแผนไทยที่สัมพันธ์กัน
+      const mCodes = combinedDxs.filter((c) => c.toUpperCase().startsWith('M'))
+      const uCodes = combinedDxs.filter((c) => c.toUpperCase().startsWith('U'))
+      const epCodes = combinedDxs.filter((c) => c.toUpperCase().startsWith('EP'))
+      const otherCodes = combinedDxs.filter((c) => !c.toUpperCase().startsWith('M') && !c.toUpperCase().startsWith('U') && !c.toUpperCase().startsWith('EP'))
+      const prioritized = [...new Set([...mCodes, ...uCodes, ...epCodes, ...otherCodes])]
+
+      // สำหรับเคสร่วมกับแพทย์: ถ้ารหัสโรคหลัก r.pdx เป็นโรคทั่วไปของแพทย์ (เช่น เบาหวาน E119 หรือ ความดัน I10)
+      // แต่มีรหัสโรคกล้ามเนื้อ/ข้อ M... ที่ตรวจร่วม ให้ดึง M-code มาเป็นรหัสหลักเพื่อให้สัมพันธ์กับรหัส U ของแพทย์แผนไทย
+      const pdx = (r.pdx && r.pdx.toUpperCase().startsWith('M'))
+        ? r.pdx
+        : (mCodes[0] || (r.pdx && r.pdx.toUpperCase().startsWith('U') ? r.pdx : (uCodes[0] || r.pdx || prioritized[0] || '')))
+
+      const nonPdxPrioritized = prioritized.filter((c) => c !== pdx)
+      const dx0 = nonPdxPrioritized[0] || r.dx0 || ''
+      const dx1 = nonPdxPrioritized[1] || r.dx1 || ''
+      const dx2 = nonPdxPrioritized[2] || r.dx2 || ''
+      const dx3 = nonPdxPrioritized[3] || r.dx3 || ''
+      const dx4 = nonPdxPrioritized[4] || r.dx4 || ''
+      const dx5 = nonPdxPrioritized[5] || r.dx5 || ''
+
       const isPostpartumCase =
-        dxs.includes('U506') ||
+        combinedDxs.includes('U506') ||
         operations.some((o) => String(o.code).startsWith('900-77')) ||
         Number(r.count_58220 ?? 0) > 0 ||
         Number(r.count_58131 ?? 0) > 0
       const labor_date = isPostpartumCase ? (laborDateByHn.get(r.hn) || null) : null
       const fullRow = {
         ...r,
+        pdx,
+        dx0, dx1, dx2, dx3, dx4, dx5,
+        all_dx: combinedDxs,
         operations,
         operation_codes,
         labor_date,

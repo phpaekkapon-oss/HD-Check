@@ -78,12 +78,14 @@ export const HEALTH_MED_AUDIT_SQL = `
   LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
       AND (
         COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301')
-        OR (nd.nhso_adp_code LIKE '58%')
+        OR (nd.nhso_adp_code LIKE '58%' AND nd.nhso_adp_code NOT IN ('58001', '58002'))
         OR (nd.name LIKE '%ค่านวด%' AND nd.name NOT LIKE '%กายภาพ%')
         OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')
         OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
         OR nd.name LIKE '%ค่าอบไอน้ำ%'
       )
+      AND COALESCE(nd.nhso_adp_code, nd.icode) NOT IN ('58001', '58002')
+      AND nd.name NOT LIKE '%ฝังเข็ม%'
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
@@ -111,7 +113,10 @@ export const HEALTH_MED_AUDIT_SQL = `
  *    - ค่านวดและประคบ 2 ครั้งไม่ผ่าน
  */
 export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
-  const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
+  const dxList = [
+    row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5,
+    ...(Array.isArray(row.all_dx) ? row.all_dx : []),
+  ]
     .map(normalizeIcdCode)
     .filter(Boolean)
   const uniqueDx = [...new Set(dxList)]
