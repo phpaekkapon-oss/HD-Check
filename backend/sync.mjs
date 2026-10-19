@@ -45,12 +45,15 @@ export function buildDrugSummarySql(customIcodes = []) {
 `
 }
 
-/** รหัสวินิจฉัยรองลำดับที่ n (1-based) จาก dgx.codes ของผู้ป่วยใน, ว่างถ้ามีไม่ถึง n รหัส */
-const ipdDx = (n) =>
-  `IF(IFNULL(dgx.codes, '') <> '' AND LENGTH(dgx.codes) - LENGTH(REPLACE(dgx.codes, ',', '')) >= ${n - 1},
-     SUBSTRING_INDEX(SUBSTRING_INDEX(dgx.codes, ',', ${n}), ',', -1), '')`
+/** รหัสวินิจฉัยรองลำดับที่ n (1-based) จาก codes string, ว่างถ้ามีไม่ถึง n รหัส */
+const getCodeAt = (field, n) =>
+  `IF(IFNULL(${field}, '') <> '' AND LENGTH(${field}) - LENGTH(REPLACE(${field}, ',', '')) >= ${n - 1},
+     SUBSTRING_INDEX(SUBSTRING_INDEX(${field}, ',', ${n}), ',', -1), '')`
 
-/** Placeholders: OPD (start, end), IPD diagnosis subquery (start, end), IPD (start, end) */
+const ipdDx = (n) => getCodeAt('dgx.codes', n)
+const opdDx = (n) => getCodeAt('odx.codes', n)
+
+/** Placeholders: OPD lv (start, end), OPD odx (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD (start, end) */
 export function buildPrescriptionSql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
   return `
@@ -67,25 +70,64 @@ export function buildPrescriptionSql(customIcodes = []) {
         op.qty AS drug_qty,
         IFNULL(d.units, '') AS drug_units,
         sp.name AS department_name,
-        ov.pdx AS main_pdx,
-        ov.pdx AS pdx,
-        ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
+        COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
+        COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS pdx,
+        COALESCE(NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), ${opdDx(1)}, '') AS dx0,
+        COALESCE(NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), ${opdDx(2)}, '') AS dx1,
+        COALESCE(NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), ${opdDx(3)}, '') AS dx2,
+        COALESCE(NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), ${opdDx(4)}, '') AS dx3,
+        COALESCE(NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), ${opdDx(5)}, '') AS dx4,
+        COALESCE(NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), ${opdDx(6)}, '') AS dx5,
         o.doctor AS doctor_code,
         doc.name AS doctor_name,
         CASE
-            WHEN ov.pdx IS NULL OR TRIM(ov.pdx) = '' THEN 'INCOMPLETE'
-            WHEN (ov.pdx LIKE 'U%' OR ov.dx0 LIKE 'U%' OR ov.dx1 LIKE 'U%' OR ov.dx2 LIKE 'U%' OR ov.dx3 LIKE 'U%') THEN 'COMPLETE'
+            WHEN COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
+            WHEN (
+              COALESCE(ov_latest.pdx, od1.icd10, ov.pdx, ov_period.pdx, '') LIKE 'U%'
+              OR COALESCE(ov_latest.dx0, ov.dx0, ov_period.dx0, '') LIKE 'U%'
+              OR COALESCE(ov_latest.dx1, ov.dx1, ov_period.dx1, '') LIKE 'U%'
+              OR CONCAT(',', IFNULL(odx.codes, '')) LIKE '%,U%'
+            ) THEN 'COMPLETE'
             ELSE 'INCOMPLETE'
         END AS audit_status
     FROM ovst o
     INNER JOIN opitemrece op ON o.vn = op.vn
-    INNER JOIN vn_stat ov ON o.vn = ov.vn
+    LEFT JOIN vn_stat ov ON o.vn = ov.vn
     INNER JOIN patient pt ON o.hn = pt.hn
     INNER JOIN drugitems d ON op.icode = d.icode
     LEFT JOIN pttype ps ON o.pttype = ps.pttype
     INNER JOIN spclty sp ON o.spclty = sp.spclty AND ${THAI_MED_FILTER}
     LEFT JOIN doctor doc ON o.doctor = doc.code
+    -- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (Latest Visit of the day for this HN)
+    LEFT JOIN (
+      SELECT o_max.hn, o_max.vstdate, MAX(o_max.vn) AS latest_vn
+      FROM ovst o_max
+      WHERE o_max.vstdate BETWEEN ? AND ?
+      GROUP BY o_max.hn, o_max.vstdate
+    ) lv ON o.hn = lv.hn AND o.vstdate = lv.vstdate
+    LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
+    -- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag เผื่อ vn_stat ของ visit ล่าสุดยังไม่อัปเดต
+    LEFT JOIN ovstdiag od1 ON od1.vn = COALESCE(lv.latest_vn, o.vn) AND od1.diagtype = '1'
+    -- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (รวมทุก visit เช่น Visit คัดกรอง + Visit ล่าสุดแพทย์แผนไทย)
+    LEFT JOIN (
+      SELECT o2.hn, o2.vstdate, 
+             GROUP_CONCAT(DISTINCT od.icd10 ORDER BY od.diagtype, od.icd10 SEPARATOR ',') AS codes
+      FROM ovstdiag od
+      INNER JOIN ovst o2 ON od.vn = o2.vn
+      WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> ''
+        AND o2.vstdate BETWEEN ? AND ?
+      GROUP BY o2.hn, o2.vstdate
+    ) odx ON o.hn = odx.hn AND o.vstdate = odx.vstdate
+    -- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เผื่อกรณีมารับยาต่อเนื่องแต่รหัสวินิจฉัยอยู่ที่ visit ล่าสุดในรอบเดือน)
+    LEFT JOIN (
+      SELECT o_m.hn, MAX(o_m.vn) AS period_latest_vn
+      FROM ovst o_m
+      WHERE o_m.vstdate BETWEEN ? AND ?
+      GROUP BY o_m.hn
+    ) plv ON o.hn = plv.hn
+    LEFT JOIN vn_stat ov_period ON ov_period.vn = plv.period_latest_vn
     WHERE o.vstdate BETWEEN ? AND ?
+      AND (op.an IS NULL OR op.an = '')
       AND ${filter}
   )
   UNION ALL
@@ -211,8 +253,15 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
     const customIcodes = mappedHerbs.map((r) => String(r.icode)).filter(Boolean)
 
     const drugs = await fetchDrugSummary(hos, startDate, endDate, customIcodes)
-    const prescSql = customIcodes.length > 0 ? buildPrescriptionSql(customIcodes) : PRESCRIPTION_SQL
-    const [presc] = await hos.query(prescSql, [startDate, endDate, startDate, endDate, startDate, endDate])
+    const prescParams = [
+      startDate, endDate, // OPD lv: latest visit of the day
+      startDate, endDate, // OPD odx: ovstdiag secondary codes of the day
+      startDate, endDate, // OPD plv: latest visit in period
+      startDate, endDate, // OPD main: vstdate
+      startDate, endDate, // IPD dgx: iptdiag secondary codes
+      startDate, endDate, // IPD main: vstdate
+    ]
+    const [presc] = await hos.query(prescSql, prescParams)
 
     // A stale/limited HOSxP source can return no rows for a period that already
     // has data in the warehouse. Never interpret that as an instruction to erase

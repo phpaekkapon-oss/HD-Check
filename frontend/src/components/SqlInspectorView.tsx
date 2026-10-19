@@ -10,22 +10,60 @@ const QUERY_1 = `SELECT
     d.name AS drug_name,
     op.qty AS drug_qty,
     sp.name AS department_name,
-    ov.pdx AS main_pdx,
-    ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
+    COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
+    COALESCE(NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), SUBSTRING_INDEX(odx.codes, ',', 1), '') AS dx0,
+    COALESCE(NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 2), ',', -1), '') AS dx1,
+    COALESCE(NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 3), ',', -1), '') AS dx2,
+    COALESCE(NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 4), ',', -1), '') AS dx3,
+    COALESCE(NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 5), ',', -1), '') AS dx4,
+    COALESCE(NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 6), ',', -1), '') AS dx5,
     doc.name AS doctor_name,
     CASE 
-        WHEN ov.pdx IS NULL OR TRIM(ov.pdx) = '' THEN 'INCOMPLETE'
-        WHEN (ov.pdx LIKE 'U%' OR ov.dx0 LIKE 'U%' OR ov.dx1 LIKE 'U%' OR ov.dx2 LIKE 'U%' OR ov.dx3 LIKE 'U%') THEN 'COMPLETE'
+        WHEN COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
+        WHEN (
+          COALESCE(ov_latest.pdx, od1.icd10, ov.pdx, ov_period.pdx, '') LIKE 'U%'
+          OR COALESCE(ov_latest.dx0, ov.dx0, ov_period.dx0, '') LIKE 'U%'
+          OR COALESCE(ov_latest.dx1, ov.dx1, ov_period.dx1, '') LIKE 'U%'
+          OR CONCAT(',', IFNULL(odx.codes, '')) LIKE '%,U%'
+        ) THEN 'COMPLETE'
         ELSE 'INCOMPLETE'
     END AS audit_status
 FROM opitemrece op
 INNER JOIN ovst o ON op.vn = o.vn
-INNER JOIN vn_stat ov ON o.vn = ov.vn
+LEFT JOIN vn_stat ov ON o.vn = ov.vn
 INNER JOIN patient pt ON o.hn = pt.hn
 INNER JOIN drugitems d ON op.icode = d.icode
 LEFT JOIN pttype ps ON o.pttype = ps.pttype
 LEFT JOIN spclty sp ON o.spclty = sp.spclty
 LEFT JOIN doctor doc ON o.doctor = doc.code
+-- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (Latest Visit of the day)
+LEFT JOIN (
+  SELECT o_max.hn, o_max.vstdate, MAX(o_max.vn) AS latest_vn
+  FROM ovst o_max
+  WHERE o_max.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+  GROUP BY o_max.hn, o_max.vstdate
+) lv ON o.hn = lv.hn AND o.vstdate = lv.vstdate
+LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
+-- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag เผื่อ vn_stat ยังไม่อัปเดต
+LEFT JOIN ovstdiag od1 ON od1.vn = COALESCE(lv.latest_vn, o.vn) AND od1.diagtype = '1'
+-- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (รวมทุก visit เช่น Visit คัดกรอง + Visit แพทย์แผนไทย)
+LEFT JOIN (
+  SELECT o2.hn, o2.vstdate, 
+         GROUP_CONCAT(DISTINCT od.icd10 ORDER BY od.diagtype, od.icd10 SEPARATOR ',') AS codes
+  FROM ovstdiag od
+  INNER JOIN ovst o2 ON od.vn = o2.vn
+  WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> ''
+    AND o2.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+  GROUP BY o2.hn, o2.vstdate
+) odx ON o.hn = odx.hn AND o.vstdate = odx.vstdate
+-- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เผื่อกรณีมารับยาต่อเนื่องแต่รหัสวินิจฉัยอยู่ที่ visit ล่าสุดในรอบเดือน)
+LEFT JOIN (
+  SELECT o_m.hn, MAX(o_m.vn) AS period_latest_vn
+  FROM ovst o_m
+  WHERE o_m.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+  GROUP BY o_m.hn
+) plv ON o.hn = plv.hn
+LEFT JOIN vn_stat ov_period ON ov_period.vn = plv.period_latest_vn
 WHERE o.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
   AND (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')
   AND (d.drugcategory LIKE '%สมุนไพร%' OR d.name LIKE '%มะแว้ง%' OR d.name LIKE '%มะขามแขก%' OR d.name LIKE '%เถาวัลย์เปรียง%' OR d.icode IN ('1550003', '1540013', '1560028', '1560031'))
