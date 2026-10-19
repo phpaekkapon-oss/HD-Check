@@ -466,15 +466,20 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             return true
           })
 
-          thaiMedDxs.sort((a, b) => {
-            const aIsM = a.code.startsWith('M')
-            const bIsM = b.code.startsWith('M')
-            if (aIsM && !bIsM) return -1
-            if (!aIsM && bIsM) return 1
-            return a.code.localeCompare(b.code)
-          })
+          // แสดงเฉพาะรหัสหลัก (M...) และรหัสรองแพทย์แผนไทย (U50-U59)
+          // ไม่แสดงรหัสกลุ่มกระบวนการ/ส่งเสริม U60-U69 (เช่น U6680, U6688, U6984) ในหน้านี้
+          const mCode = thaiMedDxs.find((d) => d.code.toUpperCase().startsWith('M'))
+          const uCode =
+            thaiMedDxs.find((d) => d.code.toUpperCase().startsWith('U5')) ||
+            thaiMedDxs.find((d) => d.code.toUpperCase().startsWith('U') && !d.code.toUpperCase().startsWith('U6'))
+          const epCode = thaiMedDxs.find((d) => d.code.toUpperCase().startsWith('EP'))
 
-          if (thaiMedDxs.length === 0) {
+          const primaryDxs = [mCode, uCode, epCode].filter(Boolean) as { code: string; isPdx: boolean }[]
+          const displayDxs = primaryDxs.length > 0
+            ? primaryDxs
+            : thaiMedDxs.filter((d) => !d.code.toUpperCase().startsWith('U6')).slice(0, 2)
+
+          if (displayDxs.length === 0) {
             return (
               <span className="text-amber-500 font-semibold text-xs italic">
                 ไม่มีรหัส M/U
@@ -484,7 +489,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
           return (
             <div className="flex flex-wrap gap-1 max-w-[145px]">
-              {thaiMedDxs.map((item, idx) => {
+              {displayDxs.map((item, idx) => {
                 const isU = item.code.startsWith('U')
                 const isM = item.code.startsWith('M')
                 const isEP = item.code.startsWith('EP')
@@ -1154,14 +1159,16 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                             key={idx}
                             className={cn(
                               'px-2 py-0.5 rounded-md text-xs font-mono font-bold border',
-                              dx.startsWith('U')
+                              dx.startsWith('U6')
+                                ? 'bg-slate-100 text-slate-700 dark:bg-slate-800/60 dark:text-slate-300 border-slate-300'
+                                : dx.startsWith('U')
                                 ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300 border-emerald-300'
                                 : dx.startsWith('M')
                                 ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300 border-blue-300'
                                 : 'bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300 border-rose-300'
                             )}
                           >
-                            {dx.startsWith('M') ? `รหัสหลัก: ${dx}` : dx.startsWith('U') ? `รหัสรอง: ${dx}` : dx}
+                            {dx.startsWith('M') ? `รหัสหลัก: ${dx}` : dx.startsWith('U6') ? `รหัสกระบวนการ: ${dx}` : dx.startsWith('U') ? `รหัสรอง: ${dx}` : dx}
                           </span>
                         ))
                       ) : (
