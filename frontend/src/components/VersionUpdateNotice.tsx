@@ -201,14 +201,21 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
               className="hidden lg:flex mt-3 w-full px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold text-xs items-center justify-center gap-1.5 shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer"
             >
               <RefreshCw className={`size-3.5 ${isReloading ? 'animate-spin' : ''}`} />
-              <span>{isReloading ? 'กำลังโหลดเวอร์ชันใหม่…' : 'อัปเดตทันที (โหลดใหม่)'}</span>
+              <span>{isReloading ? 'กำลังโหลดเวอร์ชันใหม่…' : `กดยืนยันเพื่อเริ่มใช้ v${remoteVersion} ล่าสุด`}</span>
             </button>
           ) : (
-            <div className="flex items-center gap-3 mt-1 lg:mt-2.5">
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              <button
+                type="button"
+                onClick={handleDismiss}
+                className="px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 hover:from-teal-600 hover:to-cyan-600 text-white font-bold text-xs inline-flex items-center gap-1.5 shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer"
+              >
+                <span>กดยืนยันใช้งาน v{activeVersion}</span>
+              </button>
               <button
                 type="button"
                 onClick={handleView}
-                className="inline-flex items-center gap-1 min-h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
+                className="inline-flex items-center gap-1 min-h-8 px-2 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
               >
                 <span>ดูรายละเอียด</span>
                 <ChevronRight className="size-3" />
@@ -227,7 +234,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
         </div>
 
         {/* Phone: compact action button on the same row */}
-        {isServerUpgradePending && (
+        {isServerUpgradePending ? (
           <button
             type="button"
             disabled={isReloading}
@@ -235,7 +242,15 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
             className="lg:hidden shrink-0 min-h-10 px-3.5 rounded-xl bg-gradient-to-r from-teal-500 to-cyan-500 text-white font-bold text-xs inline-flex items-center gap-1.5 active:scale-95 transition cursor-pointer"
           >
             <RefreshCw className={`size-3.5 ${isReloading ? 'animate-spin' : ''}`} />
-            {isReloading ? 'กำลังโหลด…' : 'อัปเดต'}
+            {isReloading ? 'กำลังโหลด…' : `ยืนยัน v${remoteVersion}`}
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="lg:hidden shrink-0 min-h-10 px-3 rounded-xl bg-teal-500 text-white font-bold text-xs inline-flex items-center gap-1 active:scale-95 transition cursor-pointer"
+          >
+            ยืนยัน
           </button>
         )}
 

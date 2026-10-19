@@ -44,6 +44,7 @@ interface AuditHeaderProps {
   readonly collapsed: boolean
   readonly onToggleCollapse: () => void
   readonly onOpenMobileMenu?: () => void
+  readonly onOpenChangelog?: () => void
 }
 
 interface BeforeInstallPromptEvent extends Event {
@@ -62,6 +63,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   collapsed,
   onToggleCollapse,
   onOpenMobileMenu,
+  onOpenChangelog,
 }) => {
   const current = NAV_ITEMS.find((n: NavItem) => n.id === page)
   const last = status?.lastSync
@@ -211,7 +213,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
           {/* Clean Enterprise Title & Subtitle Hierarchy */}
           <div className="min-w-0 flex flex-col justify-center">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
               <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
                 {current?.label}
               </h1>
@@ -219,6 +221,14 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                 <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 HOSxP Online
               </span>
+              <button
+                type="button"
+                onClick={onOpenChangelog}
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 border border-violet-500/30 text-[11px] font-mono font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
+                title="เวอร์ชันระบบปัจจุบัน — คลิกเพื่อดูประวัติการอัปเดต (Changelog)"
+              >
+                <span>v{__APP_VERSION__}</span>
+              </button>
             </div>
 
             {/* Clean Metadata Line (แทนที่กล่องป้ายซ้อนทับกันหลายชิ้นแบบเดิม) */}

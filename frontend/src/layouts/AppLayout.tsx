@@ -91,6 +91,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
             collapsed={collapsed}
             onToggleCollapse={handleToggleCollapse}
             onOpenMobileMenu={() => { setMoreOpen(false); setMobileMenuOpen(true) }}
+            onOpenChangelog={() => setChangelogOpen(true)}
           />
 
           {/* Main Content Area (Adaptive Padding: Mobile, Tablet, Desktop) */}
