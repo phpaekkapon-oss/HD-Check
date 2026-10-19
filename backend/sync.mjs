@@ -72,12 +72,12 @@ export function buildPrescriptionSql(customIcodes = []) {
         sp.name AS department_name,
         COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
         COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS pdx,
-        COALESCE(NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), ${opdDx(1)}, '') AS dx0,
-        COALESCE(NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), ${opdDx(2)}, '') AS dx1,
-        COALESCE(NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), ${opdDx(3)}, '') AS dx2,
-        COALESCE(NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), ${opdDx(4)}, '') AS dx3,
-        COALESCE(NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), ${opdDx(5)}, '') AS dx4,
-        COALESCE(NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), ${opdDx(6)}, '') AS dx5,
+        COALESCE(NULLIF(${opdDx(1)}, ''), NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), '') AS dx0,
+        COALESCE(NULLIF(${opdDx(2)}, ''), NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), '') AS dx1,
+        COALESCE(NULLIF(${opdDx(3)}, ''), NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), '') AS dx2,
+        COALESCE(NULLIF(${opdDx(4)}, ''), NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), '') AS dx3,
+        COALESCE(NULLIF(${opdDx(5)}, ''), NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), '') AS dx4,
+        COALESCE(NULLIF(${opdDx(6)}, ''), NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), '') AS dx5,
         o.doctor AS doctor_code,
         doc.name AS doctor_name,
         CASE
@@ -108,10 +108,10 @@ export function buildPrescriptionSql(customIcodes = []) {
     LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
     -- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag เผื่อ vn_stat ของ visit ล่าสุดยังไม่อัปเดต
     LEFT JOIN ovstdiag od1 ON od1.vn = COALESCE(lv.latest_vn, o.vn) AND od1.diagtype = '1'
-    -- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (รวมทุก visit เช่น Visit คัดกรอง + Visit ล่าสุดแพทย์แผนไทย)
+    -- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (เรียง non-U ขึ้นก่อน เพื่อไม่ให้ U-codes เบียดรหัสโรคแผนปัจจุบันหลุดจาก 6 ช่อง)
     LEFT JOIN (
       SELECT o2.hn, o2.vstdate, 
-             GROUP_CONCAT(DISTINCT od.icd10 ORDER BY od.diagtype, od.icd10 SEPARATOR ',') AS codes
+             GROUP_CONCAT(DISTINCT od.icd10 ORDER BY (od.icd10 LIKE 'U%') ASC, od.diagtype, od.icd10 SEPARATOR ',') AS codes
       FROM ovstdiag od
       INNER JOIN ovst o2 ON od.vn = o2.vn
       WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> ''
@@ -253,6 +253,7 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
     const customIcodes = mappedHerbs.map((r) => String(r.icode)).filter(Boolean)
 
     const drugs = await fetchDrugSummary(hos, startDate, endDate, customIcodes)
+    const prescSql = customIcodes.length > 0 ? buildPrescriptionSql(customIcodes) : PRESCRIPTION_SQL
     const prescParams = [
       startDate, endDate, // OPD lv: latest visit of the day
       startDate, endDate, // OPD odx: ovstdiag secondary codes of the day

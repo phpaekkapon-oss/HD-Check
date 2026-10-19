@@ -2232,6 +2232,12 @@ for (let attempt = 1; ; attempt++) {
     await initAuthTables(dwPool)
     await initSsoTables(dwPool)
     await initDispensingRulesTable(dwPool)
+    // เพิ่มรหัส M, M62 ในเกณฑ์ยาสตรีหลังคลอด (1560016) รองรับเคสบริบาลหลังคลอดปวดกล้ามเนื้อ (M6260 + U506)
+    await dwPool.query(`
+      UPDATE dw_hd_check_drug_dx_map 
+      SET dx_prefixes = IF(dx_prefixes LIKE '%M%', dx_prefixes, CONCAT(IFNULL(dx_prefixes, ''), ',M,M62'))
+      WHERE icode = '1560016'
+    `).catch(() => {})
     break
   } catch (err) {
     const delaySec = Math.min(5 * attempt, 30)
