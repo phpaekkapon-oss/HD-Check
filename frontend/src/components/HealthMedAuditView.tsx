@@ -20,7 +20,8 @@ import {
   Layers,
   ShieldAlert,
   Loader2,
-  Sparkles,
+  Cpu,
+  RotateCcw,
   Eye,
   X,
   Stethoscope,
@@ -219,7 +220,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row, table }) => {
           const { pageIndex, pageSize } = table.getState().pagination
           return (
-            <span className="font-mono text-slate-400 dark:text-slate-500 font-bold text-center block w-6 mx-auto text-xs sm:text-[13px]">
+            <span className="font-mono text-slate-400 dark:text-slate-400 font-bold text-center block w-6 mx-auto text-xs sm:text-[13px]">
               {pageIndex * pageSize + row.index + 1}
             </span>
           )
@@ -232,7 +233,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         cell: ({ row }) => (
           <div className="font-mono whitespace-nowrap text-center">
             <div className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px] leading-tight">{row.original.visit_date}</div>
-            <div className="text-[11px] sm:text-xs text-slate-400 dark:text-slate-500 flex items-center justify-center gap-1 mt-0.5 font-medium leading-tight">
+            <div className="text-xs sm:text-xs text-slate-400 dark:text-slate-400 flex items-center justify-center gap-1 mt-0.5 font-medium leading-tight">
               <Clock className="size-3 text-slate-400 shrink-0" />
               <span>{row.original.visit_time ? `${row.original.visit_time.substring(0, 5)} น.` : '—'}</span>
             </div>
@@ -261,7 +262,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
               />
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-[11px]">
+            <div className="flex items-center gap-1.5 mt-1 text-xs">
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
                 <span>HN: {row.original.hn}</span>
                 <CopyButton
@@ -272,7 +273,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 />
               </span>
               {row.original.vn && (
-                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-500 text-[11px] font-medium">
+                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-400 text-xs font-medium">
                   <span>VN: {row.original.vn}</span>
                   <CopyButton
                     text={row.original.vn}
@@ -303,7 +304,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     : 'bg-slate-100 dark:bg-white/5 text-slate-700 dark:text-slate-300 border-slate-200 dark:border-white/10'
                 )}
               >
-                {isKneeIssue && <span className="text-[11px]">⚠️</span>}
+                {isKneeIssue && <span className="text-xs">⚠️</span>}
                 {age} ปี
               </span>
             </div>
@@ -383,7 +384,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       <span
                         key={idx}
                         className={cn(
-                          'text-[11px] sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-md border transition shadow-2xs leading-tight',
+                          'text-xs sm:text-xs inline-flex items-center gap-1 px-2 py-0.5 rounded-md border transition shadow-2xs leading-tight',
                           p.isDup
                             ? 'bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-200 border-rose-300 dark:border-rose-500/40 font-semibold'
                             : 'bg-teal-50/80 dark:bg-teal-950/25 text-teal-900 dark:text-teal-200 border-teal-200/70 dark:border-teal-500/30 font-medium'
@@ -394,7 +395,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                           [{p.code}]
                         </strong>
                         <span className="truncate max-w-[160px]">{cleanName}</span>
-                        <span className="font-mono text-[10.5px] opacity-80 shrink-0 font-bold">x{p.qty}</span>
+                        <span className="font-mono text-xs opacity-80 shrink-0 font-bold">x{p.qty}</span>
                       </span>
                     )
                   })}
@@ -407,7 +408,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   {operations.map((op, idx) => (
                     <span
                       key={idx}
-                      className="px-1.5 py-0.5 rounded text-[10.5px] sm:text-[11px] font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap text-center"
+                      className="px-1.5 py-0.5 rounded text-xs sm:text-xs font-mono font-bold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/20 whitespace-nowrap text-center"
                       title={`${op.code}: ${op.name}`}
                     >
                       {op.code}
@@ -419,12 +420,12 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               {/* วันคลอดในระบบงานบัญชี 2 */}
               {isPostpartum && (
                 laborDate ? (
-                  <div className="text-[11px] text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-bold">
+                  <div className="text-xs text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-bold">
                     <Baby className="size-3 shrink-0" />
                     <span>คลอด: {laborDate}</span>
                   </div>
                 ) : (
-                  <div className="text-[11px] text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-bold">
+                  <div className="text-xs text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-bold">
                     <AlertTriangle className="size-3 shrink-0" />
                     <span>ไม่มีวันคลอดในบัญชี 2</span>
                   </div>
@@ -552,7 +553,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <XCircle className="size-3.5 text-rose-500 shrink-0" />
                   <span>ไม่ผ่านเกณฑ์</span>
                   {isDup && (
-                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-300 text-[10px] font-bold">
+                    <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-500/25 text-amber-800 dark:text-amber-300 text-xs font-bold">
                       ซ้ำ
                     </span>
                   )}
@@ -565,7 +566,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     setSelectedRecord(row.original)
                     handleAskAi(row.original)
                   }}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition-all cursor-pointer group shrink-0 hover:scale-105 active:scale-95 shadow-2xs"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-teal-500/10 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition-all cursor-pointer group shrink-0 hover:scale-105 active:scale-95 shadow-2xs"
                   title="คลิกให้ AI ช่วยวิเคราะห์สาเหตุและวิธีแก้ไขใน HOSxP"
                 >
                   <Bot className="size-3 text-teal-500 group-hover:scale-110 transition-transform" />
@@ -582,7 +583,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <span
                     key={idx}
                     className={cn(
-                      'text-[10.5px] font-medium px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs transition-colors',
+                      'text-xs font-medium px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs transition-colors',
                       t.color === 'amber'
                         ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-300/80 dark:border-amber-500/30 font-semibold'
                         : t.color === 'purple'
@@ -594,7 +595,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   </span>
                 ))}
                 {tags.length > 2 && (
-                  <span className="text-[10px] text-slate-400 font-mono font-bold">
+                  <span className="text-xs text-slate-400 font-mono font-bold">
                     +{tags.length - 2}
                   </span>
                 )}
@@ -694,7 +695,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       icon: Layers,
       iconBg: 'bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 border border-amber-500/30',
       valueColor: (kpi?.duplicateFail ?? 0) > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.duplicateFail ?? 0) > 0 ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-slate-400 dark:text-slate-500',
+      subColor: (kpi?.duplicateFail ?? 0) > 0 ? 'text-amber-700/80 dark:text-amber-400/80' : 'text-slate-400 dark:text-slate-400',
       activeBorder: 'border-amber-500 dark:border-amber-400',
       activeShadow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]',
       activeBg: 'bg-amber-500/[0.06] dark:bg-amber-950/40',
@@ -708,7 +709,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       icon: Bone,
       iconBg: 'bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300 border border-cyan-500/30',
       valueColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-700/80 dark:text-cyan-400/80' : 'text-slate-400 dark:text-slate-500',
+      subColor: (kpi?.kneeFail ?? 0) > 0 ? 'text-cyan-700/80 dark:text-cyan-400/80' : 'text-slate-400 dark:text-slate-400',
       activeBorder: 'border-cyan-500 dark:border-cyan-400',
       activeShadow: 'shadow-[0_0_20px_rgba(6,182,212,0.3)]',
       activeBg: 'bg-cyan-500/[0.06] dark:bg-cyan-950/40',
@@ -722,7 +723,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       icon: Activity,
       iconBg: 'bg-violet-500/15 text-violet-600 dark:bg-violet-500/20 dark:text-violet-300 border border-violet-500/30',
       valueColor: (kpi?.muscleFail ?? 0) > 0 ? 'text-violet-600 dark:text-violet-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.muscleFail ?? 0) > 0 ? 'text-violet-700/80 dark:text-violet-400/80' : 'text-slate-400 dark:text-slate-500',
+      subColor: (kpi?.muscleFail ?? 0) > 0 ? 'text-violet-700/80 dark:text-violet-400/80' : 'text-slate-400 dark:text-slate-400',
       activeBorder: 'border-violet-500 dark:border-violet-400',
       activeShadow: 'shadow-[0_0_20px_rgba(139,92,246,0.3)]',
       activeBg: 'bg-violet-500/[0.06] dark:bg-violet-950/40',
@@ -736,7 +737,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       icon: Baby,
       iconBg: 'bg-fuchsia-500/15 text-fuchsia-600 dark:bg-fuchsia-500/20 dark:text-fuchsia-300 border border-fuchsia-500/30',
       valueColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-600 dark:text-fuchsia-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-700/80 dark:text-fuchsia-400/80' : 'text-slate-400 dark:text-slate-500',
+      subColor: (kpi?.postpartumFail ?? 0) > 0 ? 'text-fuchsia-700/80 dark:text-fuchsia-400/80' : 'text-slate-400 dark:text-slate-400',
       activeBorder: 'border-fuchsia-500 dark:border-fuchsia-400',
       activeShadow: 'shadow-[0_0_20px_rgba(217,70,239,0.3)]',
       activeBg: 'bg-fuchsia-500/[0.06] dark:bg-fuchsia-950/40',
@@ -750,7 +751,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       icon: ShieldAlert,
       iconBg: 'bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30',
       valueColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-700/80 dark:text-red-400/80' : 'text-slate-400 dark:text-slate-500',
+      subColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-700/80 dark:text-red-400/80' : 'text-slate-400 dark:text-slate-400',
       activeBorder: 'border-red-500 dark:border-red-400',
       activeShadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
       activeBg: 'bg-red-500/[0.06] dark:bg-red-950/40',
@@ -770,8 +771,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             <div>
               <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
                 <span>ตรวจหัตถการแพทย์แผนไทย</span>
-                <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
-                  <Sparkles className="size-3" /> HOSxP Audit Engine
+                <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
+                  <Cpu className="size-3" /> HOSxP Audit Engine
                 </span>
               </h2>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
@@ -818,7 +819,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     <AnimatedNumber value={card.value} />
                   </strong>
                   {card.rate !== undefined && (
-                    <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
                       ({card.rate}%)
                     </span>
                   )}
@@ -865,19 +866,19 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       <AnimatedNumber value={card.value} />
                     </span>
                     {card.rate !== undefined && (
-                      <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-300 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                      <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-300 px-1.5 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
                         {card.rate}%
                       </span>
                     )}
                   </div>
 
                   {/* Bottom row: Subtext or Active Badge */}
-                  <div className="pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-[11px] sm:text-[11.5px] leading-tight gap-1">
+                  <div className="pt-1.5 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-xs sm:text-[11.5px] leading-tight gap-1">
                     <span className={cn('truncate font-medium', card.subColor)}>
                       {card.sub}
                     </span>
                     {isSelected && (
-                      <span className="shrink-0 flex items-center gap-1 font-bold text-[9.5px] px-1.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                      <span className="shrink-0 flex items-center gap-1 font-bold text-xs px-1.5 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                         <span className="size-1.5 rounded-full bg-emerald-400 animate-pulse" />
                         เลือก
                       </span>
@@ -907,7 +908,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               )}
             >
               <span className="size-2 rounded-full bg-current animate-pulse shrink-0" />
-              <span className="opacity-75 text-[11px]">กลุ่ม:</span>
+              <span className="opacity-75 text-xs">กลุ่ม:</span>
               <strong className="font-bold text-xs">
                 {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
                 {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
@@ -939,7 +940,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
           >
             <SlidersHorizontal className="size-3 text-teal-500" />
-            <span className="text-[11px] font-semibold">{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
+            <span className="text-xs font-semibold">{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
           </button>
 
           {/* Search Box */}
@@ -1106,21 +1107,21 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             {/* Visit Metadata Grid */}
             <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-200/60 dark:border-white/5">
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">วันที่ / เวลาที่รับบริการ</span>
+                <span className="text-slate-400 block text-xs uppercase font-semibold">วันที่ / เวลาที่รับบริการ</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200 font-mono">
                   {selectedRecord.visit_date} {selectedRecord.visit_time}
                 </span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">สิทธิการรักษา</span>
+                <span className="text-slate-400 block text-xs uppercase font-semibold">สิทธิการรักษา</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.pttype_name || '—'}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">แพทย์ / ผู้ตรวจวินิจฉัย</span>
+                <span className="text-slate-400 block text-xs uppercase font-semibold">แพทย์ / ผู้ตรวจวินิจฉัย</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.doctor_name || '—'}</span>
               </div>
               <div>
-                <span className="text-slate-400 block text-[10px] uppercase font-semibold">แผนกที่ให้บริการ</span>
+                <span className="text-slate-400 block text-xs uppercase font-semibold">แผนกที่ให้บริการ</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200">{selectedRecord.department_name || 'แผนกแพทย์แผนไทย'}</span>
               </div>
             </div>
@@ -1152,7 +1153,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 return (
                   <div className="space-y-2 p-3 rounded-xl bg-slate-50 dark:bg-white/[0.02] border border-slate-200/60 dark:border-white/5">
                     <div className="flex flex-wrap gap-1.5 items-center">
-                      <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mr-1">รหัสแผนไทย:</span>
+                      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 mr-1">รหัสแผนไทย:</span>
                       {thaiMedList.length > 0 ? (
                         thaiMedList.map((dx, idx) => (
                           <span
@@ -1177,10 +1178,10 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     </div>
 
                     {otherList.length > 0 && (
-                      <div className="pt-1.5 border-t border-slate-200/50 dark:border-white/5 flex flex-wrap gap-1 items-center text-[11px] text-slate-400">
+                      <div className="pt-1.5 border-t border-slate-200/50 dark:border-white/5 flex flex-wrap gap-1 items-center text-xs text-slate-400">
                         <span className="mr-1">รหัสโรคทั่วไป (ตรวจในหน้าจ่ายยาสมุนไพร):</span>
                         {otherList.map((dx, idx) => (
-                          <span key={idx} className="font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-[10px]">
+                          <span key={idx} className="font-mono px-1.5 py-0.2 rounded bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 text-xs">
                             {dx}
                           </span>
                         ))}
@@ -1231,7 +1232,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 <span className="flex items-center gap-1.5">
                   <Activity className="size-3.5 text-teal-500" /> รหัสหัตถการแพทย์แผนไทย (ICD-10-TM)
                 </span>
-                <span className="text-[10.5px] font-mono text-slate-400">
+                <span className="text-xs font-mono text-slate-400">
                   {selectedRecord.operations?.length ?? 0} รายการ
                 </span>
               </h4>
@@ -1298,8 +1299,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   <div>
                     <h4 className="text-xs font-bold text-slate-800 dark:text-slate-100 flex items-center gap-1.5">
                       <span>AI Clinical Audit Advisor</span>
-                      <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 flex items-center gap-0.5">
-                        <Sparkles className="size-2.5" /> Google Gemini
+                      <span className="text-xs font-mono px-1.5 py-0.2 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 border border-teal-500/25 flex items-center gap-0.5">
+                        <Bot className="size-2.5" /> Google Gemini
                       </span>
                     </h4>
                   </div>
@@ -1319,7 +1320,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                       </>
                     ) : (
                       <>
-                        <Sparkles className="size-3.5" />
+                        <Bot className="size-3.5" />
                         <span>วิเคราะห์ & ขอคำแนะนำแก้ไข</span>
                       </>
                     )}
@@ -1355,8 +1356,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[#0d1627] dark:via-[#0c1424] dark:to-[#141226] border border-teal-500/30 dark:border-teal-500/40 shadow-sm space-y-2.5 animate-in fade-in duration-200">
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 flex items-center gap-1">
-                        <Sparkles className="size-3" /> บทวิเคราะห์โดย {aiAdvice.aiModel || 'Google Gemini AI'}:
+                      <span className="text-xs font-bold text-teal-700 dark:text-teal-400 flex items-center gap-1">
+                        <Bot className="size-3" /> บทวิเคราะห์โดย {aiAdvice.aiModel || 'Google Gemini AI'}:
                       </span>
                       <p className="text-xs font-semibold text-slate-900 dark:text-white mt-1 leading-snug">
                         {aiAdvice.summary}
@@ -1365,7 +1366,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     <button
                       type="button"
                       onClick={handleCopyAdvice}
-                      className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1 text-[10.5px] font-medium"
+                      className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1 text-xs font-medium"
                       title="คัดลอกคำแนะนำไปใช้งาน"
                     >
                       {copiedAdvice ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
@@ -1374,7 +1375,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   </div>
 
                   <div className="p-2.5 rounded-lg bg-white/90 dark:bg-black/30 border border-teal-500/20 text-xs text-slate-800 dark:text-slate-200 space-y-1">
-                    <strong className="block font-bold text-teal-700 dark:text-teal-300 text-[11px] flex items-center gap-1">
+                    <strong className="block font-bold text-teal-700 dark:text-teal-300 text-xs flex items-center gap-1">
                       🛠️ สิ่งที่ต้องแก้ไขในระบบ HOSxP:
                     </strong>
                     <div className="whitespace-pre-line leading-relaxed pl-1 text-slate-700 dark:text-slate-200 text-xs font-medium">
@@ -1383,7 +1384,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   </div>
 
                   {aiAdvice.caution && (
-                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+                    <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
                       <strong>⚠️ ข้อควรระวัง:</strong> {aiAdvice.caution}
                     </div>
                   )}
@@ -1392,9 +1393,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                     <button
                       type="button"
                       onClick={() => handleAskAi(selectedRecord)}
-                      className="text-[10px] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1"
+                      className="text-xs text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1"
                     >
-                      <Sparkles className="size-2.5" /> วิเคราะห์ใหม่อีกครั้ง
+                      <RotateCcw className="size-2.5" /> วิเคราะห์ใหม่อีกครั้ง
                     </button>
                   </div>
                 </div>

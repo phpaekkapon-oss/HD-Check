@@ -1,4 +1,7 @@
 import type {
+  ClaimCheckResponse,
+  MenuPermissionMatrix,
+  MenuPermissionsResponse,
   AuditRecord,
   HerbAuditAnalysis,
   HerbAuditAiAdvice,
@@ -9,6 +12,7 @@ import type {
   DxMapRecord,
   DxMapPreview,
   DxMapUpdate,
+  DxMapBatchItem,
   PrescriptionResponse,
   SyncResult,
   HealthMedRecord,
@@ -77,6 +81,12 @@ export const herbDxApi = {
       body: JSON.stringify(body),
     }),
 
+  batchUpdateDxMap: (body: { items: readonly DxMapBatchItem[] }) =>
+    request<{ success: true; updatedCount: number }>('/api/dx-map/batch-update', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    }),
+
   previewDxMap: (icode: string, dx_prefixes: string, periodDays: number) =>
     request<DxMapPreview>(`/api/dx-map/${encodeURIComponent(icode)}/preview`, {
       method: 'POST',
@@ -110,6 +120,14 @@ export const herbDxApi = {
       body: JSON.stringify(record),
     }),
 
+  menuPermissions: () => request<MenuPermissionsResponse>('/api/permissions/menus'),
+
+  saveMenuPermissions: (permissions: MenuPermissionMatrix) =>
+    request<{ success: true; permissions: MenuPermissionMatrix }>('/api/permissions/menus', {
+      method: 'PUT',
+      body: JSON.stringify({ permissions }),
+    }),
+
   herbAuditAdvice: (record: AuditRecord, mode: 'rule' | 'ai') =>
     request<{
       success: true
@@ -120,6 +138,8 @@ export const herbDxApi = {
       method: 'POST',
       body: JSON.stringify({ record, mode }),
     }),
+
+  claimCheck: (range: DateRange) => request<ClaimCheckResponse>(`/api/claims/check?${qs({ startDate: range.startDate, endDate: range.endDate })}`),
 
   aiChat: (message: string, history?: Array<{ role: 'user' | 'model'; content: string }>) =>
     request<{

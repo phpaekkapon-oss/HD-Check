@@ -423,3 +423,74 @@ test('Copilot offline - topic questions are not hijacked by drug names', () => {
   assert.match(offlineAnswer(copilotKb, 'รหัส EP แก้อย่างไร'), /รหัสปิดสิทธิ/)
   assert.match(offlineAnswer(copilotKb, 'ลูกประคบใช้รหัสอะไร'), /ยาประคบ \(ลูกประคบ\)/)
 })
+
+const perm = await import('./permissions.mjs')
+
+test('Menu permissions - roles resolve IT > Thai-med > pharmacist > general', () => {
+  assert.equal(perm.resolveRole({ position: 'นักวิชาการคอมพิวเตอร์' }, true), 'it')
+  assert.equal(perm.resolveRole({ groupname: 'doctor', position: 'แพทย์แผนไทยปฏิบัติการ' }, false), 'thaimed')
+  assert.equal(perm.resolveRole({ groupname: 'ผู้ดูแลระบบ_ระดับที่_3', entryposition: 'นักการแพทย์แผนไทย' }, false), 'thaimed')
+  assert.equal(perm.resolveRole({ groupname: 'doctor', position: 'นายแพทย์ปฏิบัติการ' }, false), 'doctor')
+  assert.equal(perm.resolveRole({ groupname: 'doctor', position: 'นักกายภาพบำบัด' }, false), 'doctor')
+  assert.equal(perm.resolveRole({ position: 'เภสัชกรชำนาญการ' }, false), 'pharmacist')
+  assert.equal(perm.resolveRole({ position: 'พยาบาลวิชาชีพ' }, false), 'general')
+})
+
+test('Menu permissions - defaults keep old behaviour, IT always sees everything, unknown keys ignored', () => {
+  const d = perm.defaultPermissions()
+  assert.equal(d.general.audit, true)
+  assert.equal(d.thaimed.sql, false)
+  assert.ok(perm.canAccessMenu(d, 'general', 'dashboard'))
+
+  const saved = perm.normalizePermissions({ general: { healthmed: false, bogus: true }, hacker: { sql: true } })
+  assert.equal(saved.general.healthmed, false)
+  assert.equal('bogus' in saved.general, false)
+  assert.equal('hacker' in saved, false)
+  assert.equal(perm.canAccessMenu(saved, 'general', 'healthmed'), false)
+  assert.equal(perm.canAccessMenu(saved, 'it', 'healthmed'), true)
+  assert.equal(perm.canAccessMenu(saved, 'it', 'sql'), true)
+})
+
+test('Menu permissions - per-user role override from IT wins over automatic grouping', () => {
+  // คนในกลุ่ม admin ของ HOSxP แต่ IT กำหนดเป็นผู้ใช้ทั่วไป
+  assert.equal(perm.resolveRole({ groupname: 'admin', role_override: 'general' }, true), 'general')
+  // พยาบาลที่ IT ยกให้เป็นแพทย์แผนไทย (รอง) / ผู้ดูแลสูงสุด
+  assert.equal(perm.resolveRole({ position: 'พยาบาลวิชาชีพ', role_override: 'thaimed' }, false), 'thaimed')
+  assert.equal(perm.resolveRole({ position: 'พยาบาลวิชาชีพ', role_override: 'it' }, false), 'it')
+  // ค่าที่ไม่รู้จักถูกเพิกเฉย ใช้กฎอัตโนมัติ
+  assert.equal(perm.resolveRole({ position: 'เภสัชกร', role_override: 'superuser' }, false), 'pharmacist')
+  assert.equal(perm.validRoleOverride('auto'), null)
+})
+
+const claims = await import('./claims.mjs')
+const claimRef = {
+  eclaim: new Set(['M179', 'U5753', 'K640', 'S934', 'W010', 'N940', 'O800']),
+  eclaimParents: new Set(['M17', 'K64', 'S93', 'N94']),
+  icdSex: new Map([['N940', '2'], ['O800', '2']]),
+  thaiMedU: new Set(['U5753']),
+}
+
+test('Claims - valid Thai-med visit has no ICD issues (K640 accepted via e-Claim table)', () => {
+  assert.deepEqual(claims.checkVisitIcd({ pdx: 'M179', dx0: 'U5753', dx1: 'K640', sex: '2' }, claimRef), [])
+})
+
+test('Claims - detects NHSO-rejected patterns (201 no PDX, 232 injury without cause, unspecific, sex)', () => {
+  const codes = (v) => claims.checkVisitIcd(v, claimRef).map((i) => i.code)
+  assert.ok(codes({ dx0: 'U5753' }).includes('NO_PDX'))
+  assert.ok(codes({ pdx: 'S934', sex: '1' }).includes('INJURY_NO_CAUSE'))
+  assert.ok(!codes({ pdx: 'S934', dx0: 'W010', sex: '1' }).includes('INJURY_NO_CAUSE'))
+  assert.ok(codes({ pdx: 'W010' }).includes('EXTERNAL_AS_PDX'))
+  assert.ok(codes({ pdx: 'M17' }).includes('NOT_SPECIFIC'))
+  assert.ok(codes({ pdx: 'M1799' }).includes('NOT_IN_ECLAIM'))
+  assert.ok(codes({ pdx: 'N940', sex: '1' }).includes('SEX_MISMATCH'))
+  assert.ok(codes({ pdx: 'M179', dx0: 'U9999' }).includes('U_NOT_THAIMED'))
+})
+
+test('Claims - claim state from FDH status', () => {
+  assert.equal(claims.claimState({ hip: 'OFC' }), 'not_nhso')
+  assert.equal(claims.claimState({ hip: 'UCS' }), 'no_result')
+  assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'cut_off_batch' }), 'pending')
+  assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'settled' }), 'settled')
+  assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'rejected' }), 'rejected')
+  assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'settled', fdh_errors: [{ code: '950' }] }), 'rejected')
+})

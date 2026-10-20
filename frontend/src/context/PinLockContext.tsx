@@ -13,8 +13,13 @@ import { useAuth } from './AuthContext'
 
 type UnlockResult = { success: boolean; error?: string; forceLogout?: boolean }
 
+export const MAX_LOCK_MINUTES = 15
+export const MAX_LOCK_MS = MAX_LOCK_MINUTES * 60 * 1000
+
 interface PinLockContextType {
   readonly isLocked: boolean
+  readonly lockedAt: number | null
+  readonly maxLockMinutes: number
   readonly hasPin: boolean
   readonly pinEnabled: boolean
   readonly pinLength: number
@@ -32,10 +37,11 @@ interface PinLockContextType {
 
 const PinLockContext = createContext<PinLockContextType | null>(null)
 
-/** Remove the lock flag older versions kept in sessionStorage (the server owns lock state now). */
+/** Remove the lock flag and lockedAt timestamp from sessionStorage. */
 export const clearStoredPinLock = () => {
   try {
     sessionStorage.removeItem('smarthoscheck_pin_locked')
+    sessionStorage.removeItem('smarthoscheck_locked_at')
   } catch {
     // Storage unavailable: nothing to clear.
   }
@@ -66,6 +72,19 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
   const { user, updateUser, isAuthenticated, serverLocked, logout } = useAuth()
 
   const [isLocked, setIsLocked] = useState(false)
+  const [lockedAt, setLockedAt] = useState<number | null>(() => {
+    try {
+      const saved = sessionStorage.getItem('smarthoscheck_locked_at')
+      return saved ? Number(saved) : null
+    } catch {
+      return null
+    }
+  })
+  const lockedAtRef = useRef<number | null>(lockedAt)
+  useEffect(() => {
+    lockedAtRef.current = lockedAt
+  }, [lockedAt])
+
   // Server answered 428 (policy switched on after this tab loaded)
   const [serverRequiresPin, setServerRequiresPin] = useState(false)
   const queryClient = useQueryClient()
@@ -86,8 +105,17 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   // Session was locked before this tab loaded (refresh / new tab)
   useEffect(() => {
-    clearStoredPinLock()
-    if (serverLocked) setIsLocked(true)
+    if (serverLocked) {
+      setIsLocked(true)
+      const now = Date.now()
+      if (!lockedAtRef.current) {
+        setLockedAt(now)
+        lockedAtRef.current = now
+        try {
+          sessionStorage.setItem('smarthoscheck_locked_at', String(now))
+        } catch {}
+      }
+    }
   }, [serverLocked])
 
   // Any API answering 423 means the server-side session is locked (e.g. locked from another device)
@@ -95,7 +123,17 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
     const original = window.fetch
     window.fetch = async (...args) => {
       const res = await original(...args)
-      if (res.status === 423) setIsLocked(true)
+      if (res.status === 423) {
+        setIsLocked(true)
+        if (!lockedAtRef.current) {
+          const now = Date.now()
+          setLockedAt(now)
+          lockedAtRef.current = now
+          try {
+            sessionStorage.setItem('smarthoscheck_locked_at', String(now))
+          } catch {}
+        }
+      }
       if (res.status === 428) setServerRequiresPin(true)
       return res
     }
@@ -109,8 +147,20 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
     channelRef.current = channel
     if (!channel) return
     channel.onmessage = (e: MessageEvent<TabMessage>) => {
-      if (e.data === 'lock') setIsLocked(true)
-      if (e.data === 'unlock') setIsLocked(false)
+      if (e.data === 'lock') {
+        setIsLocked(true)
+        const now = Date.now()
+        if (!lockedAtRef.current) {
+          setLockedAt(now)
+          lockedAtRef.current = now
+        }
+      }
+      if (e.data === 'unlock') {
+        setIsLocked(false)
+        setLockedAt(null)
+        lockedAtRef.current = null
+        clearStoredPinLock()
+      }
       if (e.data === 'unlock' || e.data === 'activity') lastActivityRef.current = Date.now()
     }
     return () => {
@@ -121,20 +171,43 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
 
   const lockNow = useCallback(() => {
     if (!isAuthenticated || !hasPin) return
+    const now = Date.now()
     setIsLocked(true)
+    setLockedAt(now)
+    lockedAtRef.current = now
+    try {
+      sessionStorage.setItem('smarthoscheck_locked_at', String(now))
+    } catch {}
     channelRef.current?.postMessage('lock')
     // Server lock is what actually blocks data; the overlay is only the UI for it
-    void postJson('/api/auth/lock').catch(() => {})
+    void postJson('/api/auth/lock')
+      .then((res) => {
+        if (res.ok && res.data?.lockedAt) {
+          const sTime = Number(res.data.lockedAt)
+          setLockedAt(sTime)
+          lockedAtRef.current = sTime
+          try {
+            sessionStorage.setItem('smarthoscheck_locked_at', String(sTime))
+          } catch {}
+        }
+      })
+      .catch(() => {})
   }, [isAuthenticated, hasPin])
 
   const finishUnlock = (ok: boolean, data: { error?: string; forceLogout?: boolean }, fallback: string): UnlockResult => {
     if (data.forceLogout) {
+      clearStoredPinLock()
       setIsLocked(false)
-      logout()
+      setLockedAt(null)
+      lockedAtRef.current = null
+      logout(data.error || 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน')
       return { success: false, forceLogout: true, error: data.error }
     }
     if (!ok) return { success: false, error: data.error || fallback }
+    clearStoredPinLock()
     setIsLocked(false)
+    setLockedAt(null)
+    lockedAtRef.current = null
     lastActivityRef.current = Date.now()
     broadcast('unlock')
     void queryClient.invalidateQueries()
@@ -239,21 +312,49 @@ export const PinLockProvider: FC<{ children: ReactNode }> = ({ children }) => {
     window.addEventListener('keydown', handleKeyDown)
 
     const intervalId = window.setInterval(() => {
-      if (isLocked) return
-      if (Date.now() - lastActivityRef.current >= autoLockMinutes * 60 * 1000) lockNow()
-    }, 5000)
+      const now = Date.now()
+
+      // 1. If screen is LOCKED: check if locked duration >= 15 minutes -> Auto-logout!
+      if (isLocked) {
+        const lockTime = lockedAtRef.current || now
+        if (now - lockTime >= MAX_LOCK_MS) {
+          clearStoredPinLock()
+          setIsLocked(false)
+          setLockedAt(null)
+          lockedAtRef.current = null
+          logout('หน้าจอถูกล็อกเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน')
+          broadcast('unlock')
+        }
+        return
+      }
+
+      // 2. If screen is NOT locked: check user inactivity
+      const idleMs = now - lastActivityRef.current
+      if (pinEnabled && autoLockMinutes > 0) {
+        if (idleMs >= autoLockMinutes * 60 * 1000) {
+          lockNow()
+        }
+      } else {
+        // No PIN enabled: auto-logout when idle for 15 minutes
+        if (idleMs >= MAX_LOCK_MS) {
+          logout('ไม่มีการใช้งานเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน')
+        }
+      }
+    }, 1000)
 
     return () => {
       events.forEach((ev) => window.removeEventListener(ev, handleUserActivity))
       window.removeEventListener('keydown', handleKeyDown)
       window.clearInterval(intervalId)
     }
-  }, [isAuthenticated, pinEnabled, autoLockMinutes, isLocked, lockNow])
+  }, [isAuthenticated, pinEnabled, autoLockMinutes, isLocked, lockNow, logout])
 
   return (
     <PinLockContext.Provider
       value={{
         isLocked,
+        lockedAt,
+        maxLockMinutes: MAX_LOCK_MINUTES,
         hasPin,
         pinEnabled,
         pinLength,

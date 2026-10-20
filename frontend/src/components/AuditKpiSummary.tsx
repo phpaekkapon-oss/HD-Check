@@ -157,7 +157,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
                 {card.sub}
               </span>
               {isSelected && (
-                <span className="shrink-0 flex items-center gap-1 font-bold text-[10.5px] px-2 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+                <span className="shrink-0 flex items-center gap-1 font-bold text-xs px-2 py-0.5 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                   <span className="size-1 rounded-full bg-emerald-400 animate-pulse" />
                   เลือก
                 </span>

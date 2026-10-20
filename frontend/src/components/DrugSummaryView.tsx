@@ -83,7 +83,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           const pageIndex = table.getState().pagination.pageIndex
           const pageSize = table.getState().pagination.pageSize
           return (
-            <div className="text-center font-mono text-slate-400 dark:text-slate-400 text-[11px]">
+            <div className="text-center font-mono text-slate-400 dark:text-slate-400 text-xs">
               {pageIndex * pageSize + row.index + 1}
             </div>
           )
@@ -113,7 +113,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               {row.original.name}
             </span>
             {row.original.units ? (
-              <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500">
+              <span className="text-xs font-normal text-slate-400 dark:text-slate-400">
                 ขนาดบรรจุ: {row.original.units}
               </span>
             ) : null}
@@ -189,7 +189,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <DataTableColumnHeader column={column} title="รหัส 24 หลัก" />
         ),
         cell: ({ row }) => (
-          <span className="font-mono text-slate-600 dark:text-slate-300 text-[11px] whitespace-nowrap">
+          <span className="font-mono text-slate-600 dark:text-slate-300 text-xs whitespace-nowrap">
             {row.original.nhso_adp_code || '-'}
           </span>
         ),
@@ -294,7 +294,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         >
           <div>
             <div className="flex items-center justify-between gap-1 mb-2">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
                 จ่ายผู้ป่วยนอก (OPD)
               </span>
               <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-cyan-500/15 text-cyan-600 dark:bg-cyan-500/20 dark:text-cyan-300 border-cyan-500/30">
@@ -306,16 +306,16 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-cyan-600 dark:text-cyan-400">
                 <AnimatedNumber value={totalOpd} />
               </span>
-              <span className="text-[11px] font-semibold text-cyan-600 dark:text-cyan-300 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25">
+              <span className="text-xs font-semibold text-cyan-600 dark:text-cyan-300 px-2 py-0.5 rounded-full bg-cyan-500/10 border border-cyan-500/25">
                 หน่วย
               </span>
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs gap-1">
             <span className="text-slate-500 dark:text-slate-400 font-medium truncate">บริการคลินิกผู้ป่วยนอก</span>
             {filterType === 'OPD' && (
-              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+              <span className="shrink-0 flex items-center gap-1 font-bold text-xs px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                 <span className="size-1 rounded-full bg-cyan-400 animate-pulse" />
                 กรองอยู่
               </span>
@@ -336,7 +336,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         >
           <div>
             <div className="flex items-center justify-between gap-1 mb-2">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
                 จ่ายผู้ป่วยใน (IPD)
               </span>
               <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-indigo-500/15 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300 border-indigo-500/30">
@@ -348,16 +348,16 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-indigo-600 dark:text-indigo-400">
                 <AnimatedNumber value={totalIpd} />
               </span>
-              <span className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25">
+              <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25">
                 หน่วย
               </span>
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs gap-1">
             <span className="text-slate-500 dark:text-slate-400 font-medium truncate">บริการหอผู้ป่วยใน</span>
             {filterType === 'IPD' && (
-              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+              <span className="shrink-0 flex items-center gap-1 font-bold text-xs px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                 <span className="size-1 rounded-full bg-indigo-400 animate-pulse" />
                 กรองอยู่
               </span>
@@ -378,7 +378,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         >
           <div>
             <div className="flex items-center justify-between gap-1 mb-2">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
                 รวมจำนวนจ่ายทั้งหมด
               </span>
               <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-teal-500/15 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300 border-teal-500/30">
@@ -390,16 +390,16 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-slate-900 dark:text-white">
                 <AnimatedNumber value={grandTotalQty} />
               </span>
-              <span className="text-[11px] font-semibold text-teal-600 dark:text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25">
+              <span className="text-xs font-semibold text-teal-600 dark:text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25">
                 หน่วย
               </span>
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] gap-1">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs gap-1">
             <span className="text-slate-500 dark:text-slate-400 font-medium truncate">รวมทุกขนานยาสมุนไพร</span>
             {filterType === 'ALL' && (
-              <span className="shrink-0 flex items-center gap-1 font-bold text-[9px] px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
+              <span className="shrink-0 flex items-center gap-1 font-bold text-xs px-1.5 py-0.2 rounded-full bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs">
                 <span className="size-1 rounded-full bg-teal-400 animate-pulse" />
                 แสดงทั้งหมด
               </span>
@@ -411,7 +411,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         <div className="rounded-2xl p-3.5 text-left transition-all duration-200 relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-amber-400/60 dark:hover:border-amber-500/40 hover:-translate-y-0.5">
           <div>
             <div className="flex items-center justify-between gap-1 mb-2">
-              <span className="text-[11px] font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider truncate">
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
                 รวมมูลค่าต้นทุนยา
               </span>
               <div className="size-7 rounded-lg grid place-items-center group-hover:scale-110 transition-transform shrink-0 border bg-amber-500/15 text-amber-600 dark:bg-amber-500/20 dark:text-amber-300 border-amber-500/30">
@@ -426,7 +426,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-[10px] text-slate-500 dark:text-slate-400">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
             <span>คำนวณจากราคาต้นทุน</span>
             <span className="font-mono text-amber-600 dark:text-amber-400 font-bold">บาท</span>
           </div>
@@ -572,7 +572,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
                       <Pill className="size-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
                       <span className="truncate">{d.name}</span>
                     </div>
-                    <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+                    <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                       รหัส: {d.icode} {d.nhso_adp_code ? `• 24 หลัก: ${d.nhso_adp_code}` : ''}
                     </div>
                   </div>
@@ -583,11 +583,11 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
 
                 <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#292440] text-xs">
                   <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยนอก (OPD)</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block">ผู้ป่วยนอก (OPD)</span>
                     <span className="font-mono font-semibold text-cyan-700 dark:text-cyan-400">{fmtNum(d.opd_qty)} หน่วย</span>
                   </div>
                   <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400 block">ผู้ป่วยใน (IPD)</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400 block">ผู้ป่วยใน (IPD)</span>
                     <span className="font-mono font-semibold text-indigo-700 dark:text-indigo-400">{fmtNum(d.ipd_qty)} หน่วย</span>
                   </div>
                 </div>

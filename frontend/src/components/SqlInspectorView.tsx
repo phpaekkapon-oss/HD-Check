@@ -1,5 +1,5 @@
 import { useState, useMemo, type FC } from 'react'
-import { Copy, Check, Database, Code, Info, Terminal, Sparkles } from 'lucide-react'
+import { Copy, Check, Database, Code, Info, Terminal, RefreshCw } from 'lucide-react'
 
 const QUERY_1 = `SELECT 
     o.vstdate AS visit_date,
@@ -230,7 +230,7 @@ const SqlCodeBlock: FC<{ readonly code: string }> = ({ code }) => {
 
       return (
         <div key={lineIndex} className="table-row hover:bg-white/5 transition-colors">
-          <span className="table-cell select-none pr-4 text-right text-teal-500/40 font-mono text-[11px] w-8">
+          <span className="table-cell select-none pr-4 text-right text-teal-500/40 font-mono text-xs w-8">
             {lineIndex + 1}
           </span>
           <span className="table-cell whitespace-pre font-mono">
@@ -247,7 +247,7 @@ const SqlCodeBlock: FC<{ readonly code: string }> = ({ code }) => {
     const tokens = line.split(/([A-Za-z0-9_`']+|\s+|[(),=<>!*+-])/)
     return (
       <div key={lineIndex} className="table-row hover:bg-white/5 transition-colors">
-        <span className="table-cell select-none pr-4 text-right text-teal-500/40 font-mono text-[11px] w-8">
+        <span className="table-cell select-none pr-4 text-right text-teal-500/40 font-mono text-xs w-8">
           {lineIndex + 1}
         </span>
         <span className="table-cell whitespace-pre font-mono">
@@ -282,8 +282,8 @@ export const SqlInspectorView: FC = () => {
             <Info className="size-4" />
           </div>
           <span className="tracking-tight">การดึงและจัดเก็บข้อมูลเข้าตาราง dw_hd-check</span>
-          <span className="ml-auto inline-flex items-center gap-1 text-[11px] font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
-            <Sparkles className="size-3" /> Auto ETL Sync
+          <span className="ml-auto inline-flex items-center gap-1 text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30">
+            <RefreshCw className="size-3" /> Auto ETL Sync
           </span>
         </div>
         <p className="text-slate-600 dark:text-slate-300 text-xs leading-relaxed">
@@ -302,7 +302,7 @@ export const SqlInspectorView: FC = () => {
               <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white tracking-tight">
                 QUERY 1 : ตรวจสอบเวชระเบียนยาสมุนไพรและรหัสวินิจฉัยโรค
               </h4>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 ดึงประวัติการสั่งจ่ายยาพร้อม PDX, DX0-DX5 เพื่อประเมินเกณฑ์
               </p>
             </div>
@@ -331,7 +331,7 @@ export const SqlInspectorView: FC = () => {
 
         {/* IDE-Grade Code Editor Container */}
         <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-teal-300/70">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs font-mono text-teal-300/70">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500/80" />
               <span className="size-2 rounded-full bg-amber-500/80" />
@@ -357,7 +357,7 @@ export const SqlInspectorView: FC = () => {
               <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white tracking-tight">
                 QUERY 2 : สรุปยอดจ่ายยาสมุนไพร OPD / IPD และต้นทุนยา พร้อมรหัสมาตรฐาน 24 หลัก
               </h4>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 จัดกลุ่มยอดจ่ายตาม icode คำนวณยอดเงินรวมและจับคู่รหัส did
               </p>
             </div>
@@ -386,7 +386,7 @@ export const SqlInspectorView: FC = () => {
 
         {/* IDE-Grade Code Editor Container */}
         <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-cyan-300/70">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs font-mono text-cyan-300/70">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500/80" />
               <span className="size-2 rounded-full bg-amber-500/80" />
@@ -412,7 +412,7 @@ export const SqlInspectorView: FC = () => {
               <h4 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white tracking-tight">
                 QUERY 3 : ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย (งานที่ 1–5 & ตรวจค่าบริการซ้ำ)
               </h4>
-              <p className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-mono">
                 ตรวจ 5 เกณฑ์ใหม่: พอกเข่า (M179+U5753 ครบ 4 หัตถการ), บริบาลหลังคลอด (M6260+U506 ครบ 5 หัตถการ + วันคลอดบัญชี 2), M6260+U อื่นๆ ผ่านเกณฑ์กล้ามเนื้อ
               </p>
             </div>
@@ -441,7 +441,7 @@ export const SqlInspectorView: FC = () => {
 
         {/* IDE-Grade Code Editor Container */}
         <div className="bg-[#0b0d1b] p-3 sm:p-4 overflow-x-auto border-t border-[#292440]">
-          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-[11px] font-mono text-teal-300/70">
+          <div className="flex items-center justify-between pb-2 mb-2 border-b border-white/10 text-xs font-mono text-teal-300/70">
             <div className="flex items-center gap-1.5">
               <span className="size-2 rounded-full bg-rose-500/80" />
               <span className="size-2 rounded-full bg-amber-500/80" />

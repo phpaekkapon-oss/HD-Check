@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { Sparkles, Database, Building2, RefreshCw } from 'lucide-react'
+import { Activity, Database, Building2, RefreshCw } from 'lucide-react'
 import type { DbStatus } from '@/types/herbdx.types'
 import { useAuth } from '@/context/AuthContext'
 import { toThaiDateLong } from '@/lib/format'
@@ -17,12 +17,12 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
   const isOnline = Boolean(status)
   const autoSyncEnabled = Boolean(status?.syncEnabled && status.autoSyncMinutes > 0)
   const syncModeLabel = !status
-    ? 'กำลังตรวจสอบรอบซิงค์'
+    ? 'กำลังตรวจสอบรอบดึงข้อมูล'
     : !status.syncEnabled
-      ? 'ปิดการซิงค์'
+      ? 'ปิดการดึงข้อมูล'
       : autoSyncEnabled
-        ? `Auto-Sync ทุก ${status.autoSyncMinutes} นาที`
-        : 'ซิงค์ด้วยตนเอง'
+        ? `ดึงข้อมูลอัตโนมัติทุก ${status.autoSyncMinutes} นาที`
+        : 'ดึงข้อมูลด้วยตนเอง'
 
   return (
     <div
@@ -37,9 +37,9 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
               <span className="whitespace-nowrap">{user?.name || 'นายเอกพล อันคำวงค์'}</span>
             </span>
             <span
-              className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-mono"
+              className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-medium px-2.5 py-0.5 rounded-full border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-800 dark:text-emerald-300 font-mono"
             >
-              <Sparkles className="size-3 text-emerald-600 dark:text-emerald-300" />
+              <Activity className="size-3 text-emerald-600 dark:text-emerald-300" />
               เกณฑ์อัตโนมัติ ICD-10 แพทย์แผนไทย
             </span>
           </h2>
@@ -82,7 +82,7 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
         </button>
 
         {status?.lastSync?.at && (
-          <span className="text-[11px] font-mono text-slate-500 dark:text-white/60 hidden md:inline">
+          <span className="text-xs font-mono text-slate-500 dark:text-white/60 hidden md:inline">
             อัปเดต {new Date(status.lastSync.at).toTimeString().slice(0, 8)}
           </span>
         )}

@@ -41,7 +41,7 @@ export function DataTableViewOptions<TData>({
 
       {isOpen && (
         <div className="absolute right-0 z-50 mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-[#45415d] bg-white dark:bg-[#1d2035] p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in-50 zoom-in-95">
-          <div className="text-[11px] font-bold text-slate-500 dark:text-slate-300 uppercase px-2 py-1 border-b border-slate-100 dark:border-[#383250] mb-1">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase px-2 py-1 border-b border-slate-100 dark:border-[#383250] mb-1">
             ซ่อน / แสดง คอลัมน์
           </div>
           <div className="max-h-60 overflow-y-auto space-y-0.5">

@@ -12,7 +12,7 @@ import {
   Loader2,
   Pill,
   Settings2,
-  Sparkles,
+  RotateCcw,
   User,
   Wrench,
   X,
@@ -192,19 +192,19 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
         {/* Visit + drug */}
         <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-white/[0.02] p-3 rounded-xl border border-slate-200/60 dark:border-white/5">
           <div>
-            <span className="text-slate-400 block text-[10px] font-semibold">วันที่ / เวลา</span>
+            <span className="text-slate-400 block text-xs font-semibold">วันที่ / เวลา</span>
             <span className="font-medium text-slate-800 dark:text-slate-200 font-mono">{toThaiDate(record.visit_date)} {record.visit_time}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] font-semibold">สิทธิการรักษา</span>
+            <span className="text-slate-400 block text-xs font-semibold">สิทธิการรักษา</span>
             <span className="font-medium text-slate-800 dark:text-slate-200">{record.pttype_name || '—'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] font-semibold">แพทย์ผู้สั่ง</span>
+            <span className="text-slate-400 block text-xs font-semibold">แพทย์ผู้สั่ง</span>
             <span className="font-medium text-slate-800 dark:text-slate-200">{record.doctor_name || '—'}</span>
           </div>
           <div>
-            <span className="text-slate-400 block text-[10px] font-semibold">แผนก</span>
+            <span className="text-slate-400 block text-xs font-semibold">แผนก</span>
             <span className="font-medium text-slate-800 dark:text-slate-200">{record.department_name || '—'}</span>
           </div>
           <div className="col-span-2 flex items-center gap-2 pt-2 border-t border-slate-200/60 dark:border-white/5">
@@ -228,7 +228,7 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
                 <span
                   key={slot}
                   className={cn(
-                    'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-[11px]',
+                    'inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 font-mono text-xs',
                     !c
                       ? 'border-dashed border-slate-300 text-slate-400 dark:border-white/10'
                       : ok
@@ -237,14 +237,14 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
                   )}
                   title={ok ? 'ตรงเกณฑ์ของยา' : c ? 'ไม่อยู่ในเกณฑ์ของยานี้' : 'ช่องว่าง'}
                 >
-                  <span className="text-[9px] font-semibold opacity-60">{slot}</span>
+                  <span className="text-xs font-semibold opacity-60">{slot}</span>
                   {c || '—'}
                   {ok && <Check className="size-3" />}
                 </span>
               )
             })}
           </div>
-          <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-1 text-[11px] text-slate-600 dark:text-slate-300">
+          <div className="mt-2.5 pt-2 border-t border-slate-200/60 dark:border-white/5 space-y-1 text-xs text-slate-600 dark:text-slate-300">
             <div>
               <span className="font-semibold">เกณฑ์แผนปัจจุบัน:</span>{' '}
               <span className="font-mono">{analysis?.criteria.modern.join(', ') || record.allowed_dx.filter((p) => !p.startsWith('U')).join(', ') || '—'}</span>
@@ -287,7 +287,7 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
           <Section icon={<Wrench className="size-3.5 text-teal-500" />} title="แก้ไขที่ไหนใน HOSxP" tone="teal">
             <BulletList items={analysis.hosxpSteps} ordered />
             {analysis.cautions.length > 0 && (
-              <div className="mt-2 pt-2 border-t border-teal-300/40 dark:border-teal-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+              <div className="mt-2 pt-2 border-t border-teal-300/40 dark:border-teal-500/20 text-xs text-amber-800 dark:text-amber-300">
                 <strong>⚠️ ข้อควรระวัง:</strong> {analysis.cautions.join(' • ')}
               </div>
             )}
@@ -311,7 +311,7 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
                   onClick={() => ai.mutate()}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-teal-500 via-cyan-500 to-violet-500 hover:from-teal-600 hover:to-violet-600 text-white font-bold text-xs shadow-md shadow-teal-500/20 active:scale-95 transition cursor-pointer disabled:opacity-50"
                 >
-                  {ai.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Sparkles className="size-3.5" />}
+                  {ai.isPending ? <Loader2 className="size-3.5 animate-spin" /> : <Bot className="size-3.5" />}
                   {ai.isPending ? 'กำลังวิเคราะห์…' : 'ให้ AI วิเคราะห์ & แนะนำการแก้ไข'}
                 </button>
               )}
@@ -330,15 +330,15 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
               <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[#0d1627] dark:via-[#0c1424] dark:to-[#141226] border border-teal-500/30 space-y-2.5 animate-in fade-in duration-200">
                 <div className="flex items-start justify-between gap-2">
                   <div>
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-teal-700 dark:text-teal-400 flex items-center gap-1">
-                      <Sparkles className="size-3" /> {aiAdvice.aiModel || 'AI'}
+                    <span className="text-xs font-bold text-teal-700 dark:text-teal-400 flex items-center gap-1">
+                      <Bot className="size-3" /> {aiAdvice.aiModel || 'AI'}
                     </span>
                     <p className="text-xs font-semibold text-slate-900 dark:text-white mt-1 leading-snug">{aiAdvice.summary}</p>
                   </div>
                   <button
                     type="button"
                     onClick={handleCopy}
-                    className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1 text-[10.5px] font-medium"
+                    className="shrink-0 px-2 py-1 rounded-lg bg-white dark:bg-white/10 hover:bg-slate-100 dark:hover:bg-white/20 text-slate-600 dark:text-slate-200 border border-slate-200 dark:border-white/10 transition cursor-pointer flex items-center gap-1 text-xs font-medium"
                   >
                     {copied ? <Check className="size-3.5 text-emerald-500" /> : <Copy className="size-3.5" />}
                     {copied ? 'คัดลอกแล้ว' : 'คัดลอก'}
@@ -346,16 +346,16 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
                 </div>
                 {aiAdvice.keyingError && (
                   <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/25 text-xs text-amber-900 dark:text-amber-200">
-                    <strong className="block text-[11px] mb-0.5">⌨️ คีย์ผิดใน HOSxP:</strong>
+                    <strong className="block text-xs mb-0.5">⌨️ คีย์ผิดใน HOSxP:</strong>
                     <div className="whitespace-pre-line leading-relaxed">{aiAdvice.keyingError}</div>
                   </div>
                 )}
                 <div className="p-2.5 rounded-lg bg-white/90 dark:bg-black/30 border border-teal-500/20 text-xs text-slate-800 dark:text-slate-200">
-                  <strong className="block font-bold text-teal-700 dark:text-teal-300 text-[11px] mb-0.5">🛠️ สิ่งที่ต้องแก้ไขใน HOSxP:</strong>
+                  <strong className="block font-bold text-teal-700 dark:text-teal-300 text-xs mb-0.5">🛠️ สิ่งที่ต้องแก้ไขใน HOSxP:</strong>
                   <div className="whitespace-pre-line leading-relaxed">{aiAdvice.hosxpAction}</div>
                 </div>
                 {aiAdvice.caution && (
-                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-800 dark:text-amber-300">
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-800 dark:text-amber-300">
                     <strong>⚠️ ข้อควรระวัง:</strong> {aiAdvice.caution}
                   </div>
                 )}
@@ -363,9 +363,9 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
                   <button
                     type="button"
                     onClick={() => ai.mutate()}
-                    className="text-[10px] text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1"
+                    className="text-xs text-slate-400 hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1"
                   >
-                    <Sparkles className="size-2.5" /> วิเคราะห์ใหม่อีกครั้ง
+                    <RotateCcw className="size-2.5" /> วิเคราะห์ใหม่อีกครั้ง
                   </button>
                 </div>
               </div>

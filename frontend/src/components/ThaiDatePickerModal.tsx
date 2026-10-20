@@ -161,7 +161,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           <span className="font-semibold text-slate-700 dark:text-slate-100">
           {toThaiDateShort(range.startDate)} – {toThaiDateShort(range.endDate)}
         </span>
-        <span className="text-[11px] font-mono font-bold bg-violet-50 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200 px-1.5 py-0.5 rounded ring-1 ring-violet-600/20">
+        <span className="text-xs font-mono font-bold bg-violet-50 text-violet-800 dark:bg-violet-500/15 dark:text-violet-200 px-1.5 py-0.5 rounded ring-1 ring-violet-600/20">
           พ.ศ.
         </span>
       </button>
@@ -182,7 +182,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
                 </div>
                 <div>
                   <h3 className="font-bold text-sm sm:text-base">กำหนดช่วงวันที่</h3>
-                  <p className="text-[11px] text-slate-400">ปฏิทินปี พ.ศ. • ข้อมูลบริการ HOSxP</p>
+                  <p className="text-xs text-slate-400">ปฏิทินปี พ.ศ. • ข้อมูลบริการ HOSxP</p>
                 </div>
               </div>
               <button
@@ -197,7 +197,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
             {/* Grouped presets separate short periods from calendar/fiscal years */}
             <div className="bg-slate-50 dark:bg-[#1d2035] border-b border-slate-100 dark:border-[#292440] p-3 sm:p-4 space-y-3">
               <div>
-                <div className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">ช่วงที่ใช้บ่อย</div>
+                <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">ช่วงที่ใช้บ่อย</div>
                 <div className="grid grid-cols-2 gap-2">
                   {quickPresets.map((preset) => {
                     const selected = tempStart === preset.start && tempEnd === preset.end
@@ -220,7 +220,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
                 </div>
               </div>
               <div className="border-t border-slate-200 pt-3 dark:border-[#34304a]">
-                <div className="mb-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">ดูข้อมูลรายปี</div>
+                <div className="mb-2 text-xs font-semibold text-slate-500 dark:text-slate-400">ดูข้อมูลรายปี</div>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {yearPresets.map((preset) => {
                     const selected = tempStart === preset.start && tempEnd === preset.end
@@ -261,7 +261,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
                         active ? 'border-accent bg-violet-50 ring-1 ring-accent/40 dark:bg-violet-500/10' : 'border-slate-200 dark:border-[#34304a] bg-white dark:bg-[#111326]'
                       )}
                     >
-                      <span className="flex items-center justify-between gap-2 text-[11px] text-slate-500 dark:text-slate-400">
+                      <span className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
                         <span>{edge === 'start' ? 'วันเริ่มต้น' : 'วันสิ้นสุด'}</span>
                         {active && <span className="rounded-full bg-accent/10 px-2 py-0.5 font-semibold text-accent">กำลังเลือก</span>}
                       </span>
@@ -360,12 +360,12 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
               {/* Selection Summary */}
               <div className="rounded-2xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] p-3 flex flex-wrap items-center justify-between gap-2 text-xs">
                 <div>
-                  <span className="text-slate-500 dark:text-slate-400 block text-[11px]">ช่วงวันที่เลือก:</span>
+                  <span className="text-slate-500 dark:text-slate-400 block text-xs">ช่วงวันที่เลือก:</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200">
                     {toThaiDate(tempStart)} ถึง {toThaiDate(tempEnd)}
                   </span>
                 </div>
-                <div className="text-[11px] font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <div className="text-xs font-mono text-slate-500 dark:text-slate-400 flex items-center gap-1">
                   <Clock className="size-3 text-slate-400" /> เวลาไทย (UTC+7)
                 </div>
               </div>

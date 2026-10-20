@@ -13,6 +13,7 @@ import {
   XCircle,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from './ConfirmModal'
 
 type P = 'thaid' | 'providerid'
 type Mode = 'off' | 'demo' | 'live'
@@ -112,12 +113,15 @@ export const SsoSettingsPanel: FC = () => {
 
   return (
     <div className="space-y-4">
-      <div className="rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-3 text-white flex flex-wrap items-center justify-between gap-2">
+      <div
+        className="rounded-2xl border border-accent-soft p-5 flex flex-wrap items-center justify-between gap-3"
+        style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-hex) 14%, transparent) 0%, transparent 70%)' }}
+      >
         <div className="min-w-0">
-          <p className="text-sm font-bold">เข้าสู่ระบบด้วย ThaiD / Provider ID</p>
-          <p className="text-[11px] text-white/80">OAuth 2.0 · จับคู่บัญชี HOSxP ด้วยเลขบัตรประชาชน (เก็บแบบ hash) · เปิด/ปิดได้ทีละผู้ให้บริการ</p>
+          <p className="text-lg font-bold text-white">เข้าสู่ระบบด้วย ThaiD / Provider ID</p>
+          <p className="mt-1 text-sm text-slate-300">จับคู่บัญชี HOSxP ด้วยเลขบัตรประชาชน (เก็บแบบ hash) · เปิด/ปิดได้ทีละผู้ให้บริการ</p>
         </div>
-        <span className="rounded-full bg-white/15 ring-1 ring-white/25 px-2.5 py-1 text-[11px] font-semibold">
+        <span className="rounded-full bg-accent-soft px-3 py-1 text-xs font-semibold text-accent">
           ผูกบัญชีแล้ว {linked.toLocaleString()} คน
         </span>
       </div>
@@ -135,13 +139,13 @@ export const SsoSettingsPanel: FC = () => {
               onClick={() => setTab(p)}
               className={cn(
                 'inline-flex items-center gap-2 px-3.5 min-h-11 text-sm font-semibold border-b-2 -mb-px whitespace-nowrap cursor-pointer',
-                tab === p ? 'border-emerald-400 text-emerald-300' : 'border-transparent text-slate-400 hover:text-slate-200'
+                tab === p ? 'border-accent text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
               )}
             >
               {META[p].label}
               <span
                 className={cn(
-                  'rounded-full px-2 py-0.5 text-[11px] font-bold',
+                  'rounded-full px-2 py-0.5 text-xs font-bold',
                   active
                     ? 'bg-emerald-500/15 text-emerald-300'
                     : c?.mode === 'demo'
@@ -220,7 +224,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
   )
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px] items-start">
+    <div className="space-y-4">
       <section className={card}>
         <div className="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-slate-800">
           <span className={`size-10 rounded-xl bg-gradient-to-br ${m.tone} grid place-items-center shrink-0`}>
@@ -228,7 +232,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
           </span>
           <div className="min-w-0 flex-1">
             <p className="font-bold text-slate-100 text-sm">การเข้าสู่ระบบด้วย {m.label}</p>
-            <p className="text-[11px] text-slate-400">{m.org}</p>
+            <p className="text-xs text-slate-400">{m.org}</p>
           </div>
           <div className="inline-flex rounded-lg bg-slate-900 p-0.5 ring-1 ring-slate-700" role="radiogroup" aria-label="โหมด">
             {(
@@ -270,9 +274,9 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
               : 'ปิด: ไม่แสดงปุ่มบนหน้าเข้าสู่ระบบ'}
         </p>
 
-        <div className="p-4 space-y-3">
+        <div className="p-5 space-y-4">
           <MsgBar msg={msg} />
-          <div className="grid gap-3 md:grid-cols-2">
+          <div className="grid gap-4 md:grid-cols-2">
             {field('Client ID', 'client_id', 'ได้จากหน่วยงานตอนลงทะเบียน')}
             <label className="block">
               <span className="text-xs font-semibold text-slate-300">
@@ -300,7 +304,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
           </div>
           {field('URL หน้าเว็บของระบบ SMART-HOSCHECK (ใช้สร้าง Callback URL)', 'public_base', suggested || 'https://hd-check.โรงพยาบาล.go.th')}
           <div className="rounded-lg bg-slate-900 px-3 py-2">
-            <p className="text-[11px] font-semibold text-slate-400">Callback / Redirect URL — แจ้งหน่วยงานตอนลงทะเบียน</p>
+            <p className="text-xs font-semibold text-slate-400">Callback / Redirect URL — แจ้งหน่วยงานตอนลงทะเบียน</p>
             <div className="flex items-center gap-2">
               <code className="flex-1 truncate text-xs text-slate-100">{callback || '— กรอก URL หน้าเว็บก่อน —'}</code>
               {callback && (
@@ -317,7 +321,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
           </div>
           <details className="rounded-lg border border-slate-800 px-3 py-2" open={!cfg.authorize_url}>
             <summary className="cursor-pointer text-sm font-semibold text-slate-200 min-h-8 flex items-center">ค่าขั้นสูง (URL ของผู้ให้บริการ)</summary>
-            <div className="mt-3 grid gap-3 md:grid-cols-2">
+            <div className="mt-3 grid gap-4 md:grid-cols-2">
               {field('Authorization URL', 'authorize_url', 'https://…')}
               {field('Token URL', 'token_url', 'https://…')}
               {field('UserInfo URL (ถ้ามี)', 'userinfo_url', 'เว้นว่างได้')}
@@ -328,7 +332,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
                 ใช้ PKCE (ถ้าผู้ให้บริการรองรับ)
               </label>
             </div>
-            <p className="mt-2 text-[11px] text-amber-300">⚠ ค่าเริ่มต้นเป็นค่าที่เปิดเผยทั่วไป — ตรวจให้ตรงกับเอกสารที่หน่วยงานส่งให้ตอนลงทะเบียน</p>
+            <p className="mt-2 text-xs text-amber-300">⚠ ค่าเริ่มต้นเป็นค่าที่เปิดเผยทั่วไป — ตรวจให้ตรงกับเอกสารที่หน่วยงานส่งให้ตอนลงทะเบียน</p>
           </details>
         </div>
 
@@ -337,14 +341,14 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
             <PlugZap className="size-4" />
             ทดสอบการติดต่อ
           </button>
-          <button type="button" onClick={() => void save()} disabled={busy} className={cn(btn, 'bg-emerald-600 text-white hover:bg-emerald-500')}>
+          <button type="button" onClick={() => void save()} disabled={busy} className={cn(btn, 'bg-accent text-white hover:opacity-90')}>
             {busy ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
             บันทึกการตั้งค่า
           </button>
         </div>
       </section>
 
-      <aside className="space-y-4">
+      <aside className="grid gap-4 md:grid-cols-2 items-start">
         <section className={card}>
           <div className="px-4 py-2.5 border-b border-slate-800 text-sm font-bold text-slate-100">สถานะ</div>
           <div className="p-4 space-y-2 text-sm">
@@ -386,7 +390,7 @@ const ProviderForm: FC<{ p: P; cfg: Cfg; suggested: string; onSaved: () => void 
             <li>ตรวจว่าเลขบัตรประชาชนใน HOSxP (opduser) ของผู้ใช้ถูกต้อง — ระบบใช้จับคู่บัญชี</li>
             <li>เลือก "ใช้งานจริง" (ระหว่างรอรหัส ใช้ "สาธิต" ให้ผู้ใช้เห็นหน้าตาก่อนได้)</li>
           </ol>
-          <p className="flex items-start gap-1.5 px-4 pb-4 text-[11px] text-slate-400">
+          <p className="flex items-start gap-1.5 px-4 pb-4 text-xs text-slate-400">
             <Info className="size-3.5 shrink-0 mt-px" />
             ใช้สิทธิ์เดียวกับบัญชี HOSxP ที่จับคู่ได้ · ไม่ถาม 2FA ซ้ำเพราะ {m.label} ยืนยันตัวตนระดับสูงแล้ว · บัญชีที่ถูกระงับใน HOSxP เข้าไม่ได้
           </p>
@@ -405,6 +409,7 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
   const [f, setF] = useState({ loginname: '', cid: '', note: '' })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<Msg>(null)
+  const [unlinkTarget, setUnlinkTarget] = useState<Identity | null>(null)
 
   const load = useCallback(async () => {
     try {
@@ -444,15 +449,15 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
         <span className="text-sm font-bold text-slate-100">
           บัญชีที่ผูกกับ {m.label} ({rows.length})
         </span>
-        <span className="text-[11px] text-slate-400">— ผูกอัตโนมัติเมื่อเข้าระบบครั้งแรก หรือผูกด้วยมือด้านล่าง (เช่น เลขบัตรใน HOSxP ว่าง/มีหลายบัญชี)</span>
+        <span className="text-xs text-slate-400">— ผูกอัตโนมัติเมื่อเข้าระบบครั้งแรก หรือผูกด้วยมือด้านล่าง (เช่น เลขบัตรใน HOSxP ว่าง/มีหลายบัญชี)</span>
       </div>
       <div className="grid gap-2 sm:grid-cols-[10rem_13rem_1fr_auto] items-end px-4 py-3 border-b border-slate-800">
         <label className="block">
-          <span className="text-[11px] text-slate-400">ชื่อผู้ใช้ HOSxP</span>
+          <span className="text-xs text-slate-400">ชื่อผู้ใช้ HOSxP</span>
           <input value={f.loginname} onChange={(e) => setF((x) => ({ ...x, loginname: e.target.value }))} className={input} />
         </label>
         <label className="block">
-          <span className="text-[11px] text-slate-400">เลขบัตรประชาชน 13 หลัก (เก็บแบบ hash)</span>
+          <span className="text-xs text-slate-400">เลขบัตรประชาชน 13 หลัก (เก็บแบบ hash)</span>
           <input
             value={f.cid}
             onChange={(e) => setF((x) => ({ ...x, cid: e.target.value.replace(/[^0-9-]/g, '').slice(0, 17) }))}
@@ -462,14 +467,14 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
           />
         </label>
         <label className="block">
-          <span className="text-[11px] text-slate-400">หมายเหตุ</span>
+          <span className="text-xs text-slate-400">หมายเหตุ</span>
           <input value={f.note} onChange={(e) => setF((x) => ({ ...x, note: e.target.value }))} placeholder="เช่น เลขบัตรใน HOSxP ว่าง" className={cn(input, 'font-sans')} />
         </label>
         <button
           type="button"
           onClick={() => void link()}
           disabled={busy || !f.loginname.trim() || f.cid.replace(/\D/g, '').length !== 13}
-          className={cn(btn, 'bg-emerald-600 text-white hover:bg-emerald-500')}
+          className={cn(btn, 'bg-accent text-white hover:opacity-90')}
         >
           ผูกบัญชีด้วยมือ
         </button>
@@ -488,14 +493,14 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
                 <p className="text-sm font-medium text-slate-100 truncate">{r.name || r.loginname}</p>
-                <p className="text-[11px] text-slate-400 font-mono">{r.loginname}</p>
+                <p className="text-xs text-slate-400 font-mono">{r.loginname}</p>
               </div>
               <StatusBadge status={r.status} label={m.label} />
             </div>
-            <p className="text-[11px] text-slate-400">
+            <p className="text-xs text-slate-400">
               {r.link_method === 'manual' ? `ผูกด้วยมือ · ${r.linked_by ?? ''}` : 'อัตโนมัติ'} · เข้าล่าสุด {fmt(r.last_login_at)} · {r.login_count} ครั้ง
             </p>
-            <RowActions r={r} label={m.label} busy={busy} run={run} />
+            <RowActions r={r} label={m.label} busy={busy} run={run} onUnlinkRequest={(target) => setUnlinkTarget(target)} />
           </div>
         ))}
       </div>
@@ -526,7 +531,7 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
               <tr key={r.id}>
                 <td>
                   <p className="font-medium">{r.name || r.loginname}</p>
-                  <p className="text-[11px] text-slate-400 font-mono">{r.loginname}</p>
+                  <p className="text-xs text-slate-400 font-mono">{r.loginname}</p>
                 </td>
                 <td title={r.note ?? ''}>{r.link_method === 'manual' ? `ผูกด้วยมือ · ${r.linked_by ?? ''}` : 'อัตโนมัติ'}</td>
                 <td className="text-slate-400">{fmt(r.linked_at)}</td>
@@ -536,22 +541,41 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
                   <StatusBadge status={r.status} label={m.label} />
                 </td>
                 <td className="text-right whitespace-nowrap">
-                  <RowActions r={r} label={m.label} busy={busy} run={run} />
+                  <RowActions r={r} label={m.label} busy={busy} run={run} onUnlinkRequest={(target) => setUnlinkTarget(target)} />
                 </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
+
+      {unlinkTarget && (
+        <ConfirmModal
+          isOpen={Boolean(unlinkTarget)}
+          title={`ยกเลิกการผูกบัญชี ${m.label}`}
+          description={`ยืนยันการยกเลิกการผูกบัญชีของ "${unlinkTarget.loginname}" กับ ${m.label} หรือไม่?`}
+          detail="เมื่อเข้าสู่ระบบครั้งถัดไป ระบบจะทำการตรวจสอบและจับคู่จากเลขบัตรประชาชนใน HOSxP ใหม่อีกครั้ง"
+          targetUser={{ loginname: unlinkTarget.loginname, name: unlinkTarget.name ?? undefined }}
+          confirmText="ยกเลิกการผูก"
+          variant="danger"
+          icon="user-x"
+          onClose={() => setUnlinkTarget(null)}
+          onConfirm={() => {
+            const target = unlinkTarget
+            setUnlinkTarget(null)
+            void run(() => api(`/api/admin/sso/identities/${target.id}`, { method: 'DELETE' }), `ยกเลิกการผูก ${target.loginname} แล้ว`)
+          }}
+        />
+      )}
     </section>
   )
 }
 
 const StatusBadge: FC<{ status: Identity['status']; label: string }> = ({ status, label }) =>
   status === 'active' ? (
-    <span className="text-[11px] font-semibold text-emerald-300 whitespace-nowrap">ใช้ได้</span>
+    <span className="text-xs font-semibold text-emerald-300 whitespace-nowrap">ใช้ได้</span>
   ) : (
-    <span className="text-[11px] font-semibold text-rose-300 whitespace-nowrap">ปิดการเข้าด้วย {label}</span>
+    <span className="text-xs font-semibold text-rose-300 whitespace-nowrap">ปิดการเข้าด้วย {label}</span>
   )
 
 const RowActions: FC<{
@@ -559,7 +583,8 @@ const RowActions: FC<{
   label: string
   busy: boolean
   run: (fn: () => Promise<unknown>, ok: string) => Promise<void>
-}> = ({ r, label, busy, run }) => (
+  onUnlinkRequest: (r: Identity) => void
+}> = ({ r, label, busy, run, onUnlinkRequest }) => (
   <div className="inline-flex gap-1.5">
     <button
       type="button"
@@ -577,10 +602,7 @@ const RowActions: FC<{
     <button
       type="button"
       disabled={busy}
-      onClick={() => {
-        if (!window.confirm(`ยกเลิกการผูก ${r.loginname} กับ ${label}?\n(เข้าครั้งหน้าระบบจะจับคู่จากเลขบัตรใน HOSxP อีกครั้ง)`)) return
-        void run(() => api(`/api/admin/sso/identities/${r.id}`, { method: 'DELETE' }), `ยกเลิกการผูก ${r.loginname} แล้ว`)
-      }}
+      onClick={() => onUnlinkRequest(r)}
       className={cn(btn, 'min-h-9 bg-rose-500/10 text-rose-300 border border-rose-500/25 hover:bg-rose-500/20')}
     >
       ยกเลิกผูก

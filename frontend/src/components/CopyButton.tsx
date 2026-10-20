@@ -53,7 +53,7 @@ export const CopyButton: FC<CopyButtonProps> = ({
         aria-label={copied ? 'คัดลอกแล้ว' : title}
         className={cn(
           'inline-flex items-center justify-center p-1 rounded-md transition-all cursor-pointer',
-          'text-slate-400 hover:text-violet-600 dark:text-slate-500 dark:hover:text-violet-300',
+          'text-slate-400 hover:text-violet-600 dark:text-slate-400 dark:hover:text-violet-300',
           'hover:bg-slate-100 dark:hover:bg-white/10 active:scale-90',
           copied && 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40',
           className
@@ -68,7 +68,7 @@ export const CopyButton: FC<CopyButtonProps> = ({
 
       {/* Floating mini tooltip confirmation badge */}
       {showTooltip && copied && (
-        <span className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-1.5 py-0.5 rounded text-[10px] font-bold bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-md whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
+        <span className="absolute -top-7 left-1/2 -translate-x-1/2 z-50 pointer-events-none px-1.5 py-0.5 rounded text-xs font-bold bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 shadow-md whitespace-nowrap animate-in fade-in zoom-in-95 duration-150">
           คัดลอกแล้ว!
         </span>
       )}

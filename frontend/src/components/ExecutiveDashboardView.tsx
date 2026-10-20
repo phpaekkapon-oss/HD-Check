@@ -7,12 +7,9 @@ import {
   CheckCircle2,
   Users,
   Pill,
-  ClipboardCheck,
   ArrowUpRight,
   Send,
-  Settings2,
   Activity,
-  Layers,
   Calendar,
   Box,
   Search,
@@ -25,6 +22,9 @@ import {
   User,
   Clock,
   XCircle,
+  Layers,
+  ClipboardCheck,
+  Settings2,
 } from 'lucide-react'
 import type {
   ActivePage,
@@ -82,7 +82,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const [hoveredDay, setHoveredDay] = useState<DailyTrendItem | null>(null)
 
   // Quick range presets (Month & Fiscal Year)
-  type PresetType = 'THIS_MONTH' | 'LAST_MONTH' | 'FY_70' | 'FY_69'
+  type PresetType = 'THIS_MONTH' | 'LAST_MONTH' | 'FY_70' | 'FY_69' | 'FY_68'
 
   const handleSelectPreset = (preset: PresetType) => {
     const now = new Date()
@@ -115,6 +115,12 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       onRangeChange({
         startDate: '2025-10-01',
         endDate: '2026-09-30',
+      })
+    } else if (preset === 'FY_68') {
+      // ปีงบประมาณ 2568: 1 ต.ค. 2567 ถึง 30 ก.ย. 2568
+      onRangeChange({
+        startDate: '2024-10-01',
+        endDate: '2025-09-30',
       })
     }
   }
@@ -456,6 +462,17 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
     })
   }, [scopedRecords, isYearlyRange])
 
+  // วันที่มีรายการน้อยมาก (เช่น เสาร์-อาทิตย์/วันหยุดที่มีแต่ IPD) ทำให้ % ผ่านแกว่งเป็น 0% จนดูเหมือนวิกฤต
+  // จึงไม่นำมาคิดเส้นแนวโน้ม: น้อยกว่า 10% ของวันที่มากที่สุด (ขั้นต่ำ 10 รายการ)
+  // (ไม่ใช้ค่ากลาง เพราะเดือนที่มีวันหยุดมาก ค่ากลางจะต่ำจนวันหยุดหลุดเข้ามา)
+  const trendMinVolume = useMemo(() => {
+    if (dailyTrends.length === 0) return 10
+    const max = Math.max(...dailyTrends.map((d) => d.total))
+    return Math.max(10, Math.round(max * 0.1))
+  }, [dailyTrends])
+  const isTrendPoint = (d: DailyTrendItem) => d.total >= trendMinVolume
+  const lowVolumeDays = dailyTrends.filter((d) => !isTrendPoint(d)).length
+
   // Maximum value for SVG scaling
   const maxDailyVolume = useMemo(() => {
     if (dailyTrends.length === 0) return 10
@@ -501,11 +518,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   }, [topDepartments])
 
   // SVG Chart Geometry Constants
-  const chartHeight = 240
+  const chartHeight = 270
   const chartWidth = 740
   const padLeft = 36
   const padRight = 40
-  const padTop = 20
+  const padTop = 30
   const padBottom = 26
   const plotWidth = chartWidth - padLeft - padRight
   const plotHeight = chartHeight - padTop - padBottom
@@ -530,12 +547,12 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <p className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 mt-0.5 flex-wrap">
               <span>ตัวชี้วัดคุณภาพและความสอดคล้องรหัสโรค ICD-10 (เป้าหมาย ≥ 50%)</span>
               {drugs.length > 0 && (
-                <span className="text-slate-400 dark:text-slate-500">
+                <span className="text-slate-400 dark:text-slate-400">
                   • บัญชียาสมุนไพร {drugs.length} ชนิด
                 </span>
               )}
               {status?.latestVisitDate && (
-                <span className="text-slate-400 dark:text-slate-500">
+                <span className="text-slate-400 dark:text-slate-400">
                   • ข้อมูล HOSxP ล่าสุด {toThaiDate(status.latestVisitDate)}
                 </span>
               )}
@@ -546,9 +563,22 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         {/* Date presets & Subtle Refresh */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
-            {/* กลุ่ม 1: ปีงบประมาณ (เรียงตามลำดับเวลา: ปีงบ 69 -> ปีงบ 70) */}
+            {/* กลุ่ม 1: ปีงบประมาณ 3 ปี (เรียงตามลำดับเวลา: ปีงบ 68 -> ปีงบ 69 -> ปีงบ 70) */}
             <div className="flex items-center gap-1 pr-1.5 border-r border-slate-300 dark:border-white/10">
-              <span className="text-[11px] text-slate-400 font-semibold px-0.5 select-none">ปีงบ:</span>
+              <span className="text-xs text-slate-400 font-semibold px-0.5 select-none">ปีงบ:</span>
+              <button
+                type="button"
+                onClick={() => handleSelectPreset('FY_68')}
+                className={cn(
+                  'px-2 py-1 rounded-lg font-medium transition cursor-pointer',
+                  range.startDate === '2024-10-01' && range.endDate === '2025-09-30'
+                    ? 'bg-white dark:bg-slate-800 text-accent font-bold shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                )}
+                title="ปีงบประมาณ 2568 (1 ต.ค. 67 - 30 ก.ย. 68)"
+              >
+                ปีงบ 68
+              </button>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('FY_69')}
@@ -579,7 +609,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             {/* กลุ่ม 2: รายเดือน (เรียงตามลำดับเวลา: ก.ย. 69 -> ต.ค. 69) */}
             <div className="flex items-center gap-1">
-              <span className="text-[11px] text-slate-400 font-semibold px-0.5 select-none">เดือน:</span>
+              <span className="text-xs text-slate-400 font-semibold px-0.5 select-none">เดือน:</span>
               <button
                 type="button"
                 onClick={() => handleSelectPreset('LAST_MONTH')}
@@ -608,7 +638,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               </button>
             </div>
 
-            <span className="px-2 py-0.5 text-[11px] font-mono text-accent bg-accent-soft rounded-md border border-accent-soft ml-0.5">
+            <span className="px-2 py-0.5 text-xs tabular-nums text-accent bg-accent-soft rounded-md border border-accent-soft ml-0.5">
               {toThaiDate(range.startDate)} - {toThaiDate(range.endDate)}
             </span>
 
@@ -633,7 +663,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <AlertTriangle className="size-4 shrink-0 text-amber-500 mt-0.5 sm:mt-0" />
             <div>
               <span className="font-bold">ยังไม่ได้ดึงข้อมูลช่วง {toThaiDate(range.startDate)} ถึง {toThaiDate(range.endDate)} เข้าสู่คลังข้อมูล</span>
-              <p className="text-[11px] text-amber-700 dark:text-amber-300/80 mt-0.5">
+              <p className="text-xs text-amber-700 dark:text-amber-300/80 mt-0.5">
                 ในฐานข้อมูล HOSxP มีประวัติการสั่งจ่ายยาอยู่ครบถ้วน กดปุ่มเพื่อดึงข้อมูลช่วงนี้เข้ามาประมวลผลทันที
               </p>
             </div>
@@ -673,7 +703,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-emerald-600 dark:text-emerald-400">
-                {passRate.toFixed(1)}%
+                <AnimatedNumber value={passRate} decimals={1} suffix="%" goodWhen="up" showDelta />
               </span>
               <span className={cn(
                 'text-xs font-semibold px-2 py-0.5 rounded-full border',
@@ -687,17 +717,17 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </div>
 
           <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 space-y-1.5">
-            <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+            <div className="flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-medium text-emerald-700/80 dark:text-emerald-400/80">
                 ผ่านเกณฑ์ {fmtNum(passCount)} จาก {fmtNum(totalPrescriptions)} รายการ
               </span>
-              <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:underline flex items-center gap-0.5">
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold group-hover:underline hidden xl:flex items-center gap-0.5 shrink-0 whitespace-nowrap">
                 ดูรายละเอียด &gt;
               </span>
             </div>
             <div className="w-full bg-slate-100 dark:bg-white/5 rounded-full h-1 overflow-hidden">
               <div
-                className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-500"
+                className="fill-grow bg-gradient-to-r from-teal-500 to-emerald-400 h-full rounded-full transition-all duration-500"
                 style={{ width: `${Math.min(100, Math.max(0, passRate))}%` }}
               />
             </div>
@@ -723,7 +753,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-slate-900 dark:text-white">
-                <AnimatedNumber value={totalPrescriptions} />
+                <AnimatedNumber value={totalPrescriptions} showDelta />
               </span>
               <span className="text-xs font-semibold text-indigo-600 dark:text-indigo-300 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/25">
                 รายการ
@@ -732,15 +762,15 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </div>
 
           <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs gap-1">
-            <div className="flex items-center gap-1 font-mono text-[11px]">
-              <span className="px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
+            <div className="flex flex-wrap items-center gap-1 tabular-nums text-xs">
+              <span className="whitespace-nowrap px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-700 dark:text-sky-300 border border-sky-500/20">
                 OPD {fmtNum(opdCount)}
               </span>
-              <span className="px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
+              <span className="whitespace-nowrap px-1.5 py-0.5 rounded bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border border-indigo-500/20">
                 IPD {fmtNum(ipdCount)}
               </span>
             </div>
-            <span className="text-indigo-600 dark:text-indigo-400 font-bold group-hover:underline flex items-center gap-0.5">
+            <span className="text-indigo-600 dark:text-indigo-400 font-bold group-hover:underline hidden xl:flex items-center gap-0.5 shrink-0 whitespace-nowrap">
               ดูรายละเอียด &gt;
             </span>
           </div>
@@ -765,7 +795,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-teal-600 dark:text-teal-400">
-                <AnimatedNumber value={uniquePatients} />
+                <AnimatedNumber value={uniquePatients} showDelta />
               </span>
               <span className="text-xs font-semibold text-teal-600 dark:text-teal-300 px-2 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/25">
                 ราย
@@ -773,9 +803,9 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+          <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2 text-xs text-slate-500 dark:text-slate-400">
             <span>เฉลี่ย {(totalPrescriptions / (uniquePatients || 1)).toFixed(1)} รายการต่อราย</span>
-            <span className="text-teal-600 dark:text-teal-400 font-bold group-hover:underline flex items-center gap-0.5">
+            <span className="text-teal-600 dark:text-teal-400 font-bold group-hover:underline hidden xl:flex items-center gap-0.5 shrink-0 whitespace-nowrap">
               ดูรายชื่อผู้รับบริการ &gt;
             </span>
           </div>
@@ -800,7 +830,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
 
             <div className="flex items-baseline gap-2 flex-wrap">
               <span className="text-3xl sm:text-[32px] font-bold tabular-nums tracking-normal font-sans leading-none text-rose-600 dark:text-rose-400">
-                <AnimatedNumber value={problemCount} />
+                <AnimatedNumber value={problemCount} goodWhen="down" showDelta />
               </span>
               <span className="text-xs font-semibold text-rose-700 dark:text-rose-300 px-2 py-0.5 rounded-full bg-rose-500/15 border border-rose-500/30">
                 {totalPrescriptions > 0 ? ((problemCount / totalPrescriptions) * 100).toFixed(0) : 0}%
@@ -808,11 +838,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             </div>
           </div>
 
-          <div className="mt-2 pt-1.5 border-t border-rose-200/50 dark:border-white/5 flex items-center justify-between text-xs">
-            <span className="text-rose-700/80 dark:text-rose-400/80 font-medium truncate">
+          <div className="mt-2 pt-1.5 border-t border-rose-200/50 dark:border-white/5 flex items-center justify-between gap-2 text-xs">
+            <span className="text-rose-700/80 dark:text-rose-400/80 font-medium leading-snug">
               ไม่ผ่านเกณฑ์ {fmtNum(failCount)} · ไม่มีรหัสวินิจฉัย {fmtNum(noDxCount)}
             </span>
-            <span className="text-rose-600 dark:text-rose-400 font-bold group-hover:underline flex items-center gap-0.5">
+            <span className="text-rose-600 dark:text-rose-400 font-bold group-hover:underline hidden xl:flex items-center gap-0.5 shrink-0 whitespace-nowrap">
               ดูรายละเอียด &gt;
             </span>
           </div>
@@ -824,7 +854,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       {/* ========================================================================= */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
         {/* Left 7 Cols: Daily Trend Bar & Line Chart */}
-        <div className="lg:col-span-7 rounded-2xl bg-themed-card border border-themed p-4 sm:p-5 shadow-xs space-y-3.5">
+        <div className="lg:col-span-7 rounded-2xl bg-themed-card border border-themed p-4 sm:p-5 shadow-xs flex flex-col gap-3.5">
           {/* Chart Header & Controls */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div>
@@ -836,7 +866,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                     : 'แนวโน้มการสั่งใช้ยาและอัตราผ่านเกณฑ์รายวัน'}
                 </h2>
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                 {isYearlyRange
                   ? 'กราฟแท่ง 3D แสดงยอดจ่ายยาสมุนไพรแยกรายเดือน พร้อมเส้นแนวโน้มอัตราผ่านเกณฑ์ (%)'
                   : 'กราฟแท่งแสดงจำนวนรายการยา (ผ่าน vs ไม่ตรงเกณฑ์) ซ้อนเส้นแนวโน้มอัตราผ่าน (%)'}
@@ -849,20 +879,21 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => setIs3DMode(!is3DMode)}
+                aria-pressed={is3DMode}
                 className={cn(
-                  'px-2.5 py-1 rounded-lg text-[11px] font-semibold transition cursor-pointer flex items-center gap-1.5 border',
+                  'px-2.5 py-1.5 rounded-lg text-xs font-semibold transition cursor-pointer flex items-center gap-1.5 border',
                   is3DMode
                     ? 'bg-accent border-accent shadow-xs'
                     : 'bg-slate-100 dark:bg-white/5 text-slate-500 border-slate-200/80 dark:border-white/5 hover:text-slate-800 dark:hover:text-white'
                 )}
-                title="สลับการแสดงผลแบบ 3D Isometric มีมิติแสงเงา"
+                title="เปิด/ปิดมุมมองกราฟแบบ 3 มิติ"
               >
                 <Box className="size-3" />
-                <span>{is3DMode ? 'กราฟ 3D' : 'กราฟ 2D'}</span>
+                <span>มุมมอง 3 มิติ</span>
               </button>
 
               {/* Scope switcher (All / OPD / IPD) */}
-              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11px]">
+              <div className="flex items-center gap-0.5 p-0.5 rounded-lg bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs">
                 <button
                   type="button"
                   onClick={() => setChartScope('ALL')}
@@ -904,13 +935,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </div>
 
           {/* SVG Chart Container */}
-          <div className="relative w-full rounded-xl bg-slate-50/70 dark:bg-[#070b14]/50 border border-slate-200/60 dark:border-white/5 p-2 overflow-hidden">
+          <div className="relative w-full flex-1 flex flex-col justify-center rounded-xl bg-slate-50/70 dark:bg-[#070b14]/50 border border-slate-200/60 dark:border-white/5 p-2 overflow-hidden">
             {dailyTrends.length === 0 ? (
               <div className="h-44 grid place-items-center text-xs text-slate-400">
                 ไม่พบข้อมูลการสั่งจ่ายยาในช่วงเวลานี้
               </div>
             ) : (
               <svg
+                key={`${range.startDate}-${range.endDate}-${chartScope}-${is3DMode}`}
                 viewBox={`0 0 ${chartWidth} ${chartHeight}`}
                 className="w-full h-auto overflow-visible select-none"
               >
@@ -963,7 +995,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         x={padLeft - 6}
                         y={y + 3.5}
                         textAnchor="end"
-                        className="text-[11px] fill-slate-400 dark:fill-slate-400 font-mono font-medium"
+                        className="text-xs fill-slate-400 dark:fill-slate-400 tabular-nums font-medium"
                       >
                         {Math.round(maxDailyVolume * pct)}
                       </text>
@@ -972,13 +1004,17 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         x={padLeft + plotWidth + 6}
                         y={y + 3.5}
                         textAnchor="start"
-                        className="text-[11px] fill-teal-500 dark:fill-teal-400 font-mono font-semibold"
+                        className="text-xs fill-teal-500 dark:fill-teal-400 tabular-nums font-semibold"
                       >
                         {Math.round(pct * 100)}%
                       </text>
                     </g>
                   )
                 })}
+
+                {/* ชื่อแกน: ซ้าย = จำนวนรายการ (แท่ง), ขวา = % ผ่าน (เส้น) */}
+                <text x={padLeft - 6} y={padTop - 9} textAnchor="end" className="text-[11px] fill-slate-500 dark:fill-slate-400 font-medium">รายการ</text>
+                <text x={padLeft + plotWidth + 6} y={padTop - 9} textAnchor="start" className="text-[11px] fill-teal-600 dark:fill-teal-400 font-medium">% ผ่าน</text>
 
                 {/* 50% Benchmark Reference Line */}
                 <line
@@ -990,6 +1026,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   strokeWidth="1.2"
                   strokeDasharray="4 3"
                 />
+
 
                 {/* 3D Stacked Columns */}
                 {dailyTrends.map((d, idx) => {
@@ -1044,6 +1081,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                         />
                       )}
 
+                      <g className="bar-grow" style={{ animationDelay: `${Math.min(idx * 30, 600)}ms` }}>
                       {/* 1. Pass Segment (Green) */}
                       {passH > 0 && (
                         <g>
@@ -1111,13 +1149,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       )}
 
                       {/* X-axis date tick */}
+                      </g>
                       {(dailyTrends.length <= 16 || idx % 2 === 0) && (
                         <text
                           x={cx + (is3DMode ? isoDx / 2 : 0)}
                           y={padTop + plotHeight + 15}
                           textAnchor="middle"
                           className={cn(
-                            'text-[11px] font-mono',
+                            'text-xs tabular-nums',
                             isHovered
                               ? 'fill-teal-500 font-bold'
                               : 'fill-slate-500 dark:fill-slate-400 font-medium'
@@ -1130,96 +1169,116 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   )
                 })}
 
-                {/* 3D Trend Area Glow (Only in 3D Mode) */}
-                {is3DMode && dailyTrends.length > 1 && (
-                  <path
-                    d={`${dailyTrends
-                      .map((d, idx) => {
-                        const slotWidth = plotWidth / dailyTrends.length
-                        const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
-                        const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
-                        return `${idx === 0 ? 'M' : 'L'} ${cx} ${cy}`
-                      })
-                      .join(' ')} L ${padLeft + (dailyTrends.length - 1) * (plotWidth / dailyTrends.length) + (plotWidth / dailyTrends.length) / 2 + 2.5} ${padTop + plotHeight} L ${padLeft + (plotWidth / dailyTrends.length) / 2 + 2.5} ${padTop + plotHeight} Z`}
-                    fill="url(#areaGlow3d)"
-                  />
-                )}
-
-                {/* Trend Line: Pass Rate % */}
-                {dailyTrends.length > 1 && (
-                  <>
-                    <path
-                      d={dailyTrends
-                        .map((d, idx) => {
-                          const slotWidth = plotWidth / dailyTrends.length
-                          const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
-                          const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
-                          return `${idx === 0 ? 'M' : 'L'} ${cx} ${cy}`
-                        })
-                        .join(' ')}
-                      fill="none"
-                      stroke="url(#lineGrad)"
-                      strokeWidth={is3DMode ? '2.8' : '2.2'}
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      filter={is3DMode ? 'url(#glow3d)' : undefined}
-                    />
-
-                    {/* 3D Spheres or Points on Line */}
-                    {dailyTrends.map((d, idx) => {
-                      const slotWidth = plotWidth / dailyTrends.length
-                      const cx = padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0)
-                      const cy = padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0)
-                      const isHovered = hoveredDay?.date === d.date
-                      return (
-                        <circle
-                          key={d.date}
-                          cx={cx}
-                          cy={cy}
-                          r={isHovered ? 5.5 : is3DMode ? 3.8 : 2.5}
-                          fill={is3DMode ? 'url(#sphereGrad)' : isHovered ? '#38bdf8' : '#06b6d4'}
-                          stroke="#ffffff"
-                          strokeWidth={isHovered ? 2 : 1.2}
-                          className="transition-all"
+                {/* เส้นแนวโน้ม % ผ่าน: เฉพาะวันที่มีรายการมากพอ */}
+                {(() => {
+                  const slotWidth = plotWidth / dailyTrends.length
+                  const pts = dailyTrends
+                    .map((d, idx) => ({
+                      d,
+                      idx,
+                      cx: padLeft + idx * slotWidth + slotWidth / 2 + (is3DMode ? 2.5 : 0),
+                      cy: padTop + plotHeight * (1 - d.passRate / 100) + (is3DMode ? -2 : 0),
+                    }))
+                    .filter((p) => isTrendPoint(p.d))
+                  if (pts.length === 0) return null
+                  const line = pts.map((p, i) => `${i === 0 ? 'M' : 'L'} ${p.cx} ${p.cy}`).join(' ')
+                  // ช่วงที่ข้ามวันข้อมูลน้อย (วันหยุด) วาดเป็นเส้นประ: ไม่มีข้อมูลจริงระหว่างจุด
+                  const seg = (dashed: boolean) =>
+                    pts
+                      .slice(1)
+                      .map((p, i) => ({ a: pts[i]!, b: p }))
+                      .filter(({ a, b }) => (b.idx - a.idx > 1) === dashed)
+                      .map(({ a, b }) => `M ${a.cx} ${a.cy} L ${b.cx} ${b.cy}`)
+                      .join(' ')
+                  const solidPath = seg(false)
+                  const gapPath = seg(true)
+                  const first = pts[0]!
+                  const last = pts[pts.length - 1]!
+                  return (
+                    <>
+                      {is3DMode && pts.length > 1 && (
+                        <path className="fade-in-late" d={`${line} L ${last.cx} ${padTop + plotHeight} L ${first.cx} ${padTop + plotHeight} Z`} fill="url(#areaGlow3d)" />
+                      )}
+                      {gapPath && (
+                        <path
+                          className="fade-in-late"
+                          d={gapPath}
+                          fill="none"
+                          stroke="#06b6d4"
+                          strokeOpacity={0.55}
+                          strokeWidth={1.6}
+                          strokeDasharray="3 4"
+                          strokeLinecap="round"
                         />
-                      )
-                    })}
-                  </>
-                )}
+                      )}
+                      {solidPath && (
+                        <path
+                          d={solidPath}
+                          pathLength={1}
+                          className="line-draw"
+                          fill="none"
+                          stroke="url(#lineGrad)"
+                          strokeWidth={is3DMode ? '2.8' : '2.2'}
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          filter={is3DMode ? 'url(#glow3d)' : undefined}
+                        />
+                      )}
+                      {pts.map(({ d, cx, cy }) => {
+                        const isHovered = hoveredDay?.date === d.date
+                        return (
+                          <circle
+                            key={d.date}
+                            cx={cx}
+                            cy={cy}
+                            r={isHovered ? 5.5 : is3DMode ? 3.8 : 3}
+                            fill={is3DMode ? 'url(#sphereGrad)' : isHovered ? '#38bdf8' : '#06b6d4'}
+                            stroke="#ffffff"
+                            strokeWidth={isHovered ? 2 : 1.2}
+                            className="fade-in-late transition-all"
+                          />
+                        )
+                      })}
+                    </>
+                  )
+                })()}
               </svg>
             )}
 
             {/* Hover Tooltip Card */}
             {hoveredDay && (
-              <div className="absolute top-2 right-2 bg-slate-900/90 backdrop-blur-md text-white text-[11px] p-2.5 rounded-xl border border-teal-500/30 shadow-lg pointer-events-none space-y-1">
-                <div className="font-bold text-teal-300 flex items-center gap-1.5">
-                  <Calendar className="size-3" />
+              <div className="absolute top-2 right-2 bg-slate-900/95 backdrop-blur-md text-white text-xs p-3 rounded-xl border border-white/10 shadow-lg pointer-events-none space-y-1.5">
+                <div className="font-semibold text-white flex items-center gap-1.5">
+                  <Calendar className="size-3.5 text-accent" />
                   <span>
                     {isYearlyRange
                       ? `เดือน ${hoveredDay.label} (รวมทั้งเดือน)`
                       : toThaiDate(hoveredDay.date)}
                   </span>
                 </div>
-                <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[10.5px]">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
                   <span className="text-slate-300">รวมทั้งหมด:</span>
-                  <strong className="font-mono text-right">{fmtNum(hoveredDay.total)} รายการ</strong>
+                  <strong className="tabular-nums text-right">{fmtNum(hoveredDay.total)} รายการ</strong>
                   <span className="text-emerald-400">ผ่านเกณฑ์:</span>
-                  <strong className="font-mono text-emerald-400 text-right">
+                  <strong className="tabular-nums text-emerald-400 text-right">
                     {fmtNum(hoveredDay.pass)} ({hoveredDay.passRate.toFixed(1)}%)
                   </strong>
-                  <span className="text-rose-400">ไม่ตรง/ไม่มี DX:</span>
-                  <strong className="font-mono text-rose-400 text-right">
+                  <span className="text-rose-400">ไม่ผ่าน / ไม่มีรหัสโรค:</span>
+                  <strong className="tabular-nums text-rose-400 text-right">
                     {fmtNum(hoveredDay.fail + hoveredDay.noDx + hoveredDay.noMap)} รายการ
                   </strong>
                 </div>
+                {!isTrendPoint(hoveredDay) && (
+                  <p className="max-w-56 border-t border-white/10 pt-1.5 text-slate-400">จำนวนน้อยกว่า {trendMinVolume} รายการ จึงไม่นำมาคิดเส้นแนวโน้ม</p>
+                )}
               </div>
             )}
           </div>
 
           {/* Chart Legends & Compliance Breakdown */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-200/60 dark:border-white/5 text-[11px]">
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-200/60 dark:border-white/5 text-xs">
             {/* Legends */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
               <span className="flex items-center gap-1 text-slate-600 dark:text-slate-300">
                 <span className="size-2.5 rounded-xs bg-emerald-500" />
                 <span>ผ่านเกณฑ์</span>
@@ -1232,6 +1291,13 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 <span className="w-3.5 h-0.5 bg-cyan-400 inline-block" />
                 <span>แนวโน้ม % ผ่าน</span>
               </span>
+              <span className="flex items-center gap-1 text-amber-600 dark:text-amber-400">
+                <span className="w-3.5 border-t-2 border-dashed border-amber-500 inline-block" />
+                <span>เป้าหมาย 50%</span>
+              </span>
+              {lowVolumeDays > 0 && (
+                <span className="text-slate-500 dark:text-slate-400">ไม่คิด % ในวันที่มีน้อยกว่า {trendMinVolume} รายการ ({lowVolumeDays} วัน เช่น วันหยุด)</span>
+              )}
             </div>
 
             <button
@@ -1259,7 +1325,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <button
                 type="button"
                 onClick={() => onNavigate('drugs')}
-                className="text-[11px] font-semibold text-accent hover:underline cursor-pointer flex items-center gap-0.5"
+                className="text-xs font-semibold text-accent hover:underline cursor-pointer flex items-center gap-0.5"
               >
                 <span>ดูทั้งหมด</span>
                 <ArrowUpRight className="size-3" />
@@ -1282,7 +1348,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       <div className="flex items-center gap-2 min-w-0">
                         <span
                           className={cn(
-                            'size-5 rounded-md text-[11px] font-bold grid place-items-center shrink-0 font-mono text-white',
+                            'size-5 rounded-md text-xs font-bold grid place-items-center shrink-0 tabular-nums text-white',
                             index === 0 ? 'bg-amber-500' : index === 1 ? 'bg-slate-400' : index === 2 ? 'bg-amber-700' : 'bg-slate-500'
                           )}
                         >
@@ -1294,12 +1360,12 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono font-bold text-xs text-slate-800 dark:text-slate-200">
-                          {fmtNum(d.count)} <span className="font-normal text-[11px] text-slate-400">รายการ</span>
+                        <span className="tabular-nums font-bold text-xs text-slate-800 dark:text-slate-200">
+                          <AnimatedNumber value={d.count} showDelta /> <span className="font-normal text-xs text-slate-400">รายการ</span>
                         </span>
                         <span
                           className={cn(
-                            'text-[11px] font-bold px-1.5 py-0.5 rounded font-mono border',
+                            'text-xs font-bold px-1.5 py-0.5 rounded tabular-nums border',
                             isPass
                               ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30'
                               : isWarning
@@ -1308,7 +1374,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                           )}
                           title={`ผ่านเกณฑ์ ${d.pass}/${d.count} รายการ (${drugPassPct.toFixed(1)}%) - เป้าหมาย สธ. ≥ 50%`}
                         >
-                          {drugPassPct.toFixed(0)}%
+                          <AnimatedNumber value={drugPassPct} suffix="%" goodWhen="up" />
                         </span>
                       </div>
                     </div>
@@ -1323,11 +1389,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Building2 className="size-4 text-accent" />
-                <h3 className="text-xs font-bold text-slate-900 dark:text-white uppercase tracking-wider">
+                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
                   แผนกที่มีการสั่งจ่ายยาสูงสุด
                 </h3>
               </div>
-              <span className="text-[10.5px] text-slate-400">สัดส่วนในรอบที่เลือก</span>
+              <span className="text-xs text-slate-400">สัดส่วนในรอบที่เลือก</span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-xs">
@@ -1340,18 +1406,18 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                     className="p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/60 dark:border-white/5 flex flex-col justify-between gap-1.5 hover:border-teal-500/30 transition group"
                   >
                     <div className="flex items-center justify-between gap-1">
-                      <span className="truncate text-slate-700 dark:text-slate-300 text-[11px] font-medium" title={dept.name}>
+                      <span className="truncate text-slate-700 dark:text-slate-300 text-xs font-medium" title={dept.name}>
                         {dept.name}
                       </span>
-                      <div className="flex items-center gap-1 shrink-0 font-mono text-[11px]">
-                        <strong className="text-accent font-bold">{fmtNum(dept.count)}</strong>
-                        <span className="text-[11px] text-slate-400 font-normal">({pctOfTotal}%)</span>
+                      <div className="flex items-center gap-1 shrink-0 tabular-nums text-xs">
+                        <strong className="text-accent font-bold"><AnimatedNumber value={dept.count} /></strong>
+                        <span className="text-xs text-slate-400 font-normal">({pctOfTotal}%)</span>
                       </div>
                     </div>
                     {/* Visual Proportion Bar */}
                     <div className="h-1.5 w-full bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-accent transition-all duration-500"
+                        className="fill-grow h-full rounded-full bg-accent transition-all duration-500"
                         style={{ width: `${Math.max(barWidthPct, 4)}%` }}
                       />
                     </div>
@@ -1370,9 +1436,9 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <div className="flex items-center justify-between mb-2 px-1">
           <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
             <Layers className="size-3.5 text-accent" />
-            <span>ศูนย์ปฏิบัติการทางลัด (Quick Launchpad)</span>
+            <span>ทางลัด</span>
           </span>
-          <span className="text-[11px] text-slate-400">เข้าถึงฟังก์ชันงานได้ทันที</span>
+          <span className="text-xs text-slate-400">เข้าถึงฟังก์ชันงานได้ทันที</span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
@@ -1388,7 +1454,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-teal-600 dark:group-hover:text-teal-400">
                 ตรวจสอบเวชระเบียน
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
+              <div className="text-xs text-slate-400 truncate">
                 ตารางตรวจสอบรหัสโรค
               </div>
             </div>
@@ -1406,7 +1472,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-cyan-600 dark:group-hover:text-cyan-400">
                 สรุปการจ่ายยา & ต้นทุน
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
+              <div className="text-xs text-slate-400 truncate">
                 วิเคราะห์ยอดจ่าย OPD / IPD
               </div>
             </div>
@@ -1424,7 +1490,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-rose-600 dark:group-hover:text-rose-400">
                 ทบทวนเคสไม่ตรง ({fmtNum(problemCount)})
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
+              <div className="text-xs text-slate-400 truncate">
                 คิวตรวจสอบและแก้ไขผล
               </div>
             </div>
@@ -1442,13 +1508,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               <div className="font-bold text-xs text-slate-900 dark:text-white truncate group-hover:text-violet-600 dark:group-hover:text-violet-400">
                 ตั้งค่าเกณฑ์ ICD-10
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
+              <div className="text-xs text-slate-400 truncate">
                 จับคู่ยาสมุนไพรกับข้อบ่งใช้
               </div>
             </div>
           </button>
         </div>
       </div>
+
 
       {/* ========================================================================= */}
       {/* 4. EXECUTIVE DRILL-DOWN MODAL (รายชื่อผู้ป่วย & ประวัติสั่งยาตาม BOX)         */}
@@ -1487,7 +1554,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                     </h3>
                     <span
                       className={cn(
-                        'px-2 py-0.5 rounded-full text-xs font-bold font-mono border',
+                        'px-2 py-0.5 rounded-full text-xs font-bold tabular-nums border',
                         activeDrillDown === 'PASS'
                           ? 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-500/25'
                           : activeDrillDown === 'TOTAL'
@@ -1592,16 +1659,16 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               {activeDrillDown === 'PATIENTS' ? (
                 // PATIENTS VIEW
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300">
                     <tr>
-                      <th className="py-2.5 px-3 w-12 text-center">#</th>
-                      <th className="py-2.5 px-3 min-w-[170px]">ผู้รับบริการ / HN</th>
-                      <th className="py-2.5 px-3 text-center">ครั้งรับบริการ (VN)</th>
-                      <th className="py-2.5 px-3 text-center">รายการยา</th>
-                      <th className="py-2.5 px-3 min-w-[200px]">ยาสมุนไพรที่ได้รับ</th>
-                      <th className="py-2.5 px-3 min-w-[130px]">แผนกที่รับบริการ</th>
-                      <th className="py-2.5 px-3 text-center min-w-[100px]">วันที่ล่าสุด</th>
-                      <th className="py-2.5 px-3 text-center">ผลตรวจ</th>
+                      <th className="py-3 px-3 w-12 text-center">#</th>
+                      <th className="py-3 px-3 min-w-[180px] whitespace-nowrap">ผู้รับบริการ</th>
+                      <th className="py-3 px-3 w-16 text-center whitespace-nowrap" title="จำนวนครั้งที่มารับบริการ (VN/AN)">ครั้ง</th>
+                      <th className="py-3 px-3 w-16 text-center whitespace-nowrap" title="จำนวนรายการยาที่ได้รับ">รายการ</th>
+                      <th className="py-3 px-3 min-w-[280px] whitespace-nowrap">ยาสมุนไพรที่ได้รับ</th>
+                      <th className="py-3 px-3 min-w-[120px] whitespace-nowrap">แผนก</th>
+                      <th className="py-3 px-3 w-28 text-center whitespace-nowrap">รับบริการล่าสุด</th>
+                      <th className="py-3 px-3 w-32 text-center whitespace-nowrap">ผลตรวจ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-sans">
@@ -1617,48 +1684,54 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                           key={p.hn}
                           className="hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors"
                         >
-                          <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                          <td className="py-3 px-3 text-center tabular-nums text-slate-400">
                             {drillDownPage * drillDownPageSize + idx + 1}
                           </td>
                           <td className="py-2.5 px-3">
-                            <div className="font-bold text-slate-900 dark:text-white">
+                            <div className="font-semibold text-sm text-slate-900 dark:text-white whitespace-nowrap">
                               {p.patientName}
                             </div>
-                            <div className="text-[10.5px] font-mono text-teal-600 dark:text-teal-400 font-semibold mt-0.5">
-                              HN: {p.hn}
+                            <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
+                              HN {p.hn}
                             </div>
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-700 dark:text-slate-200">
-                            {p.visitCount} ครั้ง
+                          <td className="py-3 px-3 text-center tabular-nums text-sm text-slate-700 dark:text-slate-200">
+                            {p.visitCount}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono font-bold text-slate-900 dark:text-white">
-                            {p.prescriptionsCount} รายการ
+                          <td className="py-3 px-3 text-center tabular-nums text-sm font-semibold text-slate-900 dark:text-white">
+                            {p.prescriptionsCount}
                           </td>
                           <td className="py-2.5 px-3">
-                            <div className="flex flex-wrap gap-1 max-w-[260px]">
-                              {p.drugs.map((d, i) => (
+                            {/* แสดงไม่เกิน 3 ชิป ที่เหลือรวมเป็น +N (ชี้ดูรายการทั้งหมด) แถวจะได้สูงเท่ากัน */}
+                            <div className="flex flex-wrap items-center gap-1" title={p.drugs.join(', ')}>
+                              {p.drugs.slice(0, 3).map((d, i) => (
                                 <span
                                   key={i}
-                                  className="px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-white/10 text-slate-700 dark:text-slate-300 text-[10.5px] border border-slate-200/80 dark:border-white/10"
+                                  className="max-w-[160px] truncate whitespace-nowrap px-2 py-0.5 rounded-md bg-slate-100 dark:bg-white/[0.06] text-slate-700 dark:text-slate-300 text-xs"
                                 >
                                   {d}
                                 </span>
                               ))}
+                              {p.drugs.length > 3 && (
+                                <span className="whitespace-nowrap px-2 py-0.5 rounded-md bg-accent-soft text-accent text-xs font-medium">
+                                  +{p.drugs.length - 3}
+                                </span>
+                              )}
                             </div>
                           </td>
-                          <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px]">
+                          <td className="py-3 px-3 text-slate-600 dark:text-slate-300 text-xs">
                             {p.departments.join(', ') || '-'}
                           </td>
-                          <td className="py-2.5 px-3 text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+                          <td className="py-3 px-3 text-center tabular-nums whitespace-nowrap text-slate-500 dark:text-slate-400 text-xs">
                             {toThaiDate(p.latestDate)}
                           </td>
-                          <td className="py-2.5 px-3 text-center">
+                          <td className="py-3 px-3 text-center">
                             {p.hasProblem ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                                 <AlertTriangle className="size-3 text-rose-500" /> มีรายการไม่ตรง
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                 <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
                               </span>
                             )}
@@ -1671,7 +1744,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               ) : (
                 // PRESCRIPTIONS VIEW (PASS, TOTAL, PROBLEMS)
                 <table className="w-full text-left text-xs border-collapse">
-                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-[11px] font-bold text-slate-600 dark:text-slate-300">
+                  <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-900 border-b border-slate-200 dark:border-white/10 text-xs font-bold text-slate-600 dark:text-slate-300">
                     <tr>
                       <th className="py-2.5 px-3 w-12 text-center">#</th>
                       <th className="py-2.5 px-3 min-w-[90px]">วันที่ / เวลา</th>
@@ -1702,12 +1775,12 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                               isFail && 'bg-rose-50/20 dark:bg-rose-950/[0.08]'
                             )}
                           >
-                            <td className="py-2.5 px-3 text-center font-mono text-slate-400">
+                            <td className="py-3 px-3 text-center tabular-nums text-slate-400">
                               {drillDownPage * drillDownPageSize + idx + 1}
                             </td>
-                            <td className="py-2.5 px-3 font-mono whitespace-nowrap text-[11px]">
+                            <td className="py-2.5 px-3 tabular-nums whitespace-nowrap text-xs">
                               <div className="text-slate-900 dark:text-slate-100 font-semibold">{toThaiDate(r.visit_date)}</div>
-                              <div className="text-[10px] text-slate-400 flex items-center gap-1 mt-0.5">
+                              <div className="text-xs text-slate-400 flex items-center gap-1 mt-0.5">
                                 <Clock className="size-3" />
                                 <span>{r.visit_time ? `${r.visit_time.substring(0, 5)} น.` : '-'}</span>
                               </div>
@@ -1716,7 +1789,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                               <div className="font-bold text-slate-900 dark:text-white truncate max-w-[170px]">
                                 {r.patient_name}
                               </div>
-                              <div className="flex items-center gap-1 mt-0.5 text-[10px] font-mono">
+                              <div className="flex items-center gap-1 mt-0.5 text-xs font-mono">
                                 <span className="px-1.5 py-0.2 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-semibold">
                                   HN {r.hn}
                                 </span>
@@ -1727,14 +1800,14 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                               <div className="font-semibold text-slate-900 dark:text-white">
                                 {r.drug_name}
                               </div>
-                              <div className="text-[10.5px] text-slate-500 dark:text-slate-400 font-mono">
+                              <div className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
                                 จำนวน {fmtNum(r.drug_qty)} {r.drug_units || 'หน่วย'}
                               </div>
                             </td>
-                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[110px]">
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-xs truncate max-w-[110px]">
                               {r.department_name || '-'}
                             </td>
-                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-[11px] truncate max-w-[120px]">
+                            <td className="py-2.5 px-3 text-slate-600 dark:text-slate-300 text-xs truncate max-w-[120px]">
                               {r.doctor_name || '-'}
                             </td>
                             <td className="py-2.5 px-3 font-mono font-bold text-xs">
@@ -1743,23 +1816,23 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                                   {r.pdx}
                                 </span>
                               ) : (
-                                <span className="text-rose-500 text-[11px] italic">ไม่มี DX</span>
+                                <span className="text-rose-500 text-xs italic">ไม่มี DX</span>
                               )}
                             </td>
                             <td className="py-2.5 px-3 text-center">
                               {isFail ? (
                                 <div className="flex flex-col items-center gap-0.5">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                                  <span className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                                     <XCircle className="size-3 text-rose-500" /> ไม่ผ่าน
                                   </span>
                                   {r.audit_reason && (
-                                    <span className="text-[9.5px] text-rose-600 dark:text-rose-400 max-w-[130px] truncate">
+                                    <span className="text-xs text-rose-600 dark:text-rose-400 max-w-[130px] truncate">
                                       {r.audit_reason}
                                     </span>
                                   )}
                                 </div>
                               ) : (
-                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <span className="inline-flex items-center gap-1 whitespace-nowrap px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                   <CheckCircle2 className="size-3 text-emerald-500" /> ผ่านเกณฑ์
                                 </span>
                               )}
@@ -1788,8 +1861,8 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               {/* Pagination */}
               <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
                 <span>
-                  หน้า <strong className="font-mono text-slate-900 dark:text-white">{drillDownPage + 1}</strong> จาก{' '}
-                  <strong className="font-mono text-slate-900 dark:text-white">{totalDrillDownPages}</strong>
+                  หน้า <strong className="tabular-nums text-slate-900 dark:text-white">{drillDownPage + 1}</strong> จาก{' '}
+                  <strong className="tabular-nums text-slate-900 dark:text-white">{totalDrillDownPages}</strong>
                 </span>
                 <div className="flex items-center gap-1 ml-2">
                   <button
@@ -1877,25 +1950,25 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             <div className="space-y-3 text-xs">
               <div className="grid grid-cols-2 gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5">
                 <div>
-                  <span className="text-slate-400 block text-[11px]">วันที่รับบริการ</span>
+                  <span className="text-slate-400 block text-xs">วันที่รับบริการ</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {toThaiDate(selectedPatientRecord.visit_date)} {selectedPatientRecord.visit_time?.substring(0, 5)} น.
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[11px]">สิทธิการรักษา</span>
+                  <span className="text-slate-400 block text-xs">สิทธิการรักษา</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {selectedPatientRecord.pttype_name || '-'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[11px]">แผนกที่รับบริการ</span>
+                  <span className="text-slate-400 block text-xs">แผนกที่รับบริการ</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {selectedPatientRecord.department_name || '-'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-slate-400 block text-[11px]">แพทย์ผู้สั่งใช้ยา</span>
+                  <span className="text-slate-400 block text-xs">แพทย์ผู้สั่งใช้ยา</span>
                   <span className="font-semibold text-slate-900 dark:text-white">
                     {selectedPatientRecord.doctor_name || '-'}
                   </span>
@@ -1903,17 +1976,17 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 space-y-1.5">
-                <span className="text-slate-400 block text-[11px]">รายการยาสมุนไพร</span>
+                <span className="text-slate-400 block text-xs">รายการยาสมุนไพร</span>
                 <div className="flex items-center justify-between">
                   <span className="font-bold text-sm text-slate-900 dark:text-white">{selectedPatientRecord.drug_name}</span>
-                  <span className="font-mono font-bold text-teal-600 dark:text-teal-400">
+                  <span className="tabular-nums font-bold text-teal-600 dark:text-teal-400">
                     {selectedPatientRecord.drug_qty} {selectedPatientRecord.drug_units || 'หน่วย'}
                   </span>
                 </div>
               </div>
 
               <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200/80 dark:border-white/5 space-y-2">
-                <span className="text-slate-400 block text-[11px]">รหัสวินิจฉัยโรค (ICD-10)</span>
+                <span className="text-slate-400 block text-xs">รหัสวินิจฉัยโรค (ICD-10)</span>
                 <div className="flex flex-wrap gap-1.5">
                   {[
                     selectedPatientRecord.pdx ? { label: 'PDX', code: selectedPatientRecord.pdx } : null,
@@ -1958,7 +2031,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                   )}
                 </div>
                 {selectedPatientRecord.allowed_dx && selectedPatientRecord.allowed_dx.length > 0 && (
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">
+                  <div className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                     รหัสที่ตรงเกณฑ์ของยานี้:{' '}
                     <span className="font-mono">{selectedPatientRecord.allowed_dx.join(', ')}</span>
                   </div>

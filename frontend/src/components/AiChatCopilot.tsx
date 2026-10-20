@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, type FC, type KeyboardEvent } from 'react'
 import {
   Bot,
-  Sparkles,
   Send,
   X,
   Trash2,
@@ -94,7 +93,7 @@ function formatInlineMarkdown(text: string): string {
   // Bold **text**
   escaped = escaped.replace(/\*\*(.*?)\*\*/g, '<strong class="font-bold text-slate-900 dark:text-white">$1</strong>')
   // Inline code `code`
-  escaped = escaped.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-violet-100 dark:bg-violet-950/70 text-violet-700 dark:text-violet-300 font-mono text-[11px]">$1</code>')
+  escaped = escaped.replace(/`([^`]+)`/g, '<code class="px-1 py-0.5 rounded bg-violet-100 dark:bg-violet-950/70 text-violet-700 dark:text-violet-300 font-mono text-xs">$1</code>')
 
   return escaped
 }
@@ -272,7 +271,7 @@ export const AiChatCopilot: FC = () => {
           {/* Desktop Tooltip Tag (floats on the left, does not block clicks) */}
           {!isOpen && (
             <div className="absolute right-full mr-2.5 top-1/2 -translate-y-1/2 hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/95 dark:bg-black/90 text-white text-xs font-semibold whitespace-nowrap shadow-xl pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-200 border border-white/10 backdrop-blur-xs">
-              <Sparkles className="size-3 text-amber-300 animate-spin" style={{ animationDuration: '4s' }} />
+              <Bot className="size-3 text-emerald-400" />
               <span>ผู้ช่วย AI Copilot (Online)</span>
             </div>
           )}
@@ -300,12 +299,12 @@ export const AiChatCopilot: FC = () => {
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className="font-bold text-sm truncate">AI Smart Copilot</h3>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-1.5 py-0.2 rounded-full">
+                  <span className="inline-flex items-center gap-1 text-xs font-medium bg-emerald-500/20 text-emerald-200 border border-emerald-400/30 px-1.5 py-0.2 rounded-full">
                     <span className="size-1.5 rounded-full bg-emerald-400 animate-ping" />
                     Online
                   </span>
                 </div>
-                <p className="text-[11px] text-violet-200 truncate">
+                <p className="text-xs text-violet-200 truncate">
                   โรงพยาบาลพังโคน • แพทย์แผนไทย & HOSxP
                 </p>
               </div>
@@ -377,7 +376,7 @@ export const AiChatCopilot: FC = () => {
 
                     <div
                       className={cn(
-                        'flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-slate-500 px-1',
+                        'flex items-center gap-1.5 text-xs text-slate-400 dark:text-slate-400 px-1',
                         isUser && 'justify-end'
                       )}
                     >
@@ -435,7 +434,7 @@ export const AiChatCopilot: FC = () => {
                   type="button"
                   disabled={loading}
                   onClick={() => handleSend(qp.query)}
-                  className="text-[11px] font-medium px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition-colors whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
+                  className="text-xs font-medium px-2.5 py-1 rounded-full bg-white dark:bg-white/5 border border-slate-300 dark:border-white/10 text-slate-700 dark:text-slate-300 hover:border-violet-400 hover:text-violet-600 dark:hover:text-violet-300 transition-colors whitespace-nowrap cursor-pointer shrink-0 disabled:opacity-50 shadow-2xs"
                 >
                   {qp.label}
                 </button>
@@ -480,7 +479,7 @@ export const AiChatCopilot: FC = () => {
                 {loading ? <Loader2 className="size-4.5 animate-spin" /> : <Send className="size-4.5" />}
               </button>
             </div>
-            <div className="mt-2 flex items-center justify-between text-[10.5px] text-slate-400 dark:text-slate-500 px-1">
+            <div className="mt-2 flex items-center justify-between text-xs text-slate-400 dark:text-slate-400 px-1">
               <span className="flex items-center gap-1 font-medium text-violet-600 dark:text-violet-400">
                 <Clock className="size-3 text-violet-400" />
                 <span>จำประวัติ 7 วัน (ลบอัตโนมัติ)</span>

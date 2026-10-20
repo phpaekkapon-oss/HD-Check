@@ -143,7 +143,7 @@ export const PinSetupRequiredOverlay: FC = () => {
         <div className="mt-3 pt-2 border-t border-white/10 flex justify-center">
           <button
             type="button"
-            onClick={logout}
+            onClick={() => logout()}
             className="min-h-10 text-xs text-rose-400 hover:text-rose-300 inline-flex items-center gap-1.5 cursor-pointer font-medium"
           >
             <LogOut className="size-3.5" />

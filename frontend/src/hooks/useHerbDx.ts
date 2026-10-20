@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { herbDxApi } from '@/api/herbdx.api'
-import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule, ThaiMedDuplicateRules } from '@/types/herbdx.types'
+import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule, MenuPermissionMatrix, ThaiMedDuplicateRules } from '@/types/herbdx.types'
 
 export const herbDxKeys = {
   all: ['herbdx'] as const,
@@ -11,6 +11,36 @@ export const herbDxKeys = {
   dispensingRules: () => [...herbDxKeys.all, 'dispensing-rules'] as const,
   healthMedSettings: () => [...herbDxKeys.all, 'healthmed-settings'] as const,
   pttypes: () => [...herbDxKeys.all, 'pttypes'] as const,
+  menuPermissions: () => [...herbDxKeys.all, 'menu-permissions'] as const,
+  claims: (r: DateRange) => [...herbDxKeys.all, 'claims', r] as const,
+}
+
+/** สิทธิ์เมนูของผู้ใช้ (และตารางสิทธิ์ทั้งหมดสำหรับ IT) */
+export function useMenuPermissions(enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: herbDxKeys.menuPermissions(),
+    queryFn: herbDxApi.menuPermissions,
+    staleTime: 30_000,
+  })
+}
+
+export function useSaveMenuPermissions() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (permissions: MenuPermissionMatrix) => herbDxApi.saveMenuPermissions(permissions),
+    onSuccess: () => qc.invalidateQueries({ queryKey: herbDxKeys.menuPermissions() }),
+  })
+}
+
+/** ตรวจการเบิก สปสช. ของ visit แพทย์แผนไทยในช่วงวันที่ */
+export function useClaimCheck(range: DateRange) {
+  return useQuery({
+    queryKey: herbDxKeys.claims(range),
+    queryFn: () => herbDxApi.claimCheck(range),
+    placeholderData: keepPreviousData,
+    staleTime: 60_000,
+  })
 }
 
 export function useDbStatus() {
@@ -21,18 +51,31 @@ export function useDbStatus() {
   })
 }
 
+function shouldAutoRefetch(startDate?: string, endDate?: string): boolean {
+  if (!endDate || !startDate) return true
+  const start = new Date(startDate).getTime()
+  const end = new Date(endDate).getTime()
+  const diffDays = (end - start) / (1000 * 60 * 60 * 24)
+  // หากเลือกดูช่วงยาวเกิน 45 วัน (เช่น ทั้งปีงบประมาณ 365 วัน) หรือสิ้นสุดผ่านมาเกิน 7 วันแล้ว ไม่ต้อง auto-refetch รบกวนเบราว์เซอร์
+  if (diffDays > 45 || end < (Date.now() - 7 * 24 * 60 * 60 * 1000)) return false
+  return true
+}
+
 export function useAuditRecords(filters: AuditFilterParams, enabled = true) {
+  const autoRefetch = shouldAutoRefetch(filters.startDate, filters.endDate)
   return useQuery({
     enabled,
     queryKey: herbDxKeys.prescriptions(filters),
     queryFn: () => herbDxApi.prescriptions(filters),
     placeholderData: keepPreviousData, // keep table while refetching → zero layout shift
-    refetchInterval: 10_000, // Auto-fetch fresh prescriptions & metrics every 10s
+    refetchInterval: autoRefetch ? 15_000 : false,
   })
 }
 
-export function useDrugSummaries(range: DateRange) {
+export function useDrugSummaries(range: DateRange, enabled = true) {
+  const autoRefetch = shouldAutoRefetch(range.startDate, range.endDate)
   return useQuery({
+    enabled,
     queryKey: herbDxKeys.drugs(range),
     queryFn: () => herbDxApi.drugs(range),
     // MySQL DECIMAL fields may arrive as strings from the warehouse snapshot.
@@ -46,7 +89,7 @@ export function useDrugSummaries(range: DateRange) {
       total_cost: Number(drug.total_cost ?? 0),
     })),
     placeholderData: keepPreviousData,
-    refetchInterval: 15_000, // Auto-fetch drug summaries every 15s
+    refetchInterval: autoRefetch ? 20_000 : false,
   })
 }
 
@@ -61,6 +104,20 @@ export function useUpdateDxMap() {
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: herbDxKeys.dxMap() })
       await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'drugs'] })
+    },
+  })
+}
+
+export function useBatchUpdateDxMap() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (items: readonly { icode: string; drug_name?: string; dx_prefixes: string; indication?: string; mergeWithExisting?: boolean }[]) =>
+      herbDxApi.batchUpdateDxMap({ items }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dxMap() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'drugs'] })
     },
   })
 }

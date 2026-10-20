@@ -444,3 +444,50 @@ select {
 .animate-pulse-ring {
   animation: fab-pulse-ring 2.2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* ===== Live data motion (dashboard) — driven by data changes, off under prefers-reduced-motion ===== */
+@keyframes delta-pop {
+  0% { opacity: 0; transform: translateY(4px) scale(0.9); }
+  12% { opacity: 1; transform: translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateY(0); }
+  100% { opacity: 0; transform: translateY(-4px); }
+}
+.delta-pop { animation: delta-pop 2.6s ease-out both; }
+
+/* chart columns grow from the baseline */
+@keyframes bar-grow {
+  from { transform: scaleY(0); }
+  to { transform: scaleY(1); }
+}
+.bar-grow {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: bar-grow 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* trend line draws itself (path must have pathLength="1") */
+@keyframes line-draw {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.line-draw {
+  stroke-dasharray: 1;
+  animation: line-draw 1.1s ease-out 0.25s both;
+}
+
+/* points and filled areas fade in after the line */
+@keyframes fade-in-soft {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.fade-in-late { animation: fade-in-soft 0.5s ease-out 0.9s both; }
+
+/* horizontal progress bars fill from the left */
+@keyframes fill-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+.fill-grow {
+  transform-origin: left center;
+  animation: fill-grow 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+}

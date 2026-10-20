@@ -100,7 +100,7 @@ export function DataTablePagination<TData>({
               return (
                 <span
                   key={`ellipsis-${idx}`}
-                  className="size-8 flex items-center justify-center font-mono text-slate-400 dark:text-slate-500 select-none text-xs"
+                  className="size-8 flex items-center justify-center font-mono text-slate-400 dark:text-slate-400 select-none text-xs"
                 >
                   …
                 </span>

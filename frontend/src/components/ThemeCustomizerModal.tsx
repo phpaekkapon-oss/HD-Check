@@ -73,7 +73,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
 
       {/* 2. Hospital System Themes (5 PRESETS) */}
       <div className={cn('space-y-2', mode !== 'dark' && 'opacity-40 pointer-events-none')}>
-        <div className="text-[11px] font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider font-mono">
+        <div className="text-xs font-bold text-slate-700 dark:text-slate-300 font-mono">
           ธีมระบบโรงพยาบาลมืออาชีพ (5 THEMES)
         </div>
 
@@ -96,7 +96,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
                 <span className={cn('size-4 rounded-full mt-0.5 shrink-0 shadow-sm', preset.swatchBg)} />
                 <div className="min-w-0 flex-1 leading-tight">
                   <div className="font-bold text-[12px] leading-snug">{preset.label}</div>
-                  <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug mt-0.5 line-clamp-2">{preset.desc}</div>
+                  <div className="text-xs text-slate-500 dark:text-slate-400 leading-snug mt-0.5 line-clamp-2">{preset.desc}</div>
                 </div>
                 {isSelected && <Check className="size-4 text-accent shrink-0" />}
               </button>
@@ -107,7 +107,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
 
       {/* 3. Accent Color (สีไฮไลต์ทางการแพทย์) */}
       <div className="space-y-2.5 pt-1 border-t border-slate-200 dark:border-white/10">
-        <div className="flex items-center justify-between text-[11px] font-bold uppercase tracking-wider font-mono">
+        <div className="flex items-center justify-between text-xs font-bold font-mono">
           <span className="text-slate-700 dark:text-slate-300">สีไฮไลต์ปุ่มและสถานะ (ACCENT)</span>
           <span className="font-semibold text-accent">
             {accent.name}

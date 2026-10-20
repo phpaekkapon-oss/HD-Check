@@ -1,5 +1,6 @@
-import { useState, useEffect, useMemo, type FC } from 'react'
+import { useState, useEffect, useMemo, useRef, type FC } from 'react'
 import {
+  ListChecks,
   ShieldCheck,
   Smartphone,
   KeyRound,
@@ -22,11 +23,15 @@ import {
   Monitor,
   Cpu,
   Fingerprint,
-  Sparkles,
   ExternalLink,
   RefreshCw,
   Database,
   Bell,
+  ChevronDown,
+  Activity,
+  Pill,
+  Bot,
+  FileText,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
@@ -34,20 +39,22 @@ import { isAdminUser, type TotpSetupData, type User2FAAdminItem, type PinPolicy 
 import { cn } from '@/lib/utils'
 import { ProfileAvatarModal } from './ProfileAvatarModal'
 import { SsoSettingsPanel } from './SsoSettingsPanel'
+import { MenuPermissionsPanel } from './MenuPermissionsPanel'
+import { ConfirmModal, type ConfirmModalProps } from './ConfirmModal'
 
 interface Security2FASettingsModalProps {
   readonly isOpen: boolean
   readonly onClose: () => void
-  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso'
+  readonly initialTab?: 'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso' | 'admin_menus'
   readonly onOpenChangelog?: () => void
 }
 
 const lockIntervals = [
-  { minutes: 1, label: '1 นาที', hint: '⚡ สูงสุด (จุดบริการคนไข้หนาแน่น)' },
-  { minutes: 3, label: '3 นาที', hint: '🛡️ แนะนำ (จุดตรวจ OPD / ห้องยา)' },
-  { minutes: 5, label: '5 นาที', hint: '⭐ มาตรฐานสากล (เวชระเบียนทั่วไป)' },
-  { minutes: 10, label: '10 นาที', hint: '🏢 ปานกลาง (ห้องทำงานส่วนตัว)' },
-  { minutes: 15, label: '15 นาที', hint: '☕ นานสุด' },
+  { minutes: 1, label: '1 นาที', tag: 'ปลอดภัยสูงสุด', desc: 'จุดบริการคนไข้หนาแน่น' },
+  { minutes: 3, label: '3 นาที', tag: 'แนะนำจุดตรวจ', desc: 'ห้องตรวจ OPD / ห้องยา' },
+  { minutes: 5, label: '5 นาที', tag: 'มาตรฐานสากล', desc: 'เวชระเบียน / คลินิกทั่วไป' },
+  { minutes: 10, label: '10 นาที', tag: 'งานธุรการ', desc: 'ห้องทำงานส่วนตัว' },
+  { minutes: 15, label: '15 นาที', tag: 'สูงสุด (Auto-Logout)', desc: 'ดีดออกไปหน้า Login' },
 ]
 
 export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
@@ -69,8 +76,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     updatePinSettings,
   } = usePinLock()
 
-  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso'>(() => {
-    if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso') && !isAdmin) return 'my_profile'
+  const [activeTab, setActiveTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso' | 'admin_menus'>(() => {
+    if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso' || initialTab === 'admin_menus') && !isAdmin) return 'my_profile'
     return initialTab
   })
 
@@ -173,9 +180,11 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }
 
+  const prevOpenRef = useRef(false)
+
   useEffect(() => {
-    if (isOpen) {
-      if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso') && !isAdmin) {
+    if (isOpen && !prevOpenRef.current) {
+      if ((initialTab === 'admin_policy' || initialTab === 'admin_system' || initialTab === 'admin_sso' || initialTab === 'admin_menus') && !isAdmin) {
         setActiveTab('my_profile')
       } else {
         setActiveTab(initialTab)
@@ -184,14 +193,59 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           handleCheckGitHubUpdates()
         }
       }
+      setSelectedMinutes(autoLockMinutes || 5)
     }
-  }, [isOpen, initialTab, isAdmin])
+    prevOpenRef.current = isOpen
+  }, [isOpen, initialTab, isAdmin, autoLockMinutes])
+
+  useEffect(() => {
+    if (autoLockMinutes) {
+      setSelectedMinutes(autoLockMinutes)
+    }
+  }, [autoLockMinutes])
+
+  // Persist open modal state and tab to sessionStorage so F5 refresh restores it
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        sessionStorage.setItem('hd_check_security_modal_open', 'true')
+        sessionStorage.setItem('hd_check_security_modal_tab', activeTab)
+      } catch {}
+    }
+  }, [isOpen, activeTab])
+
+  const handleModalClose = () => {
+    try {
+      sessionStorage.removeItem('hd_check_security_modal_open')
+      sessionStorage.removeItem('hd_check_security_modal_tab')
+    } catch {}
+    onClose()
+  }
 
   // Profile Avatar cropper modal state
   const [isCropperOpen, setIsCropperOpen] = useState(false)
   const [cropperFile, setCropperFile] = useState<File | null>(null)
   const [avatarError, setAvatarError] = useState<string | null>(null)
   const [avatarSuccess, setAvatarSuccess] = useState<string | null>(null)
+
+  // Professional Confirm Dialog State
+  const [confirmConfig, setConfirmConfig] = useState<Omit<ConfirmModalProps, 'isOpen' | 'onClose'> | null>(null)
+  const [isConfirmLoading, setIsConfirmLoading] = useState(false)
+
+  const promptConfirm = (cfg: Omit<ConfirmModalProps, 'isOpen' | 'onClose' | 'isLoading'>) => {
+    setConfirmConfig(cfg)
+  }
+
+  const handleExecuteModalConfirm = async () => {
+    if (!confirmConfig) return
+    setIsConfirmLoading(true)
+    try {
+      await confirmConfig.onConfirm()
+      setConfirmConfig(null)
+    } finally {
+      setIsConfirmLoading(false)
+    }
+  }
 
   const handleAvatarFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -206,17 +260,25 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     if (e.target) e.target.value = ''
   }
 
-  const handleDeleteAvatar = async () => {
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพประจำตัว?')) return
-    setAvatarError(null)
-    setAvatarSuccess(null)
-    const res = await deleteAvatar()
-    if (!res.success) {
-      setAvatarError(res.error || 'ลบรูปภาพไม่สำเร็จ')
-    } else {
-      setAvatarSuccess('ลบรูปภาพประจำตัวเรียบร้อยแล้ว')
-      setTimeout(() => setAvatarSuccess(null), 4000)
-    }
+  const handleDeleteAvatar = () => {
+    promptConfirm({
+      title: 'ยืนยันการลบรูปภาพประจำตัว',
+      description: 'คุณแน่ใจหรือไม่ว่าต้องการลบรูปภาพประจำตัวของคุณ? ระบบจะเปลี่ยนกลับไปใช้ตัวอักษรย่อชื่อเริ่มต้น',
+      confirmText: 'ลบรูปภาพ',
+      variant: 'danger',
+      icon: 'trash',
+      onConfirm: async () => {
+        setAvatarError(null)
+        setAvatarSuccess(null)
+        const res = await deleteAvatar()
+        if (!res.success) {
+          setAvatarError(res.error || 'ลบรูปภาพไม่สำเร็จ')
+        } else {
+          setAvatarSuccess('ลบรูปภาพประจำตัวเรียบร้อยแล้ว')
+          setTimeout(() => setAvatarSuccess(null), 4000)
+        }
+      },
+    })
   }
 
   // My 2FA states
@@ -249,6 +311,20 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   const [enforcePolicy, setEnforcePolicy] = useState<'Y' | 'N'>('N')
   const [enforcePinPolicy, setEnforcePinPolicy] = useState<'Y' | 'N'>('N')
   const [defaultHospitalMinutes, setDefaultHospitalMinutes] = useState<number>(5)
+  const [timeDropdownOpen, setTimeDropdownOpen] = useState(false)
+  const timeDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!timeDropdownOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (timeDropdownRef.current && !timeDropdownRef.current.contains(e.target as Node)) {
+        setTimeDropdownOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [timeDropdownOpen])
+
   const [policyLoading, setPolicyLoading] = useState(false)
   const [pinPolicyLoading, setPinPolicyLoading] = useState(false)
   const [usersList, setUsersList] = useState<User2FAAdminItem[]>([])
@@ -328,7 +404,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     if (!isOpen) return
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose()
+        handleModalClose()
       }
     }
     window.addEventListener('keydown', handleKeyDown)
@@ -452,22 +528,31 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }
 
-  const handleDisable2FA = async () => {
+  const handleDisable2FA = () => {
     if (!user) return
-    if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการปิดการใช้งานการยืนยัน 2 ขั้นตอน (2FA)?')) return
-    setMyError(null)
-    try {
-      const res = await disable2FA(user.loginname)
-      if (!res.success) {
-        setMyError(res.error || 'ไม่สามารถปิดได้')
-        return
-      }
-      setMySuccess('ปิดการใช้งาน 2FA เรียบร้อยแล้ว')
-      setSetupData(null)
-      fetchUsers()
-    } catch (err) {
-      setMyError((err as Error).message)
-    }
+    promptConfirm({
+      title: 'ยืนยันปิดการใช้งาน 2FA',
+      description: 'คุณแน่ใจหรือไม่ว่าต้องการปิดการใช้งานการยืนยัน 2 ขั้นตอน (2FA)?',
+      detail: 'การปิด 2FA จะลดระดับความปลอดภัยของบัญชีคุณ และทำให้บัญชีมีความเสี่ยงต่อการถูกเข้าถึงโดยไม่ได้รับอนุญาต',
+      confirmText: 'ปิดใช้งาน 2FA',
+      variant: 'danger',
+      icon: 'shield-alert',
+      onConfirm: async () => {
+        setMyError(null)
+        try {
+          const res = await disable2FA(user.loginname)
+          if (!res.success) {
+            setMyError(res.error || 'ไม่สามารถปิดได้')
+            return
+          }
+          setMySuccess('ปิดการใช้งาน 2FA เรียบร้อยแล้ว')
+          setSetupData(null)
+          fetchUsers()
+        } catch (err) {
+          setMyError((err as Error).message)
+        }
+      },
+    })
   }
 
   // PIN Handlers
@@ -503,17 +588,26 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     }
   }
 
-  const handleDisablePinLock = async () => {
-    if (!confirm('คุณต้องการปิดการใช้งานระบบ PIN Lock หรือไม่?')) return
-    setPinLoading(true)
-    const res = await disablePin()
-    setPinLoading(false)
-    if (!res.success) {
-      setPinError(res.error || 'ปิด PIN ไม่สำเร็จ')
-    } else {
-      setPinSuccess('ปิดการใช้งานระบบ PIN Lock เรียบร้อยแล้ว')
-      fetchUsers()
-    }
+  const handleDisablePinLock = () => {
+    promptConfirm({
+      title: 'ยืนยันปิดระบบ PIN Lock',
+      description: 'คุณต้องการปิดการใช้งานระบบ PIN Lock ล็อกหน้าจอหรือไม่?',
+      detail: 'ระบบจะไม่ล็อกหน้าจอและไม่ถามรหัส PIN เมื่อไม่มีการใช้งานตามระยะเวลาที่กำหนด',
+      confirmText: 'ปิด PIN Lock',
+      variant: 'warning',
+      icon: 'key',
+      onConfirm: async () => {
+        setPinLoading(true)
+        const res = await disablePin()
+        setPinLoading(false)
+        if (!res.success) {
+          setPinError(res.error || 'ปิด PIN ไม่สำเร็จ')
+        } else {
+          setPinSuccess('ปิดการใช้งานระบบ PIN Lock เรียบร้อยแล้ว')
+          fetchUsers()
+        }
+      },
+    })
   }
 
   const handleUpdateAutoLockTime = async (minutes: number) => {
@@ -534,133 +628,349 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
   }
 
   // Admin Reset User 2FA
-  const handleResetUser2FA = async (targetLogin: string) => {
-    if (!confirm(`ยืนยันการรีเซ็ต 2FA ให้กับผู้ใช้ "${targetLogin}" หรือไม่? ผู้ใช้จะต้องเริ่มสแกน QR ใหม่`)) return
-    setResettingUser(targetLogin)
-    try {
-      const res = await fetch('/api/admin/reset-user-2fa', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginname: targetLogin }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setAdminNotice(`รีเซ็ต 2FA ให้ผู้ใช้ ${targetLogin} สำเร็จแล้ว`)
-        fetchUsers()
-        setTimeout(() => setAdminNotice(null), 5000)
-      } else {
-        setAdminNotice(`ข้อผิดพลาด: ${data.error}`)
-      }
-    } catch (err) {
-      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
-    } finally {
-      setResettingUser(null)
-    }
+  const handleResetUser2FA = (targetLogin: string) => {
+    const targetUserItem = usersList.find((u) => u.loginname.toLowerCase() === targetLogin.toLowerCase())
+    promptConfirm({
+      title: 'รีเซ็ตการยืนยันตัวตน 2FA',
+      description: `ยืนยันการรีเซ็ต 2FA ให้กับผู้ใช้ "${targetLogin}" หรือไม่?`,
+      detail: 'ผู้ใช้จะต้องทำการสแกน QR Code เพื่อตั้งค่า 2FA ใหม่อีกครั้งในการเข้าสู่ระบบครั้งถัดไป',
+      targetUser: {
+        loginname: targetLogin,
+        name: targetUserItem?.name,
+        role: targetUserItem?.position || targetUserItem?.groupname,
+      },
+      confirmText: 'รีเซ็ต 2FA',
+      variant: 'warning',
+      icon: 'reset',
+      onConfirm: async () => {
+        setResettingUser(targetLogin)
+        try {
+          const res = await fetch('/api/admin/reset-user-2fa', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loginname: targetLogin }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setAdminNotice(`รีเซ็ต 2FA ให้ผู้ใช้ ${targetLogin} สำเร็จแล้ว`)
+            fetchUsers()
+            setTimeout(() => setAdminNotice(null), 5000)
+          } else {
+            setAdminNotice(`ข้อผิดพลาด: ${data.error}`)
+          }
+        } catch (err) {
+          setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+        } finally {
+          setResettingUser(null)
+        }
+      },
+    })
   }
 
   // Admin Reset User PIN
-  const handleResetUserPin = async (targetLogin: string) => {
-    if (!confirm(`ยืนยันการรีเซ็ตรหัส PIN ให้กับผู้ใช้ "${targetLogin}" หรือไม่?`)) return
-    setResettingPinUser(targetLogin)
-    try {
-      const res = await fetch('/api/admin/reset-user-pin', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ loginname: targetLogin }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setAdminNotice(`รีเซ็ตรหัส PIN ให้ผู้ใช้ ${targetLogin} เรียบร้อยแล้ว`)
-        fetchUsers()
-        setTimeout(() => setAdminNotice(null), 5000)
-      } else {
-        setAdminNotice(`ข้อผิดพลาด: ${data.error}`)
-      }
-    } catch (err) {
-      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
-    } finally {
-      setResettingPinUser(null)
-    }
+  const handleResetUserPin = (targetLogin: string) => {
+    const targetUserItem = usersList.find((u) => u.loginname.toLowerCase() === targetLogin.toLowerCase())
+    promptConfirm({
+      title: 'รีเซ็ตรหัส PIN ล็อกหน้าจอ',
+      description: `ยืนยันการรีเซ็ตรหัส PIN ให้กับผู้ใช้ "${targetLogin}" หรือไม่?`,
+      detail: 'รหัส PIN เดิมจะถูกล้าง ผู้ใช้จะต้องตั้งค่า PIN ใหม่ในการใช้งานครั้งถัดไป',
+      targetUser: {
+        loginname: targetLogin,
+        name: targetUserItem?.name,
+        role: targetUserItem?.position || targetUserItem?.groupname,
+      },
+      confirmText: 'รีเซ็ต PIN',
+      variant: 'warning',
+      icon: 'key',
+      onConfirm: async () => {
+        setResettingPinUser(targetLogin)
+        try {
+          const res = await fetch('/api/admin/reset-user-pin', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ loginname: targetLogin }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setAdminNotice(`รีเซ็ตรหัส PIN ให้ผู้ใช้ ${targetLogin} เรียบร้อยแล้ว`)
+            fetchUsers()
+            setTimeout(() => setAdminNotice(null), 5000)
+          } else {
+            setAdminNotice(`ข้อผิดพลาด: ${data.error}`)
+          }
+        } catch (err) {
+          setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+        } finally {
+          setResettingPinUser(null)
+        }
+      },
+    })
   }
 
-  const handleToggleHosxpAccount = async (targetLogin: string, disabled: boolean) => {
+  const handleToggleHosxpAccount = (targetLogin: string, disabled: boolean) => {
     const action = disabled ? 'ปิด' : 'เปิด'
-    if (!confirm(`ยืนยัน${action}บัญชี HOSxP ของ "${targetLogin}" หรือไม่? ${disabled ? 'ผู้ใช้นี้จะเข้าสู่ระบบ HOSxP และ SMART-HOSCHECK ไม่ได้' : 'ผู้ใช้จะกลับเข้าสู่ระบบได้ตามปกติ'}`)) return
-    setUpdatingAccountUser(targetLogin)
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/account-status`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ disabled }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setAdminNotice(`${action}บัญชี HOSxP ของ ${targetLogin} เรียบร้อยแล้ว`)
-        await fetchUsers()
-        setTimeout(() => setAdminNotice(null), 5000)
-      } else {
-        setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสถานะบัญชีไม่สำเร็จ'}`)
-      }
-    } catch (err) {
-      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
-    } finally {
-      setUpdatingAccountUser(null)
-    }
+    const targetUserItem = usersList.find((u) => u.loginname.toLowerCase() === targetLogin.toLowerCase())
+    promptConfirm({
+      title: `ยืนยัน${action}บัญชีผู้ใช้ HOSxP`,
+      description: `คุณต้องการ${action}การใช้งานบัญชี "${targetLogin}" ใน HOSxP ใช่หรือไม่?`,
+      detail: disabled
+        ? 'ผู้ใช้นี้จะไม่สามารถเข้าสู่ระบบทั้ง HOSxP และ SMART-HOSCHECK ได้จนกว่าจะเปิดใช้งานอีกครั้ง'
+        : 'ผู้ใช้จะสามารถกลับเข้าสู่ระบบ HOSxP และ SMART-HOSCHECK ได้ตามปกติ',
+      targetUser: {
+        loginname: targetLogin,
+        name: targetUserItem?.name,
+        role: targetUserItem?.position || targetUserItem?.groupname,
+      },
+      confirmText: `${action}บัญชี`,
+      variant: disabled ? 'danger' : 'primary',
+      icon: disabled ? 'user-x' : 'user-check',
+      onConfirm: async () => {
+        setUpdatingAccountUser(targetLogin)
+        try {
+          const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/account-status`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ disabled }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setAdminNotice(`${action}บัญชี HOSxP ของ ${targetLogin} เรียบร้อยแล้ว`)
+            await fetchUsers()
+            setTimeout(() => setAdminNotice(null), 5000)
+          } else {
+            setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสถานะบัญชีไม่สำเร็จ'}`)
+          }
+        } catch (err) {
+          setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+        } finally {
+          setUpdatingAccountUser(null)
+        }
+      },
+    })
   }
 
-  const handleToggleAdmin = async (targetLogin: string, enabled: boolean) => {
+  const handleToggleAdmin = (targetLogin: string, enabled: boolean) => {
     const action = enabled ? 'กำหนด' : 'ถอด'
-    if (!confirm(`ยืนยัน${action}สิทธิ์ Admin ของบัญชี "${targetLogin}" หรือไม่? ${enabled ? 'ผู้ใช้นี้จะเข้าถึงและแก้ไขการตั้งค่าระดับผู้ดูแลได้' : 'หากกลุ่มงานหรือตำแหน่งใน HOSxP ยังเข้าเงื่อนไข Admin บัญชีอาจยังมีสิทธิ์อยู่'}`)) return
-    setUpdatingAdminUser(targetLogin)
-    try {
-      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/admin-role`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ enabled }),
-      })
-      const data = await res.json()
-      if (data.success) {
-        setAdminNotice(`${action}สิทธิ์ Admin ให้ ${targetLogin} เรียบร้อยแล้ว ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่`)
-        await fetchUsers()
-        setTimeout(() => setAdminNotice(null), 6000)
-      } else {
-        setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสิทธิ์ Admin ไม่สำเร็จ'}`)
-      }
-    } catch (err) {
-      setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
-    } finally {
-      setUpdatingAdminUser(null)
-    }
+    const targetUserItem = usersList.find((u) => u.loginname.toLowerCase() === targetLogin.toLowerCase())
+    promptConfirm({
+      title: `ยืนยัน${action}สิทธิ์ Admin`,
+      description: `ยืนยัน${action}สิทธิ์ผู้ดูแลระบบ (Admin) ของบัญชี "${targetLogin}" หรือไม่?`,
+      detail: enabled
+        ? 'ผู้ใช้นี้จะสามารถเข้าถึงและแก้ไขการตั้งค่าระบบ ความปลอดภัย และนโยบายระดับผู้ดูแลระบบได้ทั้งหมด'
+        : 'หากกลุ่มงานหรือตำแหน่งใน HOSxP ของผู้ใช้นี้ยังเข้าเงื่อนไข Admin บัญชีอาจยังมีสิทธิ์ตามเงื่อนไขหลัก',
+      targetUser: {
+        loginname: targetLogin,
+        name: targetUserItem?.name,
+        role: targetUserItem?.position || targetUserItem?.groupname,
+      },
+      confirmText: enabled ? 'กำหนดสิทธิ์ Admin' : 'ถอดสิทธิ์ Admin',
+      variant: enabled ? 'primary' : 'danger',
+      icon: enabled ? 'shield-check' : 'shield-alert',
+      onConfirm: async () => {
+        setUpdatingAdminUser(targetLogin)
+        try {
+          const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/admin-role`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setAdminNotice(`${action}สิทธิ์ Admin ให้ ${targetLogin} เรียบร้อยแล้ว ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่`)
+            await fetchUsers()
+            setTimeout(() => setAdminNotice(null), 6000)
+          } else {
+            setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสิทธิ์ Admin ไม่สำเร็จ'}`)
+          }
+        } catch (err) {
+          setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+        } finally {
+          setUpdatingAdminUser(null)
+        }
+      },
+    })
   }
 
-  // Filtered users for staff directory
+  // Role categorization helpers
+  const isUserAdmin = (u: User2FAAdminItem) => {
+    return Boolean(u.admin_enabled || u.effective_role === 'it' || isAdminUser(u as any))
+  }
+  const isUserThaiMed = (u: User2FAAdminItem) => {
+    if (isUserAdmin(u)) return false
+    if (u.effective_role === 'thaimed') return true
+    const pos = (u.position || u.entryposition || '').toLowerCase()
+    const group = (u.groupname || '').toLowerCase()
+    return (
+      pos.includes('แพทย์แผนไทย') ||
+      pos.includes('แผนไทย') ||
+      pos.includes('การแพทย์ทางเลือก') ||
+      group.includes('แพทย์แผนไทย') ||
+      group.includes('แผนไทย') ||
+      group.includes('การแพทย์ทางเลือก')
+    )
+  }
+  const isUserPharmacist = (u: User2FAAdminItem) => {
+    if (isUserAdmin(u) || isUserThaiMed(u)) return false
+    if (u.effective_role === 'pharmacist') return true
+    const pos = (u.position || u.entryposition || '').toLowerCase()
+    const group = (u.groupname || '').toLowerCase()
+    return pos.includes('เภสัช') || group.includes('เภสัช')
+  }
+  const isUserDoctor = (u: User2FAAdminItem) => {
+    if (isUserAdmin(u) || isUserThaiMed(u) || isUserPharmacist(u)) return false
+    if (u.effective_role === 'doctor') return true
+    const pos = (u.position || u.entryposition || '').toLowerCase()
+    const group = (u.groupname || '').toLowerCase()
+    return pos.includes('แพทย์') || pos.includes('ทันต') || group.includes('doctor')
+  }
+
+  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'thaimed' | 'pharmacist' | 'doctor' | 'general' | 'disabled'>('all')
+  const [selectedLogins, setSelectedLogins] = useState<Set<string>>(new Set())
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false)
+
+  // Real-time role breakdown counts
+  const roleCounts = useMemo(() => {
+    const list = Array.isArray(usersList) ? usersList : []
+    let admin = 0
+    let thaimed = 0
+    let pharmacist = 0
+    let doctor = 0
+    let general = 0
+    let disabled = 0
+
+    for (const u of list) {
+      if (u.account_disable) disabled++
+      if (isUserAdmin(u)) {
+        admin++
+      } else if (isUserThaiMed(u)) {
+        thaimed++
+      } else if (isUserPharmacist(u)) {
+        pharmacist++
+      } else if (isUserDoctor(u)) {
+        doctor++
+      } else {
+        general++
+      }
+    }
+    return {
+      all: list.length,
+      admin,
+      thaimed,
+      pharmacist,
+      doctor,
+      general,
+      disabled,
+    }
+  }, [usersList])
+
+  // Filtered users for staff directory with role tabs & search
   const filteredUsers = useMemo(() => {
     const list = Array.isArray(usersList) ? usersList : []
     const q = searchQuery.trim().toLowerCase()
-    if (!q) return list
-    return list.filter(
-      (u) =>
+    return list.filter((u) => {
+      // 1. Role filter
+      if (roleFilter === 'admin' && !isUserAdmin(u)) return false
+      if (roleFilter === 'thaimed' && !isUserThaiMed(u)) return false
+      if (roleFilter === 'pharmacist' && !isUserPharmacist(u)) return false
+      if (roleFilter === 'doctor' && !isUserDoctor(u)) return false
+      if (roleFilter === 'general' && (isUserAdmin(u) || isUserThaiMed(u) || isUserPharmacist(u) || isUserDoctor(u))) return false
+      if (roleFilter === 'disabled' && !u.account_disable) return false
+
+      // 2. Text search
+      if (!q) return true
+      return (
         (u?.loginname && u.loginname.toLowerCase().includes(q)) ||
         (u?.name && u.name.toLowerCase().includes(q)) ||
-        (u?.groupname && u.groupname.toLowerCase().includes(q))
-    )
-  }, [usersList, searchQuery])
+        (u?.groupname && u.groupname.toLowerCase().includes(q)) ||
+        (u?.position && u.position.toLowerCase().includes(q)) ||
+        (u?.entryposition && u.entryposition.toLowerCase().includes(q))
+      )
+    })
+  }, [usersList, searchQuery, roleFilter])
+
+  // Toggle select all visible
+  const allVisibleSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedLogins.has(u.loginname))
+  const handleToggleSelectAll = () => {
+    setSelectedLogins((prev) => {
+      const next = new Set(prev)
+      if (allVisibleSelected) {
+        filteredUsers.forEach((u) => next.delete(u.loginname))
+      } else {
+        filteredUsers.forEach((u) => next.add(u.loginname))
+      }
+      return next
+    })
+  }
+
+  const handleToggleSelectOne = (loginname: string) => {
+    setSelectedLogins((prev) => {
+      const next = new Set(prev)
+      if (next.has(loginname)) next.delete(loginname)
+      else next.add(loginname)
+      return next
+    })
+  }
+
+  // Batch toggle Admin role
+  const handleBatchAdminRole = (enabled: boolean) => {
+    if (selectedLogins.size === 0) return
+    const action = enabled ? 'กำหนดสิทธิ์ Admin' : 'ถอดสิทธิ์ Admin'
+    promptConfirm({
+      title: `ยืนยัน${action}แบบกลุ่ม`,
+      description: `ยืนยัน${action}ให้กับผู้ใช้ที่เลือกไว้จำนวน ${selectedLogins.size} คน หรือไม่?`,
+      detail: enabled
+        ? 'ผู้ใช้ทั้งหมดที่เลือกจะได้รับสิทธิ์ผู้ดูแลระบบ (Admin) สามารถเข้าถึงเครื่องมือจัดการระดับแอดมินได้'
+        : 'ผู้ใช้ที่เลือกจะถูกเพิกถอนสิทธิ์ผู้ดูแลระบบ (ยกเว้นบัญชีที่คุณกำลังใช้งานอยู่เพื่อความปลอดภัย)',
+      confirmText: `${action} (${selectedLogins.size} คน)`,
+      variant: enabled ? 'primary' : 'danger',
+      icon: enabled ? 'shield-check' : 'shield-alert',
+      onConfirm: async () => {
+        setIsBatchProcessing(true)
+        let successCount = 0
+        let failCount = 0
+
+        for (const login of selectedLogins) {
+          if (!enabled && login.toLowerCase() === String(user?.loginname ?? '').toLowerCase()) {
+            continue
+          }
+          try {
+            const res = await fetch(`/api/admin/users/${encodeURIComponent(login)}/admin-role`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabled }),
+            })
+            const data = await res.json()
+            if (data.success) successCount++
+            else failCount++
+          } catch {
+            failCount++
+          }
+        }
+
+        setAdminNotice(`${action}สำเร็จ ${successCount} คน${failCount > 0 ? ` (ข้าม/ผิดพลาด ${failCount} คน)` : ''}`)
+        setSelectedLogins(new Set())
+        await fetchUsers()
+        setIsBatchProcessing(false)
+        setTimeout(() => setAdminNotice(null), 6000)
+      },
+    })
+  }
 
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
-      <div className="fixed inset-0" onClick={onClose} />
+      <div className="fixed inset-0" onClick={handleModalClose} />
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-3xl sm:max-w-4xl max-sm:h-dvh max-h-dvh sm:max-h-[90dvh] bg-slate-900 border border-slate-800 max-sm:rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
+      <div className="relative w-full max-w-3xl sm:max-w-4xl lg:max-w-6xl max-sm:h-dvh sm:h-[min(860px,90dvh)] bg-slate-900 dark:bg-[var(--card-bg)] border border-slate-800 dark:border-[var(--card-border)] max-sm:rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-slate-800/80 bg-slate-950/80 shrink-0">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-white/[0.06] bg-slate-950/80 dark:bg-[var(--card-header)] shrink-0">
           <div className="flex items-center gap-3.5">
             <div className={cn(
               'grid place-items-center size-10 rounded-xl border shadow-sm shrink-0 transition-colors',
               activeTab === 'admin_system'
-                ? 'bg-violet-500/15 border-violet-500/30 text-violet-400'
-                : 'bg-emerald-500/10 border-emerald-500/25 text-emerald-400'
+                ? 'bg-accent-soft border-accent-soft text-accent'
+                : 'bg-accent-soft border-accent-soft text-accent'
             )}>
               {activeTab === 'admin_system' ? (
                 <Cpu className="size-5.5 stroke-[2.2]" />
@@ -669,12 +979,12 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
               )}
             </div>
             <div>
-              <h2 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 {activeTab === 'admin_system'
                   ? 'ศูนย์จัดการระบบ & ควบคุมเวอร์ชัน (Admin Hub)'
                   : 'ศูนย์ตั้งค่าความปลอดภัย & จัดการบัญชี'}
               </h2>
-              <p className="text-xs text-slate-400 font-normal mt-0.5">
+              <p className="text-sm text-slate-400 font-normal mt-0.5">
                 {activeTab === 'admin_system'
                   ? 'บริหารเวอร์ชัน • ระบบสรุป AI อัตโนมัติ • สถานะเซิร์ฟเวอร์ & ซิงค์ HOSxP'
                   : 'ยืนยันตัวตน 2FA • PIN ล็อกหน้าจอ • นโยบายคุ้มครองข้อมูลผู้ป่วย'}
@@ -683,7 +993,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleModalClose}
             className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800/80 transition cursor-pointer"
             title="ปิดหน้าต่าง"
           >
@@ -691,128 +1001,83 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           </button>
         </div>
 
-        {/* Modern Segmented Tab Bar */}
-        <div className="px-3 sm:px-6 py-2.5 border-b border-slate-800/80 bg-slate-950/50 shrink-0">
-          <div className="flex p-1 rounded-xl bg-slate-950 border border-slate-800/80 gap-1 overflow-x-auto">
-            {/* Tab: Profile */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('my_profile')}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                activeTab === 'my_profile'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-              )}
-            >
-              <UserIcon className={cn('size-3.5', activeTab === 'my_profile' ? 'text-teal-400' : 'text-slate-400')} />
-              <span>โปรไฟล์</span>
-            </button>
-
-            {/* Tab 1: 2FA */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('my_2fa')}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                activeTab === 'my_2fa'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-              )}
-            >
-              <Smartphone className={cn('size-3.5', activeTab === 'my_2fa' ? 'text-emerald-400' : 'text-slate-400')} />
-              <span>2FA ของฉัน</span>
-              {user?.two_factor_enabled && (
-                <span className="size-1.5 rounded-full bg-emerald-400" />
-              )}
-            </button>
-
-            {/* Tab 2: PIN Lock */}
-            <button
-              type="button"
-              onClick={() => setActiveTab('my_pin')}
-              className={cn(
-                'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                activeTab === 'my_pin'
-                  ? 'bg-slate-800 text-white shadow-xs'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-              )}
-            >
-              <Lock className={cn('size-3.5', activeTab === 'my_pin' ? 'text-teal-400' : 'text-slate-400')} />
-              <span>รหัส PIN & ล็อกอัตโนมัติ</span>
-              {hasPin && (
-                <span className="size-1.5 rounded-full bg-teal-400" />
-              )}
-            </button>
-
-            {/* Tab 3: Admin Policy (Admin / IT only) */}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('admin_policy')
-                  fetchPolicy()
-                  fetchPinPolicy()
-                  fetchUsers()
-                }}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'admin_policy'
-                    ? 'bg-slate-800 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                )}
-              >
-                <Users className={cn('size-3.5', activeTab === 'admin_policy' ? 'text-amber-400' : 'text-slate-400')} />
-                <span>บัญชีผู้ใช้ HOSxP / นโยบาย 2FA</span>
-                {(enforcePolicy === 'Y' || enforcePinPolicy === 'Y') && (
-                  <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                    บังคับใช้
-                  </span>
-                )}
-              </button>
-            )}
-
-            {/* Tab: ThaiD / Provider ID sign-in (Admin / IT only) */}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => setActiveTab('admin_sso')}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'admin_sso'
-                    ? 'bg-slate-800 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                )}
-              >
-                <Fingerprint className={cn('size-3.5', activeTab === 'admin_sso' ? 'text-indigo-300' : 'text-slate-400')} />
-                <span>ThaiD / Provider ID</span>
-              </button>
-            )}
-
-            {/* Tab 4: Admin System & Versions (Admin / IT only) */}
-            {isAdmin && (
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveTab('admin_system')
-                  fetchSysStatus()
-                }}
-                className={cn(
-                  'flex-1 flex items-center justify-center gap-2 px-3.5 py-2 text-xs font-semibold rounded-lg transition-all cursor-pointer whitespace-nowrap',
-                  activeTab === 'admin_system'
-                    ? 'bg-slate-800 text-white shadow-xs'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/60'
-                )}
-              >
-                <Cpu className={cn('size-3.5', activeTab === 'admin_system' ? 'text-violet-400' : 'text-slate-400')} />
-                <span>จัดการระบบ & เวอร์ชัน</span>
-                <span className="px-1.5 py-0.2 rounded-full text-[9.5px] font-bold bg-violet-500/20 text-violet-300 border border-violet-500/30">
-                  v{__APP_VERSION__}
-                </span>
-              </button>
-            )}
-          </div>
-        </div>
+        {/* เมนูหมวดด้านซ้าย (มือถือ: แถบเลื่อนแนวนอนด้านบน) + เนื้อหาเลื่อนในกรอบ — หน้าต่างสูงคงที่ ไม่ยืดหดตามแท็บ */}
+        <div className="flex-1 min-h-0 flex flex-col sm:flex-row">
+          <nav
+            aria-label="หมวดการตั้งค่า"
+            className="shrink-0 border-b sm:border-b-0 sm:border-r border-white/[0.06] bg-slate-950/40 dark:bg-[var(--card-header)] sm:w-52 lg:w-56 sm:overflow-y-auto"
+          >
+            <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible p-2 sm:p-3 scrollbar-none">
+              {(
+                [
+                  { group: 'บัญชีของฉัน' },
+                  { id: 'my_profile', label: 'โปรไฟล์', icon: UserIcon },
+                  { id: 'my_2fa', label: 'ยืนยันตัวตน 2FA', icon: Smartphone, dot: Boolean(user?.two_factor_enabled) },
+                  { id: 'my_pin', label: 'PIN & ล็อกหน้าจอ', icon: Lock, dot: hasPin },
+                  ...(isAdmin
+                    ? [
+                        { group: 'ผู้ดูแลระบบ' },
+                        {
+                          id: 'admin_policy',
+                          label: 'ผู้ใช้ & นโยบาย',
+                          icon: Users,
+                          badge: enforcePolicy === 'Y' || enforcePinPolicy === 'Y' ? 'บังคับ' : undefined,
+                          onOpen: () => {
+                            fetchPolicy()
+                            fetchPinPolicy()
+                            fetchUsers()
+                          },
+                        },
+                        { id: 'admin_menus', label: 'สิทธิ์เมนู', icon: ListChecks },
+                        { id: 'admin_sso', label: 'ThaiD / SSO', icon: Fingerprint },
+                        { id: 'admin_system', label: 'จัดการระบบ', icon: Cpu, badge: `v${__APP_VERSION__}`, onOpen: () => fetchSysStatus() },
+                      ]
+                    : []),
+                ] as const
+              ).map((item, i) => {
+                if ('group' in item) {
+                  return (
+                    <div key={`g-${i}`} className={cn('hidden sm:block px-3 pb-1 text-xs font-medium text-slate-500', i > 0 && 'pt-4')}>
+                      {item.group}
+                    </div>
+                  )
+                }
+                const Icon = item.icon
+                const isActive = activeTab === item.id
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    aria-current={isActive ? 'page' : undefined}
+                    onClick={() => {
+                      setActiveTab(item.id as typeof activeTab)
+                      if ('onOpen' in item && item.onOpen) item.onOpen()
+                    }}
+                    className={cn(
+                      'group shrink-0 flex items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-sm font-medium whitespace-nowrap transition cursor-pointer sm:w-full',
+                      isActive
+                        ? 'bg-accent-soft text-white'
+                        : 'text-slate-400 hover:text-slate-100 hover:bg-white/[0.04]'
+                    )}
+                  >
+                    <Icon className={cn('size-4 shrink-0', isActive ? 'text-accent' : 'text-slate-500 group-hover:text-slate-300')} />
+                    <span className="sm:flex-1">{item.label}</span>
+                    {'dot' in item && item.dot && <span className="size-1.5 shrink-0 rounded-full bg-emerald-400" aria-label="เปิดใช้งาน" />}
+                    {'badge' in item && item.badge && (
+                      <span
+                        className={cn(
+                          'shrink-0 rounded-full px-1.5 py-0.5 text-[11px] font-medium',
+                          item.badge === 'บังคับ' ? 'bg-amber-500/15 text-amber-300' : 'bg-white/[0.06] text-slate-400'
+                        )}
+                      >
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          </nav>
 
         {/* Modal Body */}
         <div className="flex-1 min-h-0 overflow-y-auto p-3.5 sm:p-6 space-y-5">
@@ -1166,192 +1431,235 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           {activeTab === 'my_pin' && (
             <div className="space-y-5">
               {pinError && (
-                <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-xs font-medium flex items-center gap-2 shadow-xs">
+                <div role="alert" className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/25 text-rose-300 text-sm flex items-center gap-2.5">
                   <AlertCircle className="size-4 shrink-0 text-rose-400" />
                   <span>{pinError}</span>
                 </div>
               )}
               {pinSuccess && (
-                <div className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs font-medium flex items-center gap-2 shadow-xs">
+                <div role="status" className="p-3.5 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-sm flex items-center gap-2.5">
                   <Check className="size-4 shrink-0 text-emerald-400" />
                   <span>{pinSuccess}</span>
                 </div>
               )}
 
-              {/* Status & Quick Lock Banner */}
-              <div
-                className={cn(
-                  'rounded-2xl border p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition-all shadow-xs',
-                  hasPin && pinEnabled
-                    ? 'bg-teal-950/20 border-teal-500/30 text-teal-100'
-                    : 'bg-slate-900/60 border-slate-800 text-slate-200'
-                )}
-              >
-                <div className="flex items-start gap-3.5 min-w-0">
-                  <div
-                    className={cn(
-                      'grid place-items-center size-11 rounded-xl shrink-0 shadow-xs',
-                      hasPin && pinEnabled
-                        ? 'bg-teal-500/15 text-teal-400 border border-teal-500/30'
-                        : 'bg-slate-800/80 text-slate-300 border border-slate-700/60'
-                    )}
-                  >
-                    <Lock className="size-5.5" />
-                  </div>
-                  <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="text-sm font-bold text-white">
-                        ระบบล็อกหน้าจอด้วย PIN:{' '}
-                        {hasPin && pinEnabled
-                          ? `เปิดใช้งานแล้ว (${selectedMinutes} นาที)`
-                          : hasPin
-                          ? 'มีรหัส PIN แล้ว (ปิดชั่วคราว)'
-                          : 'ยังไม่ได้ตั้งรหัส PIN'}
-                      </h3>
-                      {hasPin && pinEnabled && (
-                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30">
-                          Active
-                        </span>
+              {/* Status hero */}
+              <section className="relative overflow-hidden rounded-2xl border border-accent-soft p-5 sm:p-6" style={{ background: 'linear-gradient(135deg, color-mix(in srgb, var(--accent-hex) 16%, transparent) 0%, transparent 70%)' }}>
+                <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-5">
+                  <div className="relative shrink-0">
+                    <div className="grid size-14 place-items-center rounded-2xl bg-accent-soft border border-accent-soft text-accent">
+                      <Lock className="size-7" />
+                    </div>
+                    <span
+                      className={cn(
+                        'absolute -bottom-1 -right-1 size-4 rounded-full ring-4 ring-slate-900 dark:ring-[var(--card-bg)]',
+                        hasPin && pinEnabled ? 'bg-emerald-400' : hasPin ? 'bg-amber-400' : 'bg-slate-500'
                       )}
+                    />
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-lg font-bold text-white">ล็อกหน้าจอด้วย PIN</h3>
+                      <span
+                        className={cn(
+                          'px-2.5 py-0.5 rounded-full text-xs font-semibold border',
+                          hasPin && pinEnabled
+                            ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
+                            : hasPin
+                              ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                              : 'bg-white/5 text-slate-300 border-white/10'
+                        )}
+                      >
+                        {hasPin && pinEnabled ? 'เปิดใช้งาน' : hasPin ? 'ปิดชั่วคราว' : 'ยังไม่ได้ตั้ง PIN'}
+                      </span>
                       {isPinEnforced && (
-                        <span className="px-2 py-0.5 rounded-full text-[10.5px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
-                          รพ. บังคับใช้
+                        <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30">
+                          โรงพยาบาลบังคับใช้
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                      เมื่อไม่มีการขยับเมาส์หรือแป้นพิมพ์ครบ {selectedMinutes} นาที หน้าจอจะล็อกอัตโนมัติและเบลอข้อมูลผู้ป่วยทันทีเพื่อคุ้มครองข้อมูลเวชระเบียน (PDPA)
+                    <p className="mt-1.5 text-sm leading-relaxed text-slate-300">
+                      {hasPin && pinEnabled
+                        ? `หน้าจอจะล็อกเองเมื่อไม่มีการใช้งาน ${selectedMinutes} นาที ปลดล็อกด้วย PIN ของคุณ`
+                        : 'ตั้ง PIN เพื่อให้หน้าจอล็อกเองเมื่อคุณลุกจากเครื่อง ป้องกันผู้อื่นเห็นข้อมูลผู้ป่วย'}
                     </p>
                   </div>
-                </div>
 
-                <div className="shrink-0 flex items-center gap-2">
                   {hasPin && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose()
-                        setTimeout(lockNow, 150)
-                      }}
-                      className="px-4 py-2 rounded-xl text-xs font-bold bg-amber-500 hover:bg-amber-450 text-slate-950 transition flex items-center gap-1.5 shadow-sm active:scale-95 cursor-pointer"
-                      title="กดล็อกหน้าจอเพื่อทดสอบ"
-                    >
-                      <Lock className="size-3.5" />
-                      <span>ล็อกทันที (Ctrl+L)</span>
-                    </button>
-                  )}
-                  {hasPin && !isPinEnforced && (
-                    <button
-                      type="button"
-                      onClick={handleDisablePinLock}
-                      disabled={pinLoading}
-                      className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-rose-500/15 hover:bg-rose-500/25 text-rose-300 border border-rose-500/30 transition cursor-pointer"
-                    >
-                      ปิดการใช้ PIN
-                    </button>
+                    <div className="flex shrink-0 flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose()
+                          setTimeout(lockNow, 150)
+                        }}
+                        className="inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold text-white shadow-md transition active:scale-[0.98] cursor-pointer"
+                        style={{ background: 'linear-gradient(135deg, var(--accent-hex) 0%, color-mix(in srgb, var(--accent-hex) 70%, #000) 100%)', boxShadow: '0 6px 18px var(--accent-glow, transparent)' }}
+                      >
+                        <Lock className="size-4" />
+                        ล็อกหน้าจอทันที
+                        <kbd className="rounded-md bg-black/20 px-1.5 py-0.5 font-mono text-[11px] font-medium">Ctrl+L</kbd>
+                      </button>
+                      {!isPinEnforced && (
+                        <button
+                          type="button"
+                          onClick={handleDisablePinLock}
+                          disabled={pinLoading}
+                          className="rounded-xl px-3.5 py-2.5 text-sm font-medium text-rose-300 transition hover:bg-rose-500/10 cursor-pointer disabled:opacity-50"
+                        >
+                          ปิดการใช้ PIN
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
-              </div>
+              </section>
 
-              {/* Inactivity Timer Selector Card */}
-              <div className="rounded-2xl bg-slate-900/60 border border-slate-800 p-5 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <Clock className="size-4 text-amber-400" />
-                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    ระยะเวลาล็อกหน้าจออัตโนมัติเมื่อไม่ได้ใช้งาน (Auto-Lock Inactivity Time)
-                  </h4>
+              {/* Auto-lock time */}
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div>
+                    <h4 className="flex items-center gap-2 text-base font-semibold text-white">
+                      <Clock className="size-4.5 text-accent" />
+                      ล็อกอัตโนมัติเมื่อไม่ได้ใช้งาน
+                    </h4>
+                    <p className="mt-1 text-sm text-slate-400">เลือกระยะเวลาที่ไม่มีการใช้งานก่อนหน้าจอจะล็อก</p>
+                  </div>
+                  <span className="rounded-lg bg-accent-soft border border-accent-soft px-3 py-1 text-sm font-semibold text-accent">
+                    {selectedMinutes} นาที
+                  </span>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                <div role="radiogroup" aria-label="ระยะเวลาล็อกอัตโนมัติ" className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
                   {lockIntervals.map((item) => {
                     const isSelected = selectedMinutes === item.minutes
                     return (
                       <button
                         key={item.minutes}
                         type="button"
+                        role="radio"
+                        aria-checked={isSelected}
                         onClick={() => handleUpdateAutoLockTime(item.minutes)}
                         className={cn(
-                          'p-3.5 rounded-xl border text-left transition cursor-pointer flex flex-col justify-between gap-1.5',
+                          'group relative rounded-xl border p-3.5 text-left transition cursor-pointer',
                           isSelected
-                            ? 'bg-emerald-500/10 border-emerald-500/50 text-white shadow-xs ring-1 ring-emerald-500/20'
-                            : 'bg-slate-950/40 border-slate-800/80 text-slate-300 hover:text-white hover:bg-slate-800/40 hover:border-slate-700'
+                            ? 'border-accent bg-accent-soft shadow-sm'
+                            : 'border-white/[0.08] bg-white/[0.02] hover:border-white/20 hover:bg-white/[0.04]'
                         )}
                       >
                         <div className="flex items-center justify-between">
-                          <span className="text-sm font-bold text-white">{item.label}</span>
-                          {isSelected && <CheckCircle2 className="size-4 text-emerald-400" />}
+                          <span className={cn('text-lg font-bold tabular-nums', isSelected ? 'text-white' : 'text-slate-200')}>
+                            {item.label}
+                          </span>
+                          <span
+                            className={cn(
+                              'grid size-5 place-items-center rounded-full border transition',
+                              isSelected ? 'border-transparent bg-accent' : 'border-white/20 group-hover:border-white/35'
+                            )}
+                          >
+                            {isSelected && <Check className="size-3 stroke-[3]" />}
+                          </span>
                         </div>
-                        <span className={cn('text-xs leading-tight', isSelected ? 'text-emerald-300/90 font-medium' : 'text-slate-400')}>
-                          {item.hint}
-                        </span>
+                        <div className={cn('mt-2 text-xs font-semibold', isSelected ? 'text-accent' : 'text-slate-400')}>{item.tag}</div>
+                        <p className="mt-0.5 text-xs leading-snug text-slate-400 line-clamp-2">{item.desc}</p>
                       </button>
                     )
                   })}
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800/80 text-xs text-slate-300 space-y-1.5">
-                  <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
-                    <Info className="size-4 text-amber-400" />
-                    <span>คำแนะนำมาตรฐานสากล (Clinical Workflow Security):</span>
+                <div className="mt-4 grid gap-2.5 sm:grid-cols-2">
+                  <div className="flex items-start gap-2.5 rounded-xl bg-white/[0.03] px-3.5 py-3 text-sm">
+                    <Info className="mt-0.5 size-4 shrink-0 text-accent" />
+                    <p className="text-slate-300">
+                      แนะนำ <strong className="text-white">3–5 นาที</strong> สำหรับจุดตรวจ OPD และห้องยา
+                    </p>
                   </div>
-                  <p className="leading-relaxed">
-                    • <strong className="text-white">3 - 5 นาที:</strong> เหมาะสมที่สุดสำหรับโรงพยาบาล จุดจ่ายยา และห้องตรวจคนไข้ (ไม่รบกวนแพทย์ตอนตรวจ และป้องกันคนไข้แอบดูจอ)
-                  </p>
-                  <p className="leading-relaxed">
-                    • <strong className="text-white">คีย์ลัดด่วน:</strong> สามารถกด <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono font-medium text-amber-200">Ctrl + L</kbd> หรือ <kbd className="px-2 py-0.5 rounded bg-slate-800 border border-slate-700 text-[11px] font-mono font-medium text-amber-200">Alt + L</kbd> เพื่อล็อกหน้าจอทันทีก่อนลุกจากโต๊ะได้ทุกเมื่อ
-                  </p>
+                  <div className="flex items-start gap-2.5 rounded-xl bg-white/[0.03] px-3.5 py-3 text-sm">
+                    <ShieldCheck className="mt-0.5 size-4 shrink-0 text-amber-300" />
+                    <p className="text-slate-300">
+                      ล็อกค้างเกิน <strong className="text-amber-300">15 นาที</strong> ระบบจะออกจากระบบให้อัตโนมัติ
+                    </p>
+                  </div>
                 </div>
-              </div>
+                <p className="mt-3 flex flex-wrap items-center gap-1.5 text-xs text-slate-400">
+                  คีย์ลัดล็อกหน้าจอ
+                  <kbd className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-slate-200">Ctrl + L</kbd>
+                  หรือ
+                  <kbd className="rounded-md border border-white/10 bg-white/5 px-1.5 py-0.5 font-mono text-[11px] text-slate-200">Alt + L</kbd>
+                </p>
+              </section>
 
-              {/* Set / Change PIN Form */}
-              <form onSubmit={handleSavePin} className="rounded-2xl bg-slate-900/60 border border-slate-800 p-5 space-y-4 shadow-xs">
-                <div className="flex items-center gap-2">
-                  <KeyRound className="size-4 text-emerald-400" />
-                  <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                    {hasPin ? 'เปลี่ยนรหัส PIN ใหม่ (Change PIN)' : 'ตั้งรหัส PIN ใหม่ (Setup PIN)'}
-                  </h4>
-                </div>
+              {/* Set / change PIN */}
+              <form onSubmit={handleSavePin} className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-5 sm:p-6">
+                <h4 className="flex items-center gap-2 text-base font-semibold text-white">
+                  <KeyRound className="size-4.5 text-accent" />
+                  {hasPin ? 'เปลี่ยนรหัส PIN' : 'ตั้งรหัส PIN'}
+                </h4>
+                <p className="mt-1 text-sm text-slate-400">ตัวเลข 4–8 หลัก ใช้ปลดล็อกหน้าจอ ไม่ต้องเหมือนรหัสผ่าน HOSxP</p>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      รหัส PIN ใหม่ (ตัวเลข 4-8 หลัก)
+                    <label htmlFor="pin-new" className="mb-2 block text-sm font-medium text-slate-300">
+                      PIN ใหม่
                     </label>
                     <input
+                      id="pin-new"
                       type="password"
+                      inputMode="numeric"
+                      autoComplete="new-password"
                       maxLength={8}
                       value={pinInput}
                       onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ''))}
-                      placeholder="เช่น 1234 หรือ 987654"
+                      placeholder="••••••"
                       required
-                      className="w-full h-11 px-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white font-mono text-center tracking-widest text-lg font-bold placeholder:text-slate-500 placeholder:text-xs placeholder:tracking-normal placeholder:font-sans focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 shadow-inner transition"
+                      className="w-full h-12 rounded-xl border border-white/12 bg-white/[0.04] px-4 text-center font-mono text-xl font-semibold tracking-[0.4em] text-white placeholder:tracking-[0.3em] placeholder:text-slate-600 transition focus:outline-hidden focus:border-accent focus:bg-white/[0.07]"
                     />
+                    <p className={cn('mt-1.5 text-xs', pinInput.length > 0 && pinInput.length < 4 ? 'text-amber-300' : 'text-slate-500')}>
+                      {pinInput.length > 0 ? `${pinInput.length} หลัก${pinInput.length < 4 ? ' (ต้องมีอย่างน้อย 4 หลัก)' : ''}` : 'อย่างน้อย 4 หลัก'}
+                    </p>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1.5">
-                      ยืนยันรหัส PIN อีกครั้ง
+                    <label htmlFor="pin-confirm" className="mb-2 block text-sm font-medium text-slate-300">
+                      ยืนยัน PIN อีกครั้ง
                     </label>
                     <input
+                      id="pin-confirm"
                       type="password"
+                      inputMode="numeric"
+                      autoComplete="new-password"
                       maxLength={8}
                       value={confirmPinInput}
                       onChange={(e) => setConfirmPinInput(e.target.value.replace(/\D/g, ''))}
-                      placeholder="ยืนยันรหัส PIN อีกครั้ง..."
+                      placeholder="••••••"
                       required
-                      className="w-full h-11 px-3.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white font-mono text-center tracking-widest text-lg font-bold placeholder:text-slate-500 placeholder:text-xs placeholder:tracking-normal placeholder:font-sans focus:outline-hidden focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/15 shadow-inner transition"
+                      className={cn(
+                        'w-full h-12 rounded-xl border bg-white/[0.04] px-4 text-center font-mono text-xl font-semibold tracking-[0.4em] text-white placeholder:tracking-[0.3em] placeholder:text-slate-600 transition focus:outline-hidden focus:bg-white/[0.07]',
+                        confirmPinInput && confirmPinInput !== pinInput ? 'border-rose-400/60 focus:border-rose-400' : 'border-white/12 focus:border-accent'
+                      )}
                     />
+                    {confirmPinInput.length > 0 && (
+                      <p className={cn('mt-1.5 flex items-center gap-1 text-xs', confirmPinInput === pinInput ? 'text-emerald-300' : 'text-rose-300')}>
+                        {confirmPinInput === pinInput ? <Check className="size-3.5" /> : <AlertCircle className="size-3.5" />}
+                        {confirmPinInput === pinInput ? 'PIN ตรงกัน' : 'PIN ไม่ตรงกัน'}
+                      </p>
+                    )}
                   </div>
                 </div>
 
-                <div className="flex items-center justify-end pt-1">
+                <div className="mt-5 flex flex-col-reverse gap-3 border-t border-white/[0.06] pt-4 sm:flex-row sm:items-center sm:justify-between">
+                  <span className="text-xs text-slate-500">
+                    {hasPin ? 'PIN ใหม่มีผลทันทีหลังบันทึก' : 'หลังตั้ง PIN ระบบจะถาม PIN ทุกครั้งที่ปลดล็อกหน้าจอ'}
+                  </span>
                   <button
                     type="submit"
                     disabled={pinLoading || pinInput.length < 4 || pinInput !== confirmPinInput}
-                    className="px-6 py-2.5 rounded-xl text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 disabled:opacity-50 transition cursor-pointer shadow-md shadow-emerald-950/40 active:scale-95 disabled:active:scale-100 flex items-center gap-2"
+                    className="inline-flex items-center justify-center gap-2 rounded-xl px-6 py-2.5 text-sm font-semibold text-white shadow-md transition active:scale-[0.98] cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 disabled:shadow-none"
+                    style={{ background: 'linear-gradient(135deg, var(--accent-hex) 0%, color-mix(in srgb, var(--accent-hex) 70%, #000) 100%)' }}
                   >
                     {pinLoading && <Loader2 className="size-4 animate-spin" />}
-                    <span>{hasPin ? 'บันทึกรหัส PIN ใหม่' : 'เปิดใช้งาน PIN Lock'}</span>
+                    {hasPin ? 'บันทึก PIN ใหม่' : 'เปิดใช้งาน PIN'}
                   </button>
                 </div>
               </form>
@@ -1369,168 +1677,150 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   <span>{adminNotice}</span>
                 </div>
               )}
-              <p className="text-[11px] text-slate-400">
+              <p className="text-xs text-slate-400">
                 กำหนด Admin จะให้สิทธิ์จัดการระบบใน SMART-HOSCHECK แก่ผู้ใช้คนนั้น ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่เพื่อให้สิทธิ์มีผล
               </p>
 
-              {/* Policy Controls Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Policy 1: 2FA Enforcement */}
-                <div
-                  className={cn(
-                    'rounded-2xl border p-5 flex flex-col justify-between gap-4 transition-all shadow-xs',
-                    enforcePolicy === 'Y'
-                      ? 'bg-amber-950/20 border-amber-500/35'
-                      : 'bg-slate-900/60 border-slate-800'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div
-                        className={cn(
-                          'grid place-items-center size-10 rounded-xl shrink-0 shadow-xs border',
-                          enforcePolicy === 'Y'
-                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                            : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
-                        )}
-                      >
-                        <Smartphone className="size-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-bold text-white">บังคับใช้ 2FA ทั้งโรงพยาบาล</h3>
-                          {enforcePolicy === 'Y' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              Enforced
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                              Optional
-                            </span>
+              {/* นโยบายโรงพยาบาล: การ์ดเดียว 2 แถว (กระชับ ให้พื้นที่กับรายชื่อบุคลากร) */}
+              <section className="rounded-2xl border border-white/[0.08] bg-white/[0.02] divide-y divide-white/[0.06]">
+                {(
+                  [
+                    {
+                      key: '2fa',
+                      icon: Smartphone,
+                      title: 'บังคับใช้ 2FA ทั้งโรงพยาบาล',
+                      on: enforcePolicy === 'Y',
+                      desc:
+                        enforcePolicy === 'Y'
+                          ? 'ทุกคนต้องยืนยันรหัส OTP จากแอปก่อนเข้าสู่ระบบ'
+                          : 'แต่ละคนเลือกเปิดหรือปิด 2FA เอง',
+                      loading: policyLoading,
+                      toggle: handleTogglePolicy,
+                    },
+                    {
+                      key: 'pin',
+                      icon: Lock,
+                      title: 'บังคับใช้ PIN ล็อกหน้าจอทุกคน',
+                      on: enforcePinPolicy === 'Y',
+                      desc:
+                        enforcePinPolicy === 'Y'
+                          ? 'ทุกเครื่องล็อกเองเมื่อไม่มีการใช้งานตามเวลาที่กำหนด'
+                          : 'แต่ละคนตั้งเวลาล็อกและเปิด/ปิด PIN เอง',
+                      loading: pinPolicyLoading,
+                      toggle: handleTogglePinPolicy,
+                    },
+                  ] as const
+                ).map((row) => (
+                  <div key={row.key} className="flex flex-wrap items-center gap-x-4 gap-y-3 px-4 py-3.5 sm:px-5">
+                    <div className={cn('grid size-9 shrink-0 place-items-center rounded-lg', row.on ? 'bg-accent-soft text-accent' : 'bg-white/[0.05] text-slate-400')}>
+                      <row.icon className="size-4.5" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-semibold text-white">{row.title}</h3>
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-[11px] font-medium',
+                            row.on ? 'bg-amber-500/15 text-amber-300' : 'bg-white/[0.06] text-slate-400'
                           )}
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          {enforcePolicy === 'Y'
-                            ? 'เจ้าหน้าที่ทุกคนต้องตั้งค่าและยืนยันรหัส OTP 2FA ก่อนเข้าสู่ระบบเวชระเบียน'
-                            : 'ให้เจ้าหน้าที่แต่ละท่านเลือกเปิดหรือปิดใช้งาน 2FA ได้ตามความสะดวก'}
-                        </p>
+                        >
+                          {row.on ? 'บังคับใช้' : 'ไม่บังคับ'}
+                        </span>
                       </div>
+                      <p className="mt-0.5 text-xs text-slate-400">{row.desc}</p>
                     </div>
 
-                    {/* Modern Switch */}
+                    {row.key === 'pin' && enforcePinPolicy === 'Y' && (
+                      <div className="relative flex items-center gap-2 text-xs text-slate-400" ref={timeDropdownRef}>
+                        <span className="whitespace-nowrap">เวลาล็อก</span>
+                        <button
+                          type="button"
+                          onClick={() => setTimeDropdownOpen((prev) => !prev)}
+                          className="inline-flex h-9 items-center gap-2 rounded-xl border border-slate-700/80 bg-slate-900/90 px-3 text-xs font-semibold text-slate-200 hover:border-emerald-500/50 hover:bg-slate-800 transition shadow-inner cursor-pointer"
+                        >
+                          <Clock className="size-3.5 text-emerald-400" />
+                          <span>
+                            {[
+                              { v: 1, l: '1 นาที' },
+                              { v: 3, l: '3 นาที' },
+                              { v: 5, l: '5 นาที (มาตรฐาน)' },
+                              { v: 10, l: '10 นาที' },
+                              { v: 15, l: '15 นาที' },
+                            ].find((t) => t.v === defaultHospitalMinutes)?.l ?? `${defaultHospitalMinutes} นาที`}
+                          </span>
+                          <ChevronDown className={cn('size-3.5 text-slate-400 transition-transform duration-200', timeDropdownOpen && 'rotate-180')} />
+                        </button>
+
+                        {timeDropdownOpen && (
+                          <div className="absolute right-0 top-full mt-1.5 w-48 rounded-xl border border-slate-700/90 bg-slate-900/95 backdrop-blur-xl p-1.5 shadow-2xl z-50 animate-in fade-in zoom-in-95 duration-150">
+                            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                              เลือกระยะเวลาล็อกกลาง
+                            </div>
+                            {[
+                              { v: 1, l: '1 นาที' },
+                              { v: 3, l: '3 นาที' },
+                              { v: 5, l: '5 นาที (มาตรฐาน)' },
+                              { v: 10, l: '10 นาที' },
+                              { v: 15, l: '15 นาที' },
+                            ].map((opt) => {
+                              const isSelected = opt.v === defaultHospitalMinutes
+                              return (
+                                <button
+                                  key={opt.v}
+                                  type="button"
+                                  onClick={() => {
+                                    handleSaveHospitalDefaultMinutes(opt.v)
+                                    setTimeDropdownOpen(false)
+                                  }}
+                                  className={cn(
+                                    'w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition cursor-pointer text-left',
+                                    isSelected
+                                      ? 'bg-emerald-500/15 text-emerald-300 font-semibold'
+                                      : 'text-slate-300 hover:bg-white/[0.06] hover:text-white'
+                                  )}
+                                >
+                                  <span>{opt.l}</span>
+                                  {isSelected && <Check className="size-3.5 text-emerald-400" />}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={enforcePolicy === 'Y'}
-                      disabled={policyLoading}
-                      onClick={handleTogglePolicy}
+                      aria-checked={row.on}
+                      aria-label={row.title}
+                      disabled={row.loading}
+                      onClick={row.toggle}
                       className={cn(
-                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden disabled:opacity-50 mt-0.5',
-                        enforcePolicy === 'Y' ? 'bg-amber-500' : 'bg-slate-800'
+                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-accent disabled:opacity-50',
+                        row.on ? 'bg-accent' : 'bg-white/[0.12]'
                       )}
-                      title={enforcePolicy === 'Y' ? 'คลิกเพื่อปิดโหมดบังคับ' : 'คลิกเพื่อเปิดโหมดบังคับ'}
                     >
                       <span
                         className={cn(
-                          'pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
-                          enforcePolicy === 'Y' ? 'translate-x-5' : 'translate-x-0'
+                          'pointer-events-none inline-block size-5 rounded-full bg-white shadow-sm transition-transform duration-200',
+                          row.on ? 'translate-x-5' : 'translate-x-0'
                         )}
                       />
                     </button>
                   </div>
-                </div>
-
-                {/* Policy 2: PIN Auto-Lock Enforcement */}
-                <div
-                  className={cn(
-                    'rounded-2xl border p-5 flex flex-col justify-between gap-4 transition-all shadow-xs',
-                    enforcePinPolicy === 'Y'
-                      ? 'bg-amber-950/20 border-amber-500/35'
-                      : 'bg-slate-900/60 border-slate-800'
-                  )}
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-3 min-w-0">
-                      <div
-                        className={cn(
-                          'grid place-items-center size-10 rounded-xl shrink-0 shadow-xs border',
-                          enforcePinPolicy === 'Y'
-                            ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                            : 'bg-slate-800/80 border-slate-700/60 text-slate-400'
-                        )}
-                      >
-                        <Lock className="size-5" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-bold text-white">บังคับใช้ PIN Auto-Lock ทุกคน</h3>
-                          {enforcePinPolicy === 'Y' ? (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                              Enforced ({defaultHospitalMinutes}น.)
-                            </span>
-                          ) : (
-                            <span className="px-2 py-0.5 rounded-full text-[11px] font-medium bg-slate-800 text-slate-400 border border-slate-700">
-                              Optional
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-slate-400 mt-1 leading-relaxed">
-                          {enforcePinPolicy === 'Y'
-                            ? `ทุกเครื่องจะถูกล็อกหน้าจออัตโนมัติเมื่อไม่ขยับเมาส์ครบ ${defaultHospitalMinutes} นาที`
-                            : 'ให้ผู้ใช้แต่ละท่านกำหนดระยะเวลาล็อกหน้าจอและเปิด-ปิด PIN เอง'}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Modern Switch */}
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={enforcePinPolicy === 'Y'}
-                      disabled={pinPolicyLoading}
-                      onClick={handleTogglePinPolicy}
-                      className={cn(
-                        'relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-hidden disabled:opacity-50 mt-0.5',
-                        enforcePinPolicy === 'Y' ? 'bg-amber-500' : 'bg-slate-800'
-                      )}
-                      title={enforcePinPolicy === 'Y' ? 'คลิกเพื่อปิดโหมดบังคับ' : 'คลิกเพื่อเปิดโหมดบังคับ'}
-                    >
-                      <span
-                        className={cn(
-                          'pointer-events-none inline-block size-5 transform rounded-full bg-white shadow-sm ring-0 transition duration-200 ease-in-out',
-                          enforcePinPolicy === 'Y' ? 'translate-x-5' : 'translate-x-0'
-                        )}
-                      />
-                    </button>
-                  </div>
-
-                  {enforcePinPolicy === 'Y' && (
-                    <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between gap-2">
-                      <span className="text-xs text-amber-200/90 font-medium">ระยะเวลาล็อกกลางของโรงพยาบาล:</span>
-                      <select
-                        value={defaultHospitalMinutes}
-                        onChange={(e) => handleSaveHospitalDefaultMinutes(Number(e.target.value))}
-                        className="h-8.5 px-3 rounded-lg bg-slate-950 border border-amber-500/30 text-xs font-bold text-amber-300 shadow-inner focus:border-amber-400 focus:outline-hidden cursor-pointer"
-                      >
-                        <option value={1}>1 นาที (จุดบริการหนาแน่น)</option>
-                        <option value={3}>3 นาที (ห้องตรวจ/ห้องยา)</option>
-                        <option value={5}>5 นาที (มาตรฐานสากล)</option>
-                        <option value={10}>10 นาที (สำนักงาน)</option>
-                        <option value={15}>15 นาที</option>
-                      </select>
-                    </div>
-                  )}
-                </div>
-              </div>
+                ))}
+              </section>
 
               {/* Staff Directory Table */}
               <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+                {/* Search & Header bar */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5">
                   <div className="flex items-center gap-2">
                     <div className="grid place-items-center size-7 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-400 shrink-0">
                       <Users className="size-3.5" />
                     </div>
-                    <span className="text-xs font-bold text-slate-200">รายชื่อบุคลากรและสถานะความปลอดภัย</span>
+                    <span className="text-xs font-bold text-slate-200">รายชื่อบุคลากรและจัดการสิทธิ์</span>
                     <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-slate-800/80 text-emerald-400 border border-slate-700/60 font-mono">
                       {filteredUsers.length.toLocaleString()} คน
                     </span>
@@ -1553,7 +1843,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="ค้นหาชื่อ, username, ตำแหน่ง…"
-                      className="w-full pl-9 pr-8 py-2 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-hidden focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/15 transition shadow-inner"
+                      className="w-full pl-9 pr-8 py-1.5 rounded-xl bg-slate-950/80 border border-slate-800 text-white placeholder-slate-500 text-xs focus:outline-hidden focus:border-emerald-500/80 focus:ring-2 focus:ring-emerald-500/15 transition shadow-inner"
                     />
                     {searchQuery && (
                       <button
@@ -1568,7 +1858,92 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   </div>
                 </div>
 
-                {/* Table Container */}
+                {/* Role Filter Tabs with Real-time Counters */}
+                <div
+                  className="flex flex-wrap items-center gap-1.5 pb-1 text-xs"
+                  onWheel={(e) => {
+                    if (e.deltaY !== 0 && e.currentTarget.scrollWidth > e.currentTarget.clientWidth) {
+                      e.currentTarget.scrollLeft += e.deltaY
+                    }
+                  }}
+                >
+                  {[
+                    { id: 'all', label: 'ทั้งหมด', count: roleCounts.all, icon: Users, color: 'text-slate-300' },
+                    { id: 'admin', label: 'ผู้ดูแลระบบ (Admin)', count: roleCounts.admin, icon: ShieldCheck, color: 'text-violet-400' },
+                    { id: 'thaimed', label: 'แพทย์แผนไทย', count: roleCounts.thaimed, icon: Activity, color: 'text-emerald-400' },
+                    { id: 'pharmacist', label: 'เภสัชกรรม', count: roleCounts.pharmacist, icon: Pill, color: 'text-sky-400' },
+                    { id: 'doctor', label: 'แพทย์ / ทันตแพทย์', count: roleCounts.doctor, icon: UserIcon, color: 'text-indigo-400' },
+                    { id: 'general', label: 'บุคลากรทั่วไป', count: roleCounts.general, icon: Users, color: 'text-slate-400' },
+                    ...(roleCounts.disabled > 0 ? [{ id: 'disabled', label: 'ปิดใช้งานใน HOSxP', count: roleCounts.disabled, icon: AlertCircle, color: 'text-rose-400' }] : []),
+                  ].map((tab) => {
+                    const isActive = roleFilter === tab.id
+                    return (
+                      <button
+                        key={tab.id}
+                        type="button"
+                        onClick={() => setRoleFilter(tab.id as any)}
+                        className={cn(
+                          'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium text-xs whitespace-nowrap transition cursor-pointer border',
+                          isActive
+                            ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300 font-semibold shadow-xs'
+                            : 'bg-white/[0.03] border-white/[0.08] text-slate-400 hover:text-white hover:bg-white/[0.06]'
+                        )}
+                      >
+                        <tab.icon className={cn('size-3.5', isActive ? 'text-emerald-400' : tab.color)} />
+                        <span>{tab.label}</span>
+                        <span
+                          className={cn(
+                            'ml-0.5 px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold',
+                            isActive
+                              ? 'bg-emerald-400/20 text-emerald-200'
+                              : 'bg-white/[0.08] text-slate-400'
+                          )}
+                        >
+                          {tab.count}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+
+                {/* Batch Action Toolbar when 1+ users selected */}
+                {selectedLogins.size > 0 && (
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-xl bg-violet-950/40 border border-violet-500/30 text-violet-200 text-xs animate-in fade-in duration-150">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-white">เลือกไว้ {selectedLogins.size} คน</span>
+                      <span className="text-violet-300/80 hidden sm:inline">จากรายการที่แสดง</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isBatchProcessing}
+                        onClick={() => handleBatchAdminRole(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-violet-600 hover:bg-violet-500 text-white shadow-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isBatchProcessing ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
+                        <span>กำหนดเป็น Admin ทั้งหมด ({selectedLogins.size})</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBatchProcessing}
+                        onClick={() => handleBatchAdminRole(false)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-rose-300 border border-rose-500/30 transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isBatchProcessing ? <Loader2 className="size-3 animate-spin" /> : <X className="size-3" />}
+                        <span>ถอดสิทธิ์ Admin</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBatchProcessing}
+                        onClick={() => setSelectedLogins(new Set())}
+                        className="px-2.5 py-1 rounded-lg text-xs font-medium text-slate-400 hover:text-white transition cursor-pointer"
+                      >
+                        ยกเลิก
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Mobile card list (< md) */}
                 <div className="md:hidden space-y-2 max-h-[60dvh] overflow-y-auto">
                   {usersLoading ? (
@@ -1578,65 +1953,121 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     </div>
                   ) : filteredUsers.length === 0 ? (
                     <div className="py-8 text-center text-sm text-slate-400 font-medium">
-                      {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากร'}
+                      {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากรในหมวดนี้'}
                     </div>
                   ) : (
-                    filteredUsers.map((u) => (
-                      <div key={u.loginname} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <div className="font-medium text-slate-100 text-sm truncate">{u.name}</div>
-                            <div className="text-xs text-slate-400 truncate">
-                              {u.position || u.entryposition || u.groupname || '-'}
+                    filteredUsers.map((u) => {
+                      const uIsAdmin = isUserAdmin(u)
+                      const uIsThaiMed = isUserThaiMed(u)
+                      const uIsPharm = isUserPharmacist(u)
+                      const uIsDoc = isUserDoctor(u)
+                      const isSelf = u.loginname.toLowerCase() === String(user?.loginname ?? '').toLowerCase()
+
+                      return (
+                        <div key={u.loginname} className="rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <input
+                                type="checkbox"
+                                checked={selectedLogins.has(u.loginname)}
+                                onChange={() => handleToggleSelectOne(u.loginname)}
+                                className="mt-1 size-4 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-0 focus:outline-hidden cursor-pointer shrink-0"
+                              />
+                              <div className="min-w-0">
+                                <div className="font-medium text-slate-100 text-sm truncate">{u.name}</div>
+                                <div className="text-xs text-slate-400 truncate">
+                                  {u.position || u.entryposition || u.groupname || '-'}
+                                </div>
+                              </div>
                             </div>
+                            <span className="font-mono font-semibold text-emerald-400 text-xs shrink-0">{u.loginname}</span>
                           </div>
-                          <span className="font-mono font-semibold text-emerald-400 text-xs shrink-0">{u.loginname}</span>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className={cn(
-                            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border',
-                            u.two_factor_enabled
-                              ? 'font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
-                              : 'font-medium bg-slate-900/80 text-slate-400 border-slate-800'
-                          )}>
-                            {u.two_factor_enabled && <Check className="size-3" />} 2FA: {u.two_factor_enabled ? 'เปิด' : 'ยังไม่เปิด'}
-                          </span>
-                          <span className={cn(
-                            'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] border',
-                            u.has_pin
-                              ? 'font-semibold bg-teal-500/10 text-teal-300 border-teal-500/25'
-                              : 'font-medium bg-slate-900/80 text-slate-400 border-slate-800'
-                          )}>
-                            {u.has_pin && <Lock className="size-3" />} PIN: {u.has_pin ? `มี (${u.auto_lock_minutes ?? 5} น.)` : 'ไม่มี'}
-                          </span>
-                        </div>
-                        <div className="flex flex-wrap gap-2 pt-1">
-                          <button
-                            type="button"
-                            disabled={updatingAdminUser === u.loginname}
-                            onClick={() => handleToggleAdmin(u.loginname, !u.admin_enabled)}
-                            className={cn('min-h-11 px-3 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60', u.admin_enabled ? 'bg-violet-500/10 text-violet-300 border-violet-500/25' : 'bg-slate-800 text-slate-200 border-slate-700')}
-                          >
-                            {updatingAdminUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
-                            {u.admin_enabled ? 'ถอดสิทธิ์ Admin' : 'กำหนดเป็น Admin'}
-                          </button>
-                          <button
-                            type="button"
-                            disabled={updatingAccountUser === u.loginname}
-                            onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
-                            className={cn('min-h-11 px-3 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60', u.account_disable ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25')}
-                          >
-                            {updatingAccountUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <ShieldCheck className="size-3.5" />}
-                            {u.account_disable ? 'เปิดบัญชี HOSxP' : 'ปิดบัญชี HOSxP'}
-                          </button>
+
+                          {/* Role Badge & Admin Switch */}
+                          <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900/80 border border-slate-800">
+                            <div className="flex items-center gap-1.5">
+                              {uIsAdmin ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30">
+                                  <ShieldCheck className="size-3 text-amber-400" />
+                                  <span>Admin</span>
+                                </span>
+                              ) : uIsThaiMed ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                  <Activity className="size-3 text-emerald-400" />
+                                  <span>แผนไทย</span>
+                                </span>
+                              ) : uIsPharm ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                                  <Pill className="size-3 text-sky-400" />
+                                  <span>เภสัชกรรม</span>
+                                </span>
+                              ) : uIsDoc ? (
+                                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/30">
+                                  <UserIcon className="size-3 text-indigo-400" />
+                                  <span>แพทย์</span>
+                                </span>
+                              ) : (
+                                <span className="px-2 py-0.5 rounded-md text-[10.5px] text-slate-400 bg-slate-800 border border-slate-700">
+                                  ทั่วไป
+                                </span>
+                              )}
+                              <span className="text-[11px] text-slate-400">สิทธิ์ Admin:</span>
+                            </div>
+
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={uIsAdmin}
+                              disabled={isSelf || updatingAdminUser === u.loginname}
+                              onClick={() => handleToggleAdmin(u.loginname, !uIsAdmin)}
+                              className={cn(
+                                'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed',
+                                uIsAdmin ? 'bg-violet-600' : 'bg-slate-700'
+                              )}
+                              title={isSelf ? 'บัญชีที่คุณกำลังใช้งานอยู่' : uIsAdmin ? 'ถอดสิทธิ์ Admin' : 'ตั้งเป็น Admin'}
+                            >
+                              <span className={cn('pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200', uIsAdmin ? 'translate-x-4' : 'translate-x-0')} />
+                            </button>
+                          </div>
+
+                          {/* 2FA & PIN Badges */}
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={cn(
+                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] border',
+                              u.two_factor_enabled
+                                ? 'font-semibold bg-emerald-500/10 text-emerald-300 border-emerald-500/25'
+                                : 'font-medium bg-slate-900/80 text-slate-500 border-slate-800'
+                            )}>
+                              {u.two_factor_enabled && <Check className="size-3" />} 2FA: {u.two_factor_enabled ? 'เปิด' : 'ยังไม่เปิด'}
+                            </span>
+                            <span className={cn(
+                              'inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10.5px] border',
+                              u.has_pin
+                                ? 'font-semibold bg-teal-500/10 text-teal-300 border-teal-500/25'
+                                : 'font-medium bg-slate-900/80 text-slate-500 border-slate-800'
+                            )}>
+                              {u.has_pin && <Lock className="size-3" />} PIN: {u.has_pin ? `มี (${u.auto_lock_minutes ?? 5}น.)` : 'ไม่มี'}
+                            </span>
+                          </div>
+
+                          <div className="flex flex-wrap gap-1.5 pt-1 border-t border-slate-800/80">
+                            <button
+                              type="button"
+                              disabled={updatingAccountUser === u.loginname || isSelf}
+                              onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
+                              className={cn('px-2.5 py-1 rounded-lg text-xs font-medium border cursor-pointer inline-flex items-center gap-1 disabled:opacity-50', u.account_disable ? 'bg-emerald-500/10 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 text-rose-300 border-rose-500/25')}
+                            >
+                              {updatingAccountUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : null}
+                              {u.account_disable ? 'เปิดบัญชี HOSxP' : 'ปิดบัญชี HOSxP'}
+                            </button>
                             {u.two_factor_enabled && (
                               <button
                                 type="button"
                                 disabled={resettingUser === u.loginname}
                                 onClick={() => handleResetUser2FA(u.loginname)}
-                                className="min-h-11 px-3 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/25 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-rose-500/10 text-rose-300 border border-rose-500/25 cursor-pointer inline-flex items-center gap-1 disabled:opacity-60"
                               >
-                                {resettingUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+                                {resettingUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <RotateCcw className="size-3" />}
                                 รีเซ็ต 2FA
                               </button>
                             )}
@@ -1645,29 +2076,39 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                 type="button"
                                 disabled={resettingPinUser === u.loginname}
                                 onClick={() => handleResetUserPin(u.loginname)}
-                                className="min-h-11 px-3 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 cursor-pointer inline-flex items-center gap-1.5 disabled:opacity-60"
+                                className="px-2.5 py-1 rounded-lg text-xs font-medium bg-amber-500/10 text-amber-300 border border-amber-500/25 cursor-pointer inline-flex items-center gap-1 disabled:opacity-60"
                               >
-                                {resettingPinUser === u.loginname ? <Loader2 className="size-3.5 animate-spin" /> : <KeyRound className="size-3.5" />}
+                                {resettingPinUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <KeyRound className="size-3" />}
                                 รีเซ็ต PIN
                               </button>
                             )}
+                          </div>
                         </div>
-                      </div>
-                    ))
+                      )
+                    })
                   )}
                 </div>
 
+                {/* Desktop Table Container (>= md) */}
                 <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/60 shadow-sm">
-                  <div className="overflow-x-auto max-h-80">
-                    <table className="w-full text-left text-xs border-collapse min-w-[700px]">
+                  <div className="overflow-x-auto overflow-y-auto max-h-[500px] scrollbar-thin scrollbar-thumb-slate-700/80 scrollbar-track-slate-900/40">
+                    <table className="w-full text-left text-xs border-collapse">
                       <thead className="sticky top-0 z-20 bg-slate-900/95 backdrop-blur-md border-b border-slate-800 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
                         <tr>
-                          <th className="py-3 px-4 w-[120px] whitespace-nowrap">Username</th>
-                          <th className="py-3 px-4 min-w-[200px] whitespace-nowrap">ชื่อ-นามสกุล</th>
-                          <th className="py-3 px-4 min-w-[140px] whitespace-nowrap">กลุ่มงาน/ตำแหน่ง</th>
-                          <th className="py-3 px-3 text-center w-[110px] whitespace-nowrap">2FA</th>
-                          <th className="py-3 px-3 text-center w-[130px] whitespace-nowrap">PIN Lock</th>
-                          <th className="py-3 px-4 text-right min-w-[340px] whitespace-nowrap">สิทธิ์ Admin / การจัดการบัญชี</th>
+                          <th className="py-2.5 px-3 w-[42px] text-center">
+                            <input
+                              type="checkbox"
+                              checked={allVisibleSelected}
+                              onChange={handleToggleSelectAll}
+                              className="size-3.5 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-0 focus:outline-hidden cursor-pointer"
+                              title="เลือกทั้งหมดในหน้านี้"
+                            />
+                          </th>
+                          <th className="py-2.5 px-3 min-w-[170px] whitespace-nowrap">Username / บุคลากร</th>
+                          <th className="py-2.5 px-3 min-w-[150px] whitespace-nowrap">กลุ่มงาน / ตำแหน่ง</th>
+                          <th className="py-2.5 px-3 w-[200px] whitespace-nowrap text-center">สิทธิ์ Admin & บทบาท</th>
+                          <th className="py-2.5 px-3 w-[150px] whitespace-nowrap text-center">2FA / PIN Lock</th>
+                          <th className="py-2.5 px-3 w-[150px] whitespace-nowrap text-right">การจัดการบัญชี</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800/60 font-sans">
@@ -1681,86 +2122,168 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                         ) : filteredUsers.length === 0 ? (
                           <tr>
                             <td colSpan={6} className="py-8 text-center text-slate-400 font-medium">
-                              {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากร'}
+                              {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากรในหมวดนี้'}
                             </td>
                           </tr>
                         ) : (
-                          filteredUsers.map((u) => (
-                            <tr key={u.loginname} className="hover:bg-slate-800/35 transition-colors h-11">
-                              <td className="py-2 px-4 font-mono font-semibold text-emerald-400 tracking-wide text-xs whitespace-nowrap align-middle">
-                                {u.loginname}
-                              </td>
-                              <td className="py-2 px-4 font-medium text-slate-100 text-xs whitespace-nowrap align-middle">
-                                {u.name}
-                              </td>
-                              <td className="py-2 px-4 text-slate-300 text-xs whitespace-nowrap align-middle">
-                                <div className="font-medium text-slate-200" title={u.entryposition || u.position || ''}>
-                                  {u.position || u.entryposition || u.groupname || '-'}
-                                </div>
-                                {u.position && u.groupname && u.position !== u.groupname && (
-                                  <div className="text-[11px] text-slate-400 font-mono">
-                                    สิทธิ์: {u.groupname}
+                          filteredUsers.map((u) => {
+                            const uIsAdmin = isUserAdmin(u)
+                            const uIsThaiMed = isUserThaiMed(u)
+                            const uIsPharm = isUserPharmacist(u)
+                            const uIsDoc = isUserDoctor(u)
+                            const isSelf = u.loginname.toLowerCase() === String(user?.loginname ?? '').toLowerCase()
+
+                            return (
+                              <tr key={u.loginname} className="hover:bg-slate-800/35 transition-colors h-11">
+                                {/* Checkbox */}
+                                <td className="py-2 px-3 text-center align-middle">
+                                  <input
+                                    type="checkbox"
+                                    checked={selectedLogins.has(u.loginname)}
+                                    onChange={() => handleToggleSelectOne(u.loginname)}
+                                    className="size-3.5 rounded border-slate-700 bg-slate-800 text-emerald-500 focus:ring-0 focus:outline-hidden cursor-pointer"
+                                  />
+                                </td>
+
+                                {/* Username / บุคลากร */}
+                                <td className="py-2 px-3 align-middle">
+                                  <div className="font-mono font-semibold text-emerald-400 text-xs">
+                                    {u.loginname}
                                   </div>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-center align-middle">
-                                {u.two_factor_enabled ? (
-                                  <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-300 border border-emerald-500/25 whitespace-nowrap">
-                                    <Check className="size-3" /> เปิด
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-900/80 text-slate-400 border border-slate-800 whitespace-nowrap">
-                                    ยังไม่เปิด
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2 px-3 text-center align-middle">
-                                {u.has_pin ? (
-                                  <span className="inline-flex items-center justify-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-teal-500/10 text-teal-300 border border-teal-500/25 whitespace-nowrap">
-                                    <Lock className="size-3" /> มี PIN ({u.auto_lock_minutes ?? 5}น.)
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center justify-center px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-slate-900/80 text-slate-400 border border-slate-800 whitespace-nowrap">
-                                    ไม่มี
-                                  </span>
-                                )}
-                              </td>
-                              <td className="py-2 px-4 text-right align-middle">
-                                <div className="inline-flex items-center gap-1.5 justify-end">
+                                  <div className="font-medium text-slate-100 text-xs truncate max-w-[190px]">
+                                    {u.name}
+                                  </div>
+                                </td>
+
+                                {/* กลุ่มงาน / ตำแหน่ง */}
+                                <td className="py-2 px-3 text-slate-300 text-xs align-middle">
+                                  <div className="font-medium text-slate-200 truncate max-w-[160px]" title={u.entryposition || u.position || ''}>
+                                    {u.position || u.entryposition || u.groupname || '-'}
+                                  </div>
+                                  {u.position && u.groupname && u.position !== u.groupname && (
+                                    <div className="text-[10.5px] text-slate-400 font-mono truncate max-w-[160px]">
+                                      สิทธิ์: {u.groupname}
+                                    </div>
+                                  )}
+                                </td>
+
+                                {/* สิทธิ์ Admin & บทบาท */}
+                                <td className="py-2 px-3 align-middle text-center">
+                                  <div className="flex items-center justify-center gap-2">
+                                    {/* Role Badge */}
+                                    {uIsAdmin ? (
+                                      <span
+                                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-bold bg-violet-500/15 text-violet-300 border border-violet-500/30 whitespace-nowrap"
+                                        title={u.admin_enabled ? 'ได้รับสิทธิ์ Admin ในระบบ SMART-HOSCHECK' : 'เป็น Admin จากกลุ่มงาน IT ใน HOSxP'}
+                                      >
+                                        <ShieldCheck className="size-3 text-amber-400" />
+                                        <span>Admin</span>
+                                      </span>
+                                    ) : uIsThaiMed ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                        <Activity className="size-3 text-emerald-400" />
+                                        <span>แผนไทย</span>
+                                      </span>
+                                    ) : uIsPharm ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-sky-500/15 text-sky-300 border border-sky-500/30 whitespace-nowrap">
+                                        <Pill className="size-3 text-sky-400" />
+                                        <span>เภสัชกรรม</span>
+                                      </span>
+                                    ) : uIsDoc ? (
+                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-500/15 text-indigo-300 border border-indigo-500/30 whitespace-nowrap">
+                                        <UserIcon className="size-3 text-indigo-400" />
+                                        <span>แพทย์</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-1.5 py-0.5 rounded-md text-[10.5px] font-normal bg-slate-900 text-slate-400 border border-slate-800 whitespace-nowrap">
+                                        ทั่วไป
+                                      </span>
+                                    )}
+
+                                    {/* Toggle Switch ให้สิทธิ์ Admin */}
                                     <button
                                       type="button"
-                                      disabled={updatingAdminUser === u.loginname}
-                                      onClick={() => handleToggleAdmin(u.loginname, !u.admin_enabled)}
-                                      className={cn('px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer flex items-center gap-1 whitespace-nowrap disabled:opacity-60', u.admin_enabled ? 'bg-violet-500/10 hover:bg-violet-500/20 text-violet-300 border-violet-500/25' : 'bg-slate-800 hover:bg-slate-700 text-slate-200 border-slate-700')}
-                                      title={u.admin_enabled ? 'ถอดสิทธิ์ Admin ของ SMART-HOSCHECK' : 'กำหนดสิทธิ์ Admin ของ SMART-HOSCHECK'}
+                                      role="switch"
+                                      aria-checked={uIsAdmin}
+                                      disabled={isSelf || updatingAdminUser === u.loginname}
+                                      onClick={() => handleToggleAdmin(u.loginname, !uIsAdmin)}
+                                      className={cn(
+                                        'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed',
+                                        uIsAdmin ? 'bg-violet-600' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                                      )}
+                                      title={
+                                        isSelf
+                                          ? 'บัญชีที่คุณกำลังใช้งานอยู่ (ไม่สามารถถอดสิทธิ์ตัวเองได้)'
+                                          : uIsAdmin
+                                            ? 'คลิกเพื่อถอดสิทธิ์ Admin'
+                                            : 'คลิกเพื่อกำหนดให้เป็น Admin'
+                                      }
                                     >
-                                      {updatingAdminUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
-                                      <span>{u.admin_enabled ? 'ถอด Admin' : 'ตั้ง Admin'}</span>
+                                      <span
+                                        className={cn(
+                                          'pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200',
+                                          uIsAdmin ? 'translate-x-4' : 'translate-x-0'
+                                        )}
+                                      />
                                     </button>
+                                    {updatingAdminUser === u.loginname && (
+                                      <Loader2 className="size-3 animate-spin text-violet-400" />
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* 2FA & PIN Lock */}
+                                <td className="py-2 px-3 align-middle text-center">
+                                  <div className="flex items-center justify-center gap-1.5 flex-wrap">
+                                    {u.two_factor_enabled ? (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap">
+                                        <Check className="size-2.5" /> 2FA
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[10.5px] text-slate-500 bg-slate-900 border border-slate-800 whitespace-nowrap">
+                                        ไม่มี 2FA
+                                      </span>
+                                    )}
+                                    {u.has_pin ? (
+                                      <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10.5px] font-semibold bg-teal-500/15 text-teal-300 border border-teal-500/30 whitespace-nowrap">
+                                        <Lock className="size-2.5" /> PIN ({u.auto_lock_minutes ?? 5}น.)
+                                      </span>
+                                    ) : (
+                                      <span className="px-1.5 py-0.5 rounded text-[10.5px] text-slate-500 bg-slate-900 border border-slate-800 whitespace-nowrap">
+                                        ไม่มี PIN
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+
+                                {/* การจัดการบัญชี */}
+                                <td className="py-2 px-3 text-right align-middle">
+                                  <div className="inline-flex items-center gap-1 justify-end">
                                     <button
                                       type="button"
-                                      disabled={updatingAccountUser === u.loginname}
+                                      disabled={updatingAccountUser === u.loginname || isSelf}
                                       onClick={() => handleToggleHosxpAccount(u.loginname, !u.account_disable)}
-                                      className={cn('px-2.5 py-1 rounded-lg text-[11px] font-medium border transition cursor-pointer flex items-center gap-1 whitespace-nowrap disabled:opacity-60', u.account_disable ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/25' : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/25')}
+                                      className={cn(
+                                        'px-2 py-1 rounded-md text-[10.5px] font-medium border transition cursor-pointer flex items-center gap-1 whitespace-nowrap disabled:opacity-50',
+                                        u.account_disable
+                                          ? 'bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-300 border-emerald-500/30'
+                                          : 'bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border-rose-500/30'
+                                      )}
                                       title={u.account_disable ? 'เปิดบัญชีผู้ใช้ใน HOSxP' : 'ปิดบัญชีผู้ใช้ใน HOSxP'}
                                     >
-                                      {updatingAccountUser === u.loginname ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
+                                      {updatingAccountUser === u.loginname ? <Loader2 className="size-2.5 animate-spin" /> : null}
                                       <span>{u.account_disable ? 'เปิดบัญชี' : 'ปิดบัญชี'}</span>
                                     </button>
+
                                     {u.two_factor_enabled && (
                                       <button
                                         type="button"
                                         disabled={resettingUser === u.loginname}
                                         onClick={() => handleResetUser2FA(u.loginname)}
-                                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-rose-500/10 hover:bg-rose-500/20 text-rose-300 border border-rose-500/25 transition cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                                        title="รีเซ็ต 2FA เมื่อผู้ใช้ทำโทรศัพท์หาย"
+                                        className="px-1.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-800 hover:bg-rose-500/20 text-slate-300 hover:text-rose-300 border border-slate-700 transition cursor-pointer"
+                                        title="รีเซ็ต 2FA"
                                       >
-                                        {resettingUser === u.loginname ? (
-                                          <Loader2 className="size-3 animate-spin" />
-                                        ) : (
-                                          <RotateCcw className="size-3" />
-                                        )}
-                                        <span>รีเซ็ต 2FA</span>
+                                        {resettingUser === u.loginname ? <Loader2 className="size-2.5 animate-spin" /> : <RotateCcw className="size-2.5" />}
                                       </button>
                                     )}
 
@@ -1769,24 +2292,31 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                         type="button"
                                         disabled={resettingPinUser === u.loginname}
                                         onClick={() => handleResetUserPin(u.loginname)}
-                                        className="px-2.5 py-1 rounded-lg text-[11px] font-medium bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/25 transition cursor-pointer flex items-center gap-1 whitespace-nowrap"
-                                        title="รีเซ็ต PIN เมื่อลืมรหัส"
+                                        className="px-1.5 py-1 rounded-md text-[10.5px] font-medium bg-slate-800 hover:bg-amber-500/20 text-slate-300 hover:text-amber-300 border border-slate-700 transition cursor-pointer"
+                                        title="รีเซ็ต PIN"
                                       >
-                                        {resettingPinUser === u.loginname ? (
-                                          <Loader2 className="size-3 animate-spin" />
-                                        ) : (
-                                          <KeyRound className="size-3" />
-                                        )}
-                                        <span>รีเซ็ต PIN</span>
+                                        {resettingPinUser === u.loginname ? <Loader2 className="size-2.5 animate-spin" /> : <KeyRound className="size-2.5" />}
                                       </button>
                                     )}
-                                </div>
-                              </td>
-                            </tr>
-                          ))
+                                  </div>
+                                </td>
+                              </tr>
+                            )
+                          })
                         )}
                       </tbody>
                     </table>
+                  </div>
+
+                  {/* Table Footer Status */}
+                  <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-t border-slate-800 text-[11px] text-slate-400">
+                    <div>
+                      แสดงทั้งหมด <span className="font-semibold text-emerald-400">{filteredUsers.length.toLocaleString()}</span> คน
+                      {roleFilter !== 'all' && <span className="text-slate-400"> (ตามหมวดหมู่ที่เลือก)</span>}
+                    </div>
+                    <div className="text-[11px] text-slate-400">
+                      หมุนลูกกลิ้งเมาส์ (Scroll) เพื่อเลื่อนดูรายชื่อทั้งหมด
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1797,6 +2327,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           {/* TAB 4: ADMIN SYSTEM & VERSION MANAGEMENT                  */}
           {/* ========================================================= */}
           {activeTab === 'admin_sso' && isAdmin && <SsoSettingsPanel />}
+          {activeTab === 'admin_menus' && isAdmin && <MenuPermissionsPanel />}
 
           {activeTab === 'admin_system' && isAdmin && (
             <div className="space-y-5">
@@ -1882,7 +2413,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       }}
                       className="px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-violet-600 hover:bg-violet-500 transition cursor-pointer shadow-md shadow-violet-950/40 active:scale-95 flex items-center gap-1.5"
                     >
-                      <Sparkles className="size-3.5 text-violet-200" />
+                      <FileText className="size-3.5 text-violet-200" />
                       <span>ดูบันทึกการอัปเดต (Changelog)</span>
                     </button>
 
@@ -1906,7 +2437,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2.5">
                       <div className="size-8 rounded-lg bg-teal-500/15 border border-teal-500/30 text-teal-400 grid place-items-center">
-                        <Sparkles className="size-4" />
+                        <Bot className="size-4" />
                       </div>
                       <div>
                         <h4 className="text-xs font-bold text-white">Google Gemini AI Auto-Release</h4>
@@ -2047,7 +2578,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 </div>
 
                 {/* Database Metrics Grid */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 pt-1">
                   <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800/80">
                     <div className="text-[10.5px] text-slate-400 font-medium">HOSxP Database</div>
                     <div className="text-xs font-bold text-emerald-400 mt-1 flex items-center gap-1.5">
@@ -2087,8 +2618,10 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           )}
         </div>
 
+        </div>
+
         {/* Footer */}
-        <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800 bg-slate-950 shrink-0 text-xs">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3.5 border-t border-white/[0.06] bg-slate-950 dark:bg-[var(--card-header)] shrink-0 text-sm">
           <div className="text-slate-400 font-normal">
             {activeTab === 'admin_system'
               ? 'SMART-HOSCHECK • HerbDx ระบบบริหารจัดการและควบคุมส่วนกลางสำหรับ Admin'
@@ -2098,8 +2631,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
-            className="px-5 py-2 rounded-xl text-xs font-bold bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 transition cursor-pointer shadow-sm"
+            onClick={handleModalClose}
+            className="shrink-0 px-5 py-2.5 rounded-xl text-sm font-semibold bg-white/[0.06] hover:bg-white/[0.1] text-white border border-white/10 transition cursor-pointer"
           >
             ปิดหน้าต่าง
           </button>
@@ -2115,6 +2648,17 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         }}
         initialFile={cropperFile}
       />
+
+      {/* Modern Professional Confirm Dialog */}
+      {confirmConfig && (
+        <ConfirmModal
+          isOpen={Boolean(confirmConfig)}
+          isLoading={isConfirmLoading}
+          onClose={() => !isConfirmLoading && setConfirmConfig(null)}
+          {...confirmConfig}
+          onConfirm={handleExecuteModalConfirm}
+        />
+      )}
     </div>
   )
 }

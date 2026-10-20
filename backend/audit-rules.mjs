@@ -36,11 +36,13 @@ export function evaluate(row, dxMap, minQtyMap) {
   const hasUDx = uDxList.length > 0
   const modernDxList = unique.filter((dx) => !dx.startsWith('U'))
 
+  const allowed = dxMap ? (dxMap.get(row.drug_icode) ?? []) : []
+
   if (unique.length === 0) {
     return {
       audit_result: 'NO_DX',
       matched_dx: [],
-      allowed_dx: [],
+      allowed_dx: allowed,
       min_qty: minQty,
       is_qty_fail: isQtyFail,
       audit_reason: isQtyFail
@@ -49,7 +51,6 @@ export function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
-  const allowed = dxMap.get(row.drug_icode) ?? []
   if (allowed.length === 0) {
     return {
       audit_result: 'NO_MAP',

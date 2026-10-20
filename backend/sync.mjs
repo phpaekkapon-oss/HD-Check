@@ -50,7 +50,7 @@ const getCodeAt = (field, n) =>
   `IF(IFNULL(${field}, '') <> '' AND LENGTH(${field}) - LENGTH(REPLACE(${field}, ',', '')) >= ${n - 1},
      SUBSTRING_INDEX(SUBSTRING_INDEX(${field}, ',', ${n}), ',', -1), '')`
 
-const ipdDx = (n) => getCodeAt('dgx.codes', n)
+const ipdDx = (n) => getCodeAt("COALESCE(NULLIF(dgx.codes, ''), adx.codes, '')", n)
 const opdDx = (n) => getCodeAt('odx.codes', n)
 
 /** Placeholders: OPD lv (start, end), OPD odx (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD (start, end) */
@@ -144,8 +144,8 @@ export function buildPrescriptionSql(customIcodes = []) {
         op.qty AS drug_qty,
         IFNULL(d.units, '') AS drug_units,
         CONCAT('IPD: ', IFNULL(w.name, 'หอผู้ป่วยใน')) AS department_name,
-        IFNULL(id1.icd10, '') AS main_pdx,
-        IFNULL(id1.icd10, '') AS pdx,
+        IFNULL(NULLIF(TRIM(id1.icd10), ''), IFNULL(ad1.icd10, '')) AS main_pdx,
+        IFNULL(NULLIF(TRIM(id1.icd10), ''), IFNULL(ad1.icd10, '')) AS pdx,
         ${ipdDx(1)} AS dx0,
         ${ipdDx(2)} AS dx1,
         ${ipdDx(3)} AS dx2,
@@ -155,8 +155,8 @@ export function buildPrescriptionSql(customIcodes = []) {
         IFNULL(op.doctor, IFNULL(i.admdoctor, '')) AS doctor_code,
         IFNULL(doc.name, 'แพทย์ประจำหอผู้ป่วย') AS doctor_name,
         CASE
-            WHEN id1.icd10 IS NULL OR TRIM(id1.icd10) = '' THEN 'INCOMPLETE'
-            WHEN (id1.icd10 LIKE 'U%' OR CONCAT(',', IFNULL(dgx.codes, '')) LIKE '%,U%') THEN 'COMPLETE'
+            WHEN COALESCE(NULLIF(TRIM(id1.icd10), ''), ad1.icd10) IS NULL OR TRIM(COALESCE(NULLIF(TRIM(id1.icd10), ''), ad1.icd10)) = '' THEN 'INCOMPLETE'
+            WHEN (COALESCE(NULLIF(TRIM(id1.icd10), ''), ad1.icd10) LIKE 'U%' OR CONCAT(',', IFNULL(COALESCE(NULLIF(dgx.codes, ''), adx.codes), '')) LIKE '%,U%') THEN 'COMPLETE'
             ELSE 'INCOMPLETE'
         END AS audit_status
     FROM opitemrece op
@@ -167,6 +167,8 @@ export function buildPrescriptionSql(customIcodes = []) {
     LEFT JOIN pttype ps ON i.pttype = ps.pttype
     LEFT JOIN doctor doc ON IFNULL(op.doctor, i.admdoctor) = doc.code
     LEFT JOIN iptdiag id1 ON op.an = id1.an AND id1.diagtype = '1'
+    -- รหัสแรกรับตอนรับตัวเข้านอน รพ. จาก OPD/ER (เผื่อเคสที่ยังนอนรักษาตัวอยู่ หรือชาร์ตยังไม่สรุป)
+    LEFT JOIN ovstdiag ad1 ON ad1.vn = i.vn AND ad1.diagtype = '1'
     -- รหัสวินิจฉัยรองทั้งหมดของ AN: diagtype 2 มีได้หลายแถว ต้องรวมทุกแถว (JOIN ทีละ diagtype เก็บได้แค่แถวเดียว)
     LEFT JOIN (
       SELECT dg.an, GROUP_CONCAT(DISTINCT dg.icd10 ORDER BY dg.diagtype, dg.icd10 SEPARATOR ',') AS codes
@@ -175,6 +177,14 @@ export function buildPrescriptionSql(customIcodes = []) {
         AND dg.an IN (SELECT o2.an FROM opitemrece o2 WHERE o2.vstdate BETWEEN ? AND ? AND o2.an IS NOT NULL AND o2.an <> '')
       GROUP BY dg.an
     ) dgx ON op.an = dgx.an
+    -- รหัสวินิจฉัยรองแรกรับจาก OPD/ER
+    LEFT JOIN (
+      SELECT od2.vn, GROUP_CONCAT(DISTINCT od2.icd10 ORDER BY (od2.icd10 LIKE 'U%') ASC, od2.diagtype, od2.icd10 SEPARATOR ',') AS codes
+      FROM ovstdiag od2
+      WHERE od2.diagtype <> '1' AND od2.icd10 IS NOT NULL AND od2.icd10 <> ''
+        AND od2.vn IN (SELECT i2.vn FROM ipt i2 WHERE i2.an IN (SELECT o2.an FROM opitemrece o2 WHERE o2.vstdate BETWEEN ? AND ? AND o2.an IS NOT NULL AND o2.an <> ''))
+      GROUP BY od2.vn
+    ) adx ON adx.vn = i.vn
     WHERE op.vstdate BETWEEN ? AND ?
       AND (op.an IS NOT NULL AND op.an <> '')
       AND ${filter}
@@ -260,6 +270,7 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
       startDate, endDate, // OPD plv: latest visit in period
       startDate, endDate, // OPD main: vstdate
       startDate, endDate, // IPD dgx: iptdiag secondary codes
+      startDate, endDate, // IPD adx: ovstdiag secondary admitting codes
       startDate, endDate, // IPD main: vstdate
     ]
     const [presc] = await hos.query(prescSql, prescParams)

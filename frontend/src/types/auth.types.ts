@@ -44,6 +44,8 @@ export interface User2FAAdminItem {
   readonly user_type: string
   readonly account_disable: boolean
   readonly admin_enabled: boolean
+  readonly role_override?: string | null
+  readonly effective_role?: 'it' | 'thaimed' | 'doctor' | 'pharmacist' | 'general'
   readonly two_factor_enabled: boolean
   readonly has_pin?: boolean
   readonly pin_enabled?: boolean
@@ -64,15 +66,12 @@ export function isAdminUser(user?: Partial<User> | null): boolean {
   const group = (user.groupname || '').toLowerCase()
   const pos = (user.position || user.entryposition || '').toLowerCase()
 
-  // Named admin logins
-  if (user.admin_enabled === true) return true
-  if (login === 'admin' || login === 'adminpk' || login === 'aekkapon') return true
-
-  // HOSxP admin groups
-  if (group.includes('admin') || group.includes('administrator') || group.includes('ผู้ดูแลระบบ') || group.includes('it')) return true
-
-  // IT & Computer positions
-  if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('it') || pos.includes('โปรแกรมเมอร์')) return true
+  // ผู้ดูแลระบบ HD-Check = งาน IT เท่านั้น (ต้องตรงกับ isAdminUser ใน backend/index.mjs)
+  // ไม่นับกลุ่ม HOSxP "ผู้ดูแลระบบ_ระดับที่_2/3" และไม่จับคำว่า "it" ในชื่อกลุ่ม/ตำแหน่ง
+  if (user.admin_enabled === true || Number(user.admin_enabled) === 1) return true
+  if (login === 'aekkapon') return true
+  if (group === 'admin' || group === 'administrator') return true
+  if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('โปรแกรมเมอร์')) return true
 
   return false
 }

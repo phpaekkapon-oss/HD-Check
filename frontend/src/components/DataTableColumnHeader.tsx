@@ -33,7 +33,7 @@ export function DataTableColumnHeader<TData, TValue>({
       ) : isSorted === 'asc' ? (
         <ArrowUp className="size-3.5 text-accent" />
       ) : (
-        <ArrowUpDown className="size-3 text-slate-400 dark:text-slate-500 group-hover:text-slate-600 dark:group-hover:text-slate-300 opacity-60 group-hover:opacity-100" />
+        <ArrowUpDown className="size-3 text-slate-400 dark:text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300 opacity-60 group-hover:opacity-100" />
       )}
     </div>
   )

@@ -18,7 +18,7 @@ interface AuthContextType {
     tempToken?: string
   ) => Promise<{ success: boolean; backupCodes?: string[]; error?: string }>
   readonly disable2FA: (loginname: string) => Promise<{ success: boolean; error?: string }>
-  readonly logout: () => void
+  readonly logout: (reason?: string) => void
   readonly updateUser: (u: User) => void
   readonly uploadAvatar: (base64Image: string, mimeType?: string) => Promise<{ success: boolean; avatarUrl?: string; error?: string }>
   readonly deleteAvatar: () => Promise<{ success: boolean; error?: string }>
@@ -39,11 +39,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem(STORAGE_KEY_TOKEN)
     localStorage.removeItem(STORAGE_KEY_USER)
     fetch('/api/auth/me', { credentials: 'same-origin' })
-      .then((res) => res.ok ? res.json() : null)
+      .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.success && data.user) {
           setUser(data.user)
           setServerLocked(Boolean(data.locked))
+          if (data.locked && data.lockedAt) {
+            try {
+              sessionStorage.setItem('smarthoscheck_locked_at', String(data.lockedAt))
+            } catch {}
+          }
+        } else if (data?.forceLogout) {
+          setUser(null)
+          if (data.error) {
+            try {
+              sessionStorage.setItem('smarthoscheck_logout_reason', data.error)
+            } catch {}
+          }
         }
       })
       .catch(() => {})
@@ -192,7 +204,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }
 
-  const logout = () => {
+  const logout = (reason?: string) => {
+    if (reason) {
+      try {
+        sessionStorage.setItem('smarthoscheck_logout_reason', reason)
+      } catch {}
+    }
     fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin' }).catch(() => {})
     setUser(null)
     localStorage.removeItem(STORAGE_KEY_USER)

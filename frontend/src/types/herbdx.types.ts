@@ -82,6 +82,20 @@ export interface AuditKpiMetrics {
   readonly uniquePatients: number
 }
 
+export type UserRoleId = 'it' | 'thaimed' | 'doctor' | 'pharmacist' | 'general'
+export type MenuPermissionMatrix = Record<string, Record<string, boolean>>
+
+/** สิทธิ์เมนูจาก /api/permissions/menus (roles/menus/permissions ส่งมาเฉพาะ IT) */
+export interface MenuPermissionsResponse {
+  readonly success: true
+  readonly myRole: UserRoleId
+  readonly myMenus: readonly ActivePage[]
+  readonly roles?: readonly { readonly id: string; readonly label: string; readonly desc: string }[]
+  readonly menus?: readonly { readonly id: ActivePage; readonly label: string }[]
+  readonly alwaysAllowed?: readonly ActivePage[]
+  readonly permissions?: MenuPermissionMatrix
+}
+
 /** ผลวิเคราะห์รายการจ่ายยาจาก /api/audit/advice (rule-based) */
 export interface HerbAuditAnalysis {
   readonly summary: string
@@ -142,6 +156,14 @@ export interface DxMapRecord {
   readonly dispensing_pttype_label?: string | null
   readonly dispensing_pttype_filter?: string | null
   readonly dispensing_is_active?: boolean | null
+}
+
+export interface DxMapBatchItem {
+  readonly icode: string
+  readonly drug_name?: string
+  readonly dx_prefixes: string
+  readonly indication?: string
+  readonly mergeWithExisting?: boolean
 }
 
 export interface DxMapUpdate {
@@ -205,7 +227,57 @@ export interface SyncResult extends DateRange {
   readonly timestamp: string
 }
 
-export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
+export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'claims' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'sql'
+
+/** ตรวจการเบิก สปสช. (/api/claims/check) */
+export type ClaimState = 'not_nhso' | 'no_result' | 'pending' | 'settled' | 'rejected'
+export interface ClaimIcdIssue {
+  readonly code: string
+  readonly level: 'error' | 'warn'
+  readonly dx?: string
+  readonly text: string
+  readonly hint: string
+}
+export interface ClaimVisit {
+  readonly vn: string
+  readonly hn: string
+  readonly visit_date: string
+  readonly visit_time: string | null
+  readonly patient_name: string
+  readonly pttype_name: string | null
+  readonly hip: string | null
+  readonly doctor_name: string | null
+  readonly pdx: string | null
+  readonly dx0: string | null
+  readonly dx1: string | null
+  readonly dx2: string | null
+  readonly dx3: string | null
+  readonly dx4: string | null
+  readonly dx5: string | null
+  readonly fdh_status: string | null
+  readonly fdh_status_th: string | null
+  readonly fdh_amount: number | null
+  readonly fdh_stm_period: string | null
+  readonly fdh_checked_at: string | null
+  readonly fdh_errors: readonly { readonly code: string; readonly text: string }[]
+  readonly icd_issues: readonly ClaimIcdIssue[]
+  readonly claim_state: ClaimState
+}
+export interface ClaimCheckResponse {
+  readonly success: true
+  readonly data: readonly ClaimVisit[]
+  readonly kpi: {
+    readonly visits: number
+    readonly ucVisits: number
+    readonly icdIssueVisits: number
+    readonly noResult: number
+    readonly pending: number
+    readonly settled: number
+    readonly rejected: number
+    readonly settledAmount: number
+  }
+  readonly meta: DateRange & { readonly fdhLastChecked: string | null }
+}
 
 export interface HealthMedOperationItem {
   readonly code: string

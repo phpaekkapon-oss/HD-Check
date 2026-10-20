@@ -15,11 +15,15 @@ import {
   Cpu,
   ExternalLink,
   Activity,
+  BadgeCheck,
+  ChevronRight,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
 import { useAuth } from '@/context/AuthContext'
 import { Security2FASettingsModal } from '@/components/Security2FASettingsModal'
+import { SystemOverview } from '@/components/SystemOverview'
+import { useMenuPermissions } from '@/hooks/useHerbDx'
 import { isAdminUser } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 
@@ -29,18 +33,28 @@ export interface NavItem {
   readonly shortLabel?: string
   readonly hint: string
   readonly icon: typeof Pill
+  /** เมนูเฉพาะผู้ดูแลระบบ (เช่น SQL ที่เปิดเผยชื่อตารางฐานข้อมูล) */
+  readonly adminOnly?: boolean
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
-  { id: 'dashboard', label: 'หน้าแรก / ภาพรวมระบบ', shortLabel: 'หน้าแรก', hint: 'สรุปภาพรวมและตัวชี้วัด', icon: LayoutDashboard },
+  { id: 'dashboard', label: 'หน้าแรก', shortLabel: 'หน้าแรก', hint: 'สรุปภาพรวมและตัวชี้วัด', icon: LayoutDashboard },
   { id: 'audit', label: 'ตรวจสอบการจ่ายยาสมุนไพร', shortLabel: 'ตรวจสอบยา', hint: 'ยา + DX ตรงข้อบ่งใช้', icon: ClipboardCheck },
   { id: 'healthmed', label: 'ตรวจหัตถการแผนไทย', shortLabel: 'ตรวจหัตถการ', hint: 'นวด/ประคบ/ซ้ำ/หลังคลอด', icon: Activity },
+  { id: 'claims', label: 'ตรวจการเบิก สปสช.', shortLabel: 'การเบิก สปสช.', hint: 'รหัสก่อนเบิก + ผลเบิกจาก FDH', icon: BadgeCheck },
   { id: 'drugs', label: 'รายการจ่ายยาสมุนไพร', shortLabel: 'รายการจ่ายยา', hint: 'OPD / IPD / ต้นทุน', icon: Pill },
   { id: 'mapping', label: 'ตรวจรหัสยาและ ICD-10', shortLabel: 'ตรวจรหัส', hint: 'รหัสว่าง / เกณฑ์ไม่ครบ', icon: ScanSearch },
-  { id: 'dxwriteback', label: 'ทบทวน DX รายครั้งรับบริการ', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },
+  { id: 'dxwriteback', label: 'ทบทวนรหัสโรค (DX)', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },
   { id: 'dxmap', label: 'ตั้งค่ายา ↔ ICD-10', shortLabel: 'เกณฑ์ ICD-10', hint: 'เกณฑ์การตรวจสอบ', icon: Settings2 },
-  { id: 'sql', label: 'SQL Query', shortLabel: 'SQL Query', hint: 'คำสั่งต้นฉบับ', icon: TerminalSquare },
+  { id: 'sql', label: 'SQL Query', shortLabel: 'SQL Query', hint: 'คำสั่งต้นฉบับ (เฉพาะผู้ดูแลระบบ)', icon: TerminalSquare, adminOnly: true },
 ]
+
+/**
+ * เมนูที่ผู้ใช้คนนี้เห็นได้: ตามสิทธิ์ที่ IT ตั้งไว้ (allowed จาก /api/permissions/menus)
+ * ระหว่างโหลดสิทธิ์ใช้กฎเดิม (ซ่อนเมนู adminOnly จากผู้ที่ไม่ใช่ IT)
+ */
+export const visibleNavItems = (isAdmin: boolean, allowed?: readonly string[]): readonly NavItem[] =>
+  NAV_ITEMS.filter((n) => (allowed ? allowed.includes(n.id) : !n.adminOnly || isAdmin))
 
 interface SidebarProps {
   readonly active: ActivePage
@@ -53,6 +67,10 @@ interface SidebarProps {
   readonly onMobileClose?: () => void
   readonly onOpenChangelog?: () => void
 }
+
+const SYSTEM_ITEM =
+  'group w-full flex items-center rounded-xl transition cursor-pointer text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]'
+const SYSTEM_ICON = 'size-4.5 shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200'
 
 export const Sidebar: FC<SidebarProps> = ({
   active,
@@ -68,8 +86,28 @@ export const Sidebar: FC<SidebarProps> = ({
   const { accent, mode } = useTheme()
   const { user } = useAuth()
   const isAdmin = isAdminUser(user)
-  const [securityModalOpen, setSecurityModalOpen] = useState(false)
-  const [securityInitialTab, setSecurityInitialTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system'>('my_profile')
+  const { data: menuPerms } = useMenuPermissions(Boolean(user))
+  const [securityModalOpen, setSecurityModalOpen] = useState(() => {
+    try {
+      return sessionStorage.getItem('hd_check_security_modal_open') === 'true'
+    } catch {
+      return false
+    }
+  })
+  const [securityInitialTab, setSecurityInitialTab] = useState<
+    'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso' | 'admin_menus'
+  >(() => {
+    try {
+      const saved = sessionStorage.getItem('hd_check_security_modal_tab')
+      if (
+        saved &&
+        ['my_profile', 'my_2fa', 'my_pin', 'admin_policy', 'admin_system', 'admin_sso', 'admin_menus'].includes(saved)
+      ) {
+        return saved as any
+      }
+    } catch {}
+    return 'admin_policy'
+  })
   const [aboutModalOpen, setAboutModalOpen] = useState(false)
   // ป้ายชื่อเมนูลอยด้านขวาเมื่อย่อแถบเมนู (แทน title ของเบราว์เซอร์ที่ขึ้นช้าและถูกบัง)
   const [tip, setTip] = useState<{ label: string; hint?: string; top: number; left: number } | null>(null)
@@ -77,6 +115,24 @@ export const Sidebar: FC<SidebarProps> = ({
   useEffect(() => {
     setTip(null)
   }, [collapsed, active])
+
+  // เปิดหน้าต่างเกี่ยวกับระบบ/ผู้พัฒนาจากส่วนอื่น (เช่น ชื่อผู้พัฒนาในแถบสถานะล่าง)
+  useEffect(() => {
+    const open = () => setAboutModalOpen(true)
+    window.addEventListener('open-about-system', open)
+    return () => window.removeEventListener('open-about-system', open)
+  }, [])
+
+  // เปิดหน้าต่างความปลอดภัย/จัดการระบบจากส่วนอื่น
+  useEffect(() => {
+    const handleOpenSecurity = (e: Event) => {
+      const tab = (e as CustomEvent).detail?.tab || 'my_profile'
+      setSecurityInitialTab(tab)
+      setSecurityModalOpen(true)
+    }
+    window.addEventListener('open-security-modal', handleOpenSecurity)
+    return () => window.removeEventListener('open-security-modal', handleOpenSecurity)
+  }, [])
 
   const tipProps = (isCollapsedView: boolean, label: string, hint?: string) => {
     if (!isCollapsedView) return {}
@@ -118,13 +174,13 @@ export const Sidebar: FC<SidebarProps> = ({
           {!isCollapsedView && (
             <div className="leading-tight min-w-0 animate-fade-in">
               <div
-                className="text-[9.5px] uppercase font-bold font-mono tracking-wider transition-colors"
+                className="text-xs uppercase font-bold font-mono tracking-wider transition-colors"
                 style={{ color: mode === 'dark' ? accent.darkText : accent.hex }}
               >
                 HOSxP HERB-CHECK
               </div>
               <div className="font-extrabold text-slate-900 dark:text-white tracking-tight text-sm truncate">SMART-HOSCHECK</div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 font-medium truncate">แพทย์แผนไทย • รพ.พังโคน</div>
+              <div className="text-xs text-slate-500 dark:text-slate-400 font-medium truncate">แพทย์แผนไทย • รพ.พังโคน</div>
             </div>
           )}
         </div>
@@ -145,7 +201,7 @@ export const Sidebar: FC<SidebarProps> = ({
               type="button"
               onClick={onToggleCollapse}
               className="p-1.5 rounded-lg text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
-              title="ย่อแถบเมนู (Collapse Sidebar)"
+              title="ย่อแถบเมนู"
             >
               <PanelLeftClose className="size-4" />
             </button>
@@ -156,7 +212,7 @@ export const Sidebar: FC<SidebarProps> = ({
       {/* Navigation List */}
       <nav className="flex-1 p-2.5 space-y-1.5 overflow-y-auto scrollbar-none">
         {!isCollapsedView && (
-          <div className="px-2.5 pt-2 pb-1 text-[11px] font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+          <div className="px-2.5 pt-2 pb-1 text-xs font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
             <span
               className="size-1 rounded-full"
               style={{ backgroundColor: mode === 'dark' ? accent.darkText : accent.hex }}
@@ -165,7 +221,7 @@ export const Sidebar: FC<SidebarProps> = ({
           </div>
         )}
 
-        {NAV_ITEMS.map(({ id, label, hint, icon: Icon }) => {
+        {visibleNavItems(isAdmin, menuPerms?.myMenus).map(({ id, label, hint, icon: Icon }) => {
           const isActive = active === id
           return (
             <button
@@ -241,8 +297,11 @@ export const Sidebar: FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Settings Action */}
-      <div className="p-2.5 border-t border-slate-200 dark:border-white/10 space-y-1.5">
+      {/* System actions */}
+      <div className="p-2.5 border-t border-slate-200 dark:border-white/10 space-y-1">
+        {!isCollapsedView && (
+          <div className="px-3 pb-1 pt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">ระบบ</div>
+        )}
         <button
           type="button"
           onClick={() => {
@@ -250,16 +309,13 @@ export const Sidebar: FC<SidebarProps> = ({
             if (isMobileView && onMobileClose) onMobileClose()
           }}
           {...tipProps(isCollapsedView, 'การตั้งค่า', 'ตั้งค่ายาสมุนไพร ↔ ICD-10')}
-          className={cn(
-            'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
-            isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
-          )}
+          className={cn(SYSTEM_ITEM, isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 min-h-10')}
         >
-          <Settings2 className="size-4.5 shrink-0 text-slate-500 dark:text-slate-400 group-hover:text-slate-800 dark:group-hover:text-slate-200 transition-transform group-hover:rotate-45" />
-          {!isCollapsedView && <span className="text-xs font-medium truncate">การตั้งค่า</span>}
+          <Settings2 className={cn(SYSTEM_ICON, 'transition-transform group-hover:rotate-45')} />
+          {!isCollapsedView && <span className="text-sm font-medium truncate">การตั้งค่า</span>}
         </button>
 
-        {/* 2FA Security Action (Visible to Admin / IT staff only) */}
+        {/* บัญชีและความปลอดภัย (Admin / IT) */}
         {isAdmin && (
           <button
             type="button"
@@ -269,36 +325,36 @@ export const Sidebar: FC<SidebarProps> = ({
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
-            {...tipProps(isCollapsedView, 'บัญชีผู้ใช้ HOSxP / 2FA & PIN', user?.two_factor_enabled ? '2FA เปิดใช้งาน' : '2FA ปิดอยู่')}
-            className={cn(
-              'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
-              isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
-            )}
+            {...tipProps(isCollapsedView, 'บัญชีและความปลอดภัย', user?.two_factor_enabled ? 'ผู้ใช้ HOSxP · 2FA เปิดใช้งาน' : 'ผู้ใช้ HOSxP · 2FA ปิดอยู่')}
+            className={cn(SYSTEM_ITEM, isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 min-h-10')}
           >
             <div className="relative shrink-0">
-              <ShieldCheck className="size-4.5 text-slate-500 dark:text-slate-400 group-hover:text-emerald-400 transition-colors" />
-              {user?.two_factor_enabled && (
-                <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-emerald-400" />
+              <ShieldCheck className={SYSTEM_ICON} />
+              {isCollapsedView && user?.two_factor_enabled && (
+                <span className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-emerald-400 ring-2 ring-[var(--sidebar-bg)]" />
               )}
             </div>
             {!isCollapsedView && (
-              <div className="flex-1 flex items-center justify-between min-w-0">
-                <span className="text-xs font-medium truncate">บัญชีผู้ใช้ HOSxP / 2FA & PIN</span>
-                {user?.two_factor_enabled ? (
-                  <span className="text-[9.5px] font-mono text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1 rounded">
-                    ON
-                  </span>
-                ) : (
-                  <span className="text-[9.5px] font-mono text-slate-400 bg-white/5 px-1 rounded">
-                    OFF
-                  </span>
-                )}
-              </div>
+              <>
+                <span className="flex-1 min-w-0 text-left text-sm font-medium truncate">ความปลอดภัย</span>
+                <span
+                  className={cn(
+                    'shrink-0 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium',
+                    user?.two_factor_enabled
+                      ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-300'
+                      : 'bg-slate-500/10 text-slate-500 dark:text-slate-400'
+                  )}
+                  title={user?.two_factor_enabled ? 'ยืนยันตัวตน 2 ขั้นตอนเปิดใช้งาน' : 'ยืนยันตัวตน 2 ขั้นตอนปิดอยู่'}
+                >
+                  <span className={cn('size-1.5 rounded-full', user?.two_factor_enabled ? 'bg-emerald-500' : 'bg-slate-400')} />
+                  2FA
+                </span>
+              </>
             )}
           </button>
         )}
 
-        {/* Admin System Management & Version Control Hub */}
+        {/* จัดการระบบ & เวอร์ชัน (Admin) */}
         {isAdmin && (
           <button
             type="button"
@@ -307,68 +363,64 @@ export const Sidebar: FC<SidebarProps> = ({
               setSecurityModalOpen(true)
               if (isMobileView && onMobileClose) onMobileClose()
             }}
-            {...tipProps(isCollapsedView, 'จัดการระบบ & เวอร์ชัน', 'เฉพาะผู้ดูแลระบบ')}
-            className={cn(
-              'group w-full flex items-center rounded-xl transition-all cursor-pointer text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]',
-              isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 py-2'
-            )}
+            {...tipProps(isCollapsedView, 'จัดการระบบ', 'เวอร์ชัน · เซิร์ฟเวอร์ · เฉพาะผู้ดูแลระบบ')}
+            className={cn(SYSTEM_ITEM, isCollapsedView ? 'justify-center p-2.5' : 'gap-3 px-3 min-h-10')}
           >
-            <div className="relative shrink-0">
-              <Cpu className="size-4.5 text-slate-500 dark:text-slate-400 group-hover:text-violet-400 transition-colors" />
-              <span className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-violet-400 animate-pulse" />
-            </div>
+            <Cpu className={SYSTEM_ICON} />
             {!isCollapsedView && (
-              <div className="flex-1 flex items-center justify-between min-w-0">
-                <span className="text-xs font-medium truncate">จัดการระบบ & เวอร์ชัน</span>
-                <span className="text-[9px] font-mono font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-1 py-0.2 rounded">
-                  ADMIN
-                </span>
-              </div>
+              <>
+                <span className="flex-1 min-w-0 text-left text-sm font-medium truncate">จัดการระบบ</span>
+                <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 text-[11px] font-medium text-accent">ผู้ดูแล</span>
+              </>
             )}
           </button>
         )}
       </div>
 
-      {/* Hospital Footer Branding (Standard Clean Enterprise Card) */}
-      <div className="p-2 border-t border-slate-200 dark:border-white/10 bg-slate-50/50 dark:bg-white/[0.02]">
+      {/* Hospital / about */}
+      <div className="p-2.5 border-t border-slate-200 dark:border-white/10">
         <button
           type="button"
           onClick={() => setAboutModalOpen(true)}
           className={cn(
-            'w-full flex items-center rounded-xl p-2 text-left hover:bg-slate-100 dark:hover:bg-white/5 transition-all cursor-pointer group',
-            isCollapsedView ? 'justify-center' : 'gap-2.5'
+            'group w-full flex items-center rounded-xl p-2 text-left transition hover:bg-slate-100/70 dark:hover:bg-white/[0.05] cursor-pointer',
+            isCollapsedView ? 'justify-center' : 'gap-3'
           )}
-          title={isCollapsedView ? undefined : 'ข้อมูลโรงพยาบาลและผู้พัฒนาระบบ (คลิกเพื่อดูรายละเอียด)'}
-          {...tipProps(isCollapsedView, 'โรงพยาบาลพังโคน', `เกี่ยวกับระบบ • v${__APP_VERSION__}`)}
+          {...tipProps(isCollapsedView, 'โรงพยาบาลพังโคน', `เกี่ยวกับระบบ · v${__APP_VERSION__}`)}
         >
-          <div className="size-8 rounded-lg bg-teal-500/10 border border-teal-500/20 text-teal-600 dark:text-teal-400 grid place-items-center shrink-0 group-hover:scale-105 transition-transform">
-            <Building2 className="size-4" />
+          <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
+            <Building2 className="size-4.5" />
           </div>
           {!isCollapsedView && (
             <div className="min-w-0 flex-1 leading-tight">
-              <div className="flex items-center justify-between gap-1">
-                <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
-                  โรงพยาบาลพังโคน
-                </span>
-                <button
-                  type="button"
+              <div className="truncate text-sm font-semibold text-slate-900 dark:text-white">โรงพยาบาลพังโคน</div>
+              <div className="mt-0.5 flex items-center gap-1.5 text-xs text-slate-500 dark:text-slate-400">
+                <span className="whitespace-nowrap">แพทย์แผนไทย</span>
+                <span aria-hidden className="text-slate-300 dark:text-white/20">·</span>
+                <span
+                  role="button"
+                  tabIndex={0}
                   onClick={(e) => {
                     e.stopPropagation()
                     onOpenChangelog?.()
                   }}
-                  className="text-[11px] font-mono font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 hover:bg-teal-500/20 px-1.5 py-0.5 rounded transition cursor-pointer shrink-0"
-                  title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      onOpenChangelog?.()
+                    }
+                  }}
+                  className="shrink-0 tabular-nums hover:text-accent hover:underline"
+                  title="ดูบันทึกการอัปเดตเวอร์ชัน"
                 >
                   v{__APP_VERSION__}
-                </button>
-              </div>
-              <div className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate mt-0.5 flex items-center justify-between">
-                <span>แพทย์แผนไทย</span>
-                <span className="text-[11px] text-teal-600 dark:text-teal-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                  เกี่ยวกับระบบ →
                 </span>
               </div>
             </div>
+          )}
+          {!isCollapsedView && (
+            <ChevronRight aria-hidden className="size-4 shrink-0 text-slate-400 opacity-60 transition group-hover:translate-x-0.5 group-hover:opacity-100" />
           )}
         </button>
       </div>
@@ -422,7 +474,7 @@ export const Sidebar: FC<SidebarProps> = ({
           onClick={() => setAboutModalOpen(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/15 p-5 shadow-2xl space-y-4 animate-scale-in text-slate-800 dark:text-slate-100"
+            className="w-full max-w-2xl max-h-[90dvh] overflow-y-auto rounded-2xl bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-white/15 p-5 sm:p-6 shadow-2xl space-y-4 animate-scale-in text-slate-800 dark:text-slate-100"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
@@ -434,7 +486,7 @@ export const Sidebar: FC<SidebarProps> = ({
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     โรงพยาบาลพังโคน
                   </h3>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     กลุ่มงานการแพทย์แผนไทยและการแพทย์ทางเลือก
                   </p>
                 </div>
@@ -465,10 +517,10 @@ export const Sidebar: FC<SidebarProps> = ({
                     title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
                   >
                     <span>v{__APP_VERSION__}</span>
-                    <span className="text-[11px] font-sans font-normal">(ดูอัปเดต)</span>
+                    <span className="text-xs font-sans font-normal">(ดูอัปเดต)</span>
                   </button>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                   ระบบตรวจสอบเวชระเบียนการสั่งใช้ยาสมุนไพรตามเงื่อนไขข้อบ่งใช้ ICD-10 / ICD-10-TM
                 </p>
               </div>
@@ -476,11 +528,11 @@ export const Sidebar: FC<SidebarProps> = ({
               {/* Developer Profile Card (พร้อมรูปถ่ายข้าราชการจริงและข้อมูลผู้พัฒนา) */}
               <div className="p-4 rounded-2xl bg-gradient-to-br from-slate-50 to-teal-50/50 dark:from-slate-800/80 dark:to-teal-950/20 border border-teal-500/25 dark:border-teal-500/35 space-y-3 shadow-xs">
                 <div className="flex items-center justify-between">
-                  <div className="text-[11px] font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
+                  <div className="text-xs font-bold text-teal-700 dark:text-teal-400 uppercase tracking-wider font-mono flex items-center gap-1.5">
                     <span className="size-1.5 rounded-full bg-teal-500 animate-pulse" />
                     ผู้พัฒนาระบบ & ฝ่ายเทคโนโลยี
                   </div>
-                  <span className="text-[9.5px] font-bold px-1.5 py-0.5 rounded-md bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/25">
+                  <span className="text-xs font-bold px-1.5 py-0.5 rounded-md bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/25">
                     Lead Developer
                   </span>
                 </div>
@@ -506,7 +558,7 @@ export const Sidebar: FC<SidebarProps> = ({
                       เอกพล
                     </div>
                     <span
-                      className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-xs grid place-items-center text-[9px] text-white"
+                      className="absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-emerald-500 border-2 border-white dark:border-slate-900 shadow-xs grid place-items-center text-xs text-white"
                       title="ผู้พัฒนาระบบตัวจริง"
                     >
                       ✓
@@ -520,7 +572,7 @@ export const Sidebar: FC<SidebarProps> = ({
                     <div className="text-teal-700 dark:text-teal-300 font-medium text-[11.5px] truncate">
                       นักวิชาการคอมพิวเตอร์ปฏิบัติการ
                     </div>
-                    <div className="text-slate-500 dark:text-slate-400 text-[11px] truncate">
+                    <div className="text-slate-500 dark:text-slate-400 text-xs truncate">
                       กลุ่มงานสุขภาพดิจิทัล • โทร. 257 IT
                     </div>
                   </div>
@@ -555,14 +607,8 @@ export const Sidebar: FC<SidebarProps> = ({
                 </div>
               </div>
 
-              {/* HOSxP Connection Status */}
-              <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-[11.5px]">
-                <span className="text-slate-500 dark:text-slate-400">การเชื่อมต่อ HOSxP</span>
-                <span className={cn('font-semibold inline-flex items-center gap-1.5', statusError ? 'text-rose-500' : 'text-emerald-600 dark:text-emerald-400')}>
-                  <span className={cn('size-1.5 rounded-full', statusError ? 'bg-rose-500' : status ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400')} />
-                  {statusError ? 'ขาดการเชื่อมต่อ' : status ? 'Online พร้อมใช้งาน' : 'กำลังตรวจสอบ…'}
-                </span>
-              </div>
+              {/* ระบบทำงานอย่างไร (ทุกคน) + รายละเอียดเทคนิค (ผู้ดูแลระบบ) */}
+              <SystemOverview status={status} statusError={statusError} isAdmin={isAdmin} />
             </div>
 
             <div className="pt-1 flex justify-end">

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, type FC } from 'react'
-import { Sparkles, X, ChevronRight, ExternalLink, RefreshCw, Zap } from 'lucide-react'
+import { Tag, X, ChevronRight, ExternalLink, RefreshCw, Zap } from 'lucide-react'
 import changelogData from '@/data/changelog.json'
 
 interface RemoteRelease {
@@ -146,7 +146,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
     <ToastShell autoCloseMs={autoCloseMs} onAutoClose={() => handleDismiss()}>
       <div className={`relative p-3 lg:p-4 rounded-2xl bg-white/95 dark:bg-[#161a2f]/95 backdrop-blur-md border border-teal-500/40 dark:border-teal-500/50 shadow-2xl shadow-teal-500/20 flex ${notesOpen ? 'items-start' : 'items-center'} lg:items-start gap-3`}>
         <div className="size-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center text-white shrink-0 shadow-md shadow-teal-500/25">
-          {isServerUpgradePending ? <Zap className="size-4.5" /> : <Sparkles className="size-4" />}
+          {isServerUpgradePending ? <Zap className="size-4.5" /> : <Tag className="size-4" />}
         </div>
 
         <div className="flex-1 min-w-0">
@@ -154,27 +154,27 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
             <span className="text-xs font-black text-slate-900 dark:text-white">
               {isServerUpgradePending ? 'มีเวอร์ชันใหม่' : 'อัปเดตระบบเรียบร้อย!'}
             </span>
-            <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-teal-500/20 text-teal-600 dark:text-teal-400 font-mono border border-teal-500/30">
+            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-teal-500/20 text-teal-600 dark:text-teal-400 font-mono border border-teal-500/30">
               v{activeVersion}
             </span>
           </div>
 
           {/* Details only on desktop; on phones the toast stays one compact row */}
-          <p className="hidden lg:block text-[11px] text-slate-600 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed">{titleText}</p>
+          <p className="hidden lg:block text-xs text-slate-600 dark:text-slate-300 mt-1 line-clamp-2 leading-relaxed">{titleText}</p>
 
           {isServerUpgradePending && (
             <button
               type="button"
               onClick={() => void toggleNotes()}
               aria-expanded={notesOpen}
-              className="inline-flex items-center gap-1 min-h-8 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
+              className="inline-flex items-center gap-1 min-h-8 text-xs font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
             >
               <span>{notesOpen ? 'ซ่อนรายละเอียด' : 'มีอะไรใหม่?'}</span>
               <ChevronRight className={`size-3 transition-transform ${notesOpen ? 'rotate-90' : ''}`} />
             </button>
           )}
           {isServerUpgradePending && notesOpen && (
-            <div className="mt-1 mb-1 max-h-48 overflow-y-auto rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2.5 text-[11px] text-slate-700 dark:text-slate-200">
+            <div className="mt-1 mb-1 max-h-48 overflow-y-auto rounded-lg bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 p-2.5 text-xs text-slate-700 dark:text-slate-200">
               {remoteNotes === 'loading' || remoteNotes === null ? (
                 <span className="text-slate-500">กำลังโหลด…</span>
               ) : remoteNotes === 'missing' ? (
@@ -215,7 +215,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
               <button
                 type="button"
                 onClick={handleView}
-                className="inline-flex items-center gap-1 min-h-8 px-2 text-[11px] font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
+                className="inline-flex items-center gap-1 min-h-8 px-2 text-xs font-bold text-teal-600 dark:text-teal-400 hover:text-teal-500 cursor-pointer"
               >
                 <span>ดูรายละเอียด</span>
                 <ChevronRight className="size-3" />
@@ -224,7 +224,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
                 href={githubReleaseUrl}
                 target="_blank"
                 rel="noreferrer"
-                className="hidden lg:inline-flex items-center gap-1 text-[11px] text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+                className="hidden lg:inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
               >
                 <span>GitHub Release</span>
                 <ExternalLink className="size-2.5" />

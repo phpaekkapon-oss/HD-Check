@@ -70,7 +70,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                   HN {rec.hn}
                 </span>
                 <CopyButton text={rec.hn} title="คัดลอก HN" iconSize="size-3" />
-                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
+                <span className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                   <Clock className="size-3 text-slate-400" />
                   {toThaiDate(rec.visit_date)} {rec.visit_time.slice(0, 5)}
                 </span>
@@ -78,17 +78,17 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
 
               <div>
                 {isPass && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300">
                     <CheckCircle2 className="size-3 text-emerald-600 dark:text-emerald-400" /> ผ่านเกณฑ์
                   </span>
                 )}
                 {isFail && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 dark:bg-rose-950/40 text-rose-800 dark:text-rose-300">
                     <AlertCircle className="size-3 text-rose-600 dark:text-rose-400" /> ไม่ตรงข้อบ่งใช้
                   </span>
                 )}
                 {isNoDx && (
-                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-200 dark:bg-rose-900/50 text-rose-900 dark:text-rose-200">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-200 dark:bg-rose-900/50 text-rose-900 dark:text-rose-200">
                     <FileQuestion className="size-3 text-rose-700 dark:text-rose-300" /> ไม่มี DX
                   </span>
                 )}
@@ -97,12 +97,12 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                     <button
                       type="button"
                       onClick={() => onConfigureDrug(rec)}
-                      className="inline-flex min-h-9 items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+                      className="inline-flex min-h-9 items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
                     >
                       <Settings2 className="size-3" /> ตั้งค่า
                     </button>
                   ) : (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300">
+                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-950/40 text-amber-800 dark:text-amber-300">
                       <HelpCircle className="size-3 text-amber-600 dark:text-amber-400" /> รอตั้งค่า
                     </span>
                   )
@@ -117,7 +117,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                 <span>{rec.patient_name}</span>
                 <CopyButton text={rec.patient_name} title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3" />
               </div>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 pl-5">{rec.pttype_name}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 pl-5">{rec.pttype_name}</p>
             </div>
 
             {/* Herbal Drug Prescribed */}
@@ -133,7 +133,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                         {rec.drug_name}
                       </span>
                       {rec.drug_units && (
-                        <span className="text-[11px] text-slate-400 dark:text-slate-500 truncate">
+                        <span className="text-xs text-slate-400 dark:text-slate-400 truncate">
                           {rec.drug_units}
                         </span>
                       )}
@@ -151,7 +151,7 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
                       x {rec.drug_qty} {cleanDrugUnit(rec.drug_units)}
                     </span>
                     {isQtyFail && minQty > 0 ? (
-                      <span className="text-[10px] text-rose-600 dark:text-rose-400 font-bold mt-0.5">
+                      <span className="text-xs text-rose-600 dark:text-rose-400 font-bold mt-0.5">
                         ขั้นต่ำ {minQty} {cleanDrugUnit(rec.drug_units)}
                       </span>
                     ) : null}
@@ -163,19 +163,19 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             {/* Diagnoses are displayed without implying that a code is valid by its prefix alone */}
             <div className="space-y-1 text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
-                <span className="text-[11px] uppercase font-bold text-slate-500 dark:text-slate-400">PDX:</span>
+                <span className="text-xs uppercase font-bold text-slate-500 dark:text-slate-400">PDX:</span>
                 <span className="font-mono px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#101326] font-bold text-slate-800 dark:text-slate-200">
                   {rec.pdx || '-'}
                 </span>
 
-                <span className="text-[11px] uppercase font-bold text-slate-400 ml-1">DX:</span>
+                <span className="text-xs uppercase font-bold text-slate-400 ml-1">DX:</span>
                 {[rec.dx0, rec.dx1, rec.dx2, rec.dx3, rec.dx4, rec.dx5]
                   .filter(Boolean)
                   .map((dx, idx) => (
                     <span
                       key={`${dx}-${idx}`}
                       className={cn(
-                        'font-mono text-[11px] px-1.5 py-0.5 rounded',
+                        'font-mono text-xs px-1.5 py-0.5 rounded',
                         'bg-slate-100 dark:bg-[#101326] text-slate-600 dark:text-slate-300'
                       )}
                     >
@@ -185,14 +185,14 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
               </div>
 
               {rec.audit_reason && (
-                <div className={cn('text-[11px] pt-1', isPass ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400 font-medium')}>
+                <div className={cn('text-xs pt-1', isPass ? 'text-emerald-700 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400 font-medium')}>
                   {rec.audit_reason}
                 </div>
               )}
             </div>
 
             {/* Department & Doctor */}
-            <div className="pt-2 border-t border-slate-100 dark:border-[#292440] flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+            <div className="pt-2 border-t border-slate-100 dark:border-[#292440] flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
               <span className="truncate max-w-[150px]">{rec.department_name}</span>
               <span className="flex items-center gap-1 font-medium text-slate-700 dark:text-slate-300">
                 <Stethoscope className="size-3 text-slate-400" />

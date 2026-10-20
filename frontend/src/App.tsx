@@ -10,14 +10,33 @@ import { CodeReviewQueue } from '@/components/CodeReviewQueue'
 import { DxWritebackView } from '@/components/DxWritebackView'
 import { SqlInspectorView } from '@/components/SqlInspectorView'
 import { HealthMedAuditView } from '@/components/HealthMedAuditView'
+import { ClaimsCheckView } from '@/components/ClaimsCheckView'
 import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
 import { ExecutiveDashboardView } from '@/components/ExecutiveDashboardView'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
-import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useSyncHerbDx } from '@/hooks/useHerbDx'
+import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useMenuPermissions, useSyncHerbDx } from '@/hooks/useHerbDx'
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange, DrugSummaryRecord, DxMapRecord } from '@/types/herbdx.types'
 import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
-import { canManageHerbDx } from '@/types/auth.types'
+import { canManageHerbDx, isAdminUser } from '@/types/auth.types'
+import { ShieldAlert } from 'lucide-react'
+
+const NoAccessNotice: FC<{ readonly onBack: () => void }> = ({ onBack }) => (
+  <div className="mx-auto mt-10 max-w-md rounded-2xl border border-themed bg-themed-card p-8 text-center">
+    <div className="mx-auto grid size-12 place-items-center rounded-2xl bg-amber-500/15 text-amber-500">
+      <ShieldAlert className="size-6" />
+    </div>
+    <h2 className="mt-4 text-lg font-semibold text-slate-900 dark:text-white">ไม่มีสิทธิ์เข้าถึงหน้านี้</h2>
+    <p className="mt-1.5 text-sm text-slate-500 dark:text-slate-400">กลุ่มผู้ใช้ของคุณยังไม่ได้รับสิทธิ์เมนูนี้ หากต้องใช้งาน กรุณาติดต่อผู้ดูแลระบบ (IT) โทร. 257</p>
+    <button
+      type="button"
+      onClick={onBack}
+      className="mt-5 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold cursor-pointer"
+    >
+      กลับหน้าแรก
+    </button>
+  </div>
+)
 import { PinLockProvider } from '@/context/PinLockContext'
 import { LoginPage } from '@/components/LoginPage'
 import { LockScreenOverlay } from '@/components/LockScreenOverlay'
@@ -32,6 +51,7 @@ const VALID_PAGES: readonly ActivePage[] = [
   'dashboard',
   'audit',
   'healthmed',
+  'claims',
   'drugs',
   'mapping',
   'dxwriteback',
@@ -41,12 +61,17 @@ const VALID_PAGES: readonly ActivePage[] = [
 
 function getInitialPage(): ActivePage {
   if (typeof window === 'undefined') return 'dashboard'
-  // 1. ตรวจสอบจาก URL Hash (เช่น #healthmed)
+  // 1. ตรวจสอบจาก URL Hash (เช่น #healthmed หรือ #/dxmap)
   const hash = window.location.hash.replace(/^#\/?/, '').trim() as ActivePage
   if (VALID_PAGES.includes(hash)) {
     return hash
   }
-  // 2. ตรวจสอบจาก LocalStorage ที่จำไว้ล่าสุด
+  // 2. ตรวจสอบจาก URL Pathname (เช่น /dxmap หรือ //dxmap)
+  const path = (window.location.pathname.replace(/^\/+/, '').split('/')[0] ?? '').trim() as ActivePage
+  if (VALID_PAGES.includes(path)) {
+    return path
+  }
+  // 3. ตรวจสอบจาก LocalStorage ที่จำไว้ล่าสุด
   const saved = localStorage.getItem('hd_check_active_page') as ActivePage
   if (VALID_PAGES.includes(saved)) {
     return saved
@@ -119,7 +144,7 @@ const DashboardView: FC = () => {
     isError: isAuditError,
     error: auditError,
     refetch: refetchAudit,
-  } = useAuditRecords(filterParams)
+  } = useAuditRecords(filterParams, activePage === 'audit')
 
   const filteredAuditData = useMemo<readonly AuditRecord[]>(() => {
     if (!auditResponse?.data) return []
@@ -171,9 +196,20 @@ const DashboardView: FC = () => {
   const dashboardParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'ALL' }
   const { data: dashboardResponse } = useAuditRecords(dashboardParams, activePage === 'dashboard')
 
-  const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'FAIL' }
-  const { data: mismatchResponse, isLoading: isMismatchLoading } = useAuditRecords(mismatchParams)
-  const { data: drugSummaries = NO_DRUGS, isLoading: isDrugsLoading } = useDrugSummaries(range)
+  // หน้าที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (IT ตั้งค่าใน จัดการระบบ > สิทธิ์เมนู) แสดงข้อความแทน แม้พิมพ์ URL ตรง
+  const { data: menuPerms } = useMenuPermissions()
+  const isBlocked = activePage !== 'dashboard' && (menuPerms ? !menuPerms.myMenus.includes(activePage) : activePage === 'sql' && !isAdminUser(user))
+  const shownPage: ActivePage | 'blocked' = isBlocked ? 'blocked' : activePage
+
+  const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'PROBLEM' }
+  const { data: mismatchResponse, isLoading: isMismatchLoading } = useAuditRecords(
+    mismatchParams,
+    activePage === 'mapping' || activePage === 'dxwriteback'
+  )
+  const { data: drugSummaries = NO_DRUGS, isLoading: isDrugsLoading } = useDrugSummaries(
+    range,
+    activePage === 'dashboard' || activePage === 'drugs' || activePage === 'mapping' || activePage === 'audit'
+  )
   const { data: dxMap = NO_DX_MAP, isLoading: isDxMapLoading } = useDxMap()
   const { mutate: triggerSync, isPending: isSyncing, data: syncResult, error: syncErr } = useSyncHerbDx()
 
@@ -267,7 +303,7 @@ const DashboardView: FC = () => {
       syncError={syncErr instanceof Error ? syncErr.message : null}
     >
       {/* Page 0: ภาพรวมระบบ (Executive Dashboard) */}
-      {activePage === 'dashboard' && (
+      {shownPage === 'dashboard' && (
         <ExecutiveDashboardView
           kpi={dashboardResponse?.kpi}
           records={dashboardResponse?.data ?? NO_RECORDS}
@@ -283,7 +319,7 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page 1: ตรวจสอบการจ่ายยาสมุนไพร (Main Audit Screen) */}
-      {activePage === 'audit' && (
+      {shownPage === 'audit' && (
         <>
           {/* Welcome Hospital Hero Banner matching Reference Screenshot */}
           <HospitalHeroBanner
@@ -393,7 +429,7 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page 2: รายการจ่ายยาสมุนไพร & ต้นทุน (Screenshot 1) */}
-      {activePage === 'drugs' && (
+      {shownPage === 'drugs' && (
         <>
           {isDrugsLoading ? (
             <AuditTableSkeleton />
@@ -409,7 +445,7 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page 3: Read-only queue for missing drug codes and ICD rules */}
-      {activePage === 'mapping' && (
+      {shownPage === 'mapping' && (
         <CodeReviewQueue
           drugs={drugSummaries}
           dxMap={dxMap}
@@ -420,7 +456,7 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page: Review a single service encounter before any HOSxP write-back */}
-      {activePage === 'dxwriteback' && (
+      {shownPage === 'dxwriteback' && (
         <DxWritebackView
           records={mismatchResponse?.data ?? NO_RECORDS}
           range={range}
@@ -432,17 +468,20 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page: ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย */}
-      {activePage === 'healthmed' && <HealthMedAuditView range={range} />}
+      {shownPage === 'healthmed' && <HealthMedAuditView range={range} />}
+      {shownPage === 'claims' && <ClaimsCheckView range={range} />}
 
       {/* Page 4: ตั้งค่ายาสมุนไพร ↔ ICD-10 */}
-      {activePage === 'dxmap' && (
+      {shownPage === 'dxmap' && (
         <DxMapSettingsModal
           initialIcode={configureIcode}
         />
       )}
 
       {/* Page 5: SQL Query Inspector */}
-      {activePage === 'sql' && <SqlInspectorView />}
+      {/* เฉพาะผู้ดูแลระบบ: เปิดเผยคำสั่ง SQL และชื่อตารางในฐานข้อมูล HOSxP */}
+      {shownPage === 'sql' && <SqlInspectorView />}
+      {shownPage === 'blocked' && <NoAccessNotice onBack={() => handlePageChange('dashboard')} />}
     </AppLayout>
   )
 }

@@ -19,6 +19,7 @@ import {
   ChevronDown,
   Lock,
   Camera,
+  Tag,
 } from 'lucide-react'
 import type { ActivePage, DbStatus, SyncResult } from '@/types/herbdx.types'
 import { NAV_ITEMS, type NavItem } from '@/components/Sidebar'
@@ -184,6 +185,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   const [avatarModalOpen, setAvatarModalOpen] = useState(false)
   const [securityInitialTab, setSecurityInitialTab] = useState<'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy'>('my_2fa')
 
+  const appVersion = status?.appVersion || (typeof __APP_VERSION__ !== 'undefined' ? __APP_VERSION__ : '1.1.45')
+  const cleanVersion = appVersion.replace(/^v/, '')
+
   return (
     <header className="sticky top-0 z-30 bg-themed-header text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#30364b] select-none shadow-sm dark:shadow-md transition-colors">
       <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 min-h-16 py-2">
@@ -195,7 +199,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               type="button"
               onClick={onToggleCollapse}
               className="hidden lg:flex p-2 rounded-xl text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition cursor-pointer"
-              title="ขยายเมนู (Expand)"
+              title="ขยายเมนู"
             >
               <PanelLeft className="size-5" />
             </button>
@@ -217,18 +221,10 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white tracking-tight truncate">
                 {current?.label}
               </h1>
-              <span className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-[11px] font-medium font-sans">
+              <span className="hidden sm:inline-flex lg:hidden items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 text-xs font-medium font-sans">
                 <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
                 HOSxP Online
               </span>
-              <button
-                type="button"
-                onClick={onOpenChangelog}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-violet-500/15 hover:bg-violet-500/25 text-violet-700 dark:text-violet-300 border border-violet-500/30 text-[11px] font-mono font-bold transition-all active:scale-95 cursor-pointer shadow-xs"
-                title="เวอร์ชันระบบปัจจุบัน — คลิกเพื่อดูประวัติการอัปเดต (Changelog)"
-              >
-                <span>v{__APP_VERSION__}</span>
-              </button>
             </div>
 
             {/* Clean Metadata Line (แทนที่กล่องป้ายซ้อนทับกันหลายชิ้นแบบเดิม) */}
@@ -242,17 +238,17 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   <span className="hidden sm:inline text-slate-500 dark:text-slate-400">
                     ซิงก์ล่าสุด: {toThaiDate(last.start_date)} – {toThaiDate(last.end_date)}
                   </span>
-                  <span className="hidden sm:inline text-slate-300 dark:text-slate-600 select-none">•</span>
+                  <span className="hidden sm:inline text-slate-300 dark:text-slate-400 select-none">•</span>
                   <span className="text-slate-600 dark:text-slate-300">
                     สะสมในระบบ <strong className="text-slate-800 dark:text-slate-100 font-bold"><AnimatedNumber value={status?.totalPrescriptions ?? 0} /></strong> รายการ
                   </span>
-                  <span className="text-slate-300 dark:text-slate-600 select-none hidden md:inline">•</span>
+                  <span className="text-slate-300 dark:text-slate-400 select-none hidden md:inline">•</span>
                   <span className={`font-medium hidden md:inline ${status?.syncEnabled === false || !status?.autoSyncMinutes ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
                     {status?.syncEnabled === false
                       ? 'โหมดดูข้อมูล · ปิดซิงก์'
                       : status?.autoSyncMinutes
-                        ? `Auto-Sync ทุก ${status.autoSyncMinutes} นาที`
-                        : 'ปิด Auto-Sync · ซิงค์เอง'}
+                        ? `ดึงข้อมูลอัตโนมัติทุก ${status.autoSyncMinutes} นาที`
+                        : 'ดึงข้อมูลด้วยตนเอง'}
                   </span>
                   {last.message?.startsWith('Preserved ') && (
                     <span className="text-amber-600 dark:text-amber-400 font-medium" title={last.message}>
@@ -275,6 +271,20 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
             <span className="font-medium tracking-wide">{liveDateTimeStr}</span>
             <span className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-xs shadow-emerald-400" />
           </div>
+
+          {/* Version Badge Pill (Click to open changelog) */}
+          {onOpenChangelog && (
+            <button
+              type="button"
+              onClick={onOpenChangelog}
+              className="hidden lg:inline-flex items-center gap-1.5 h-9 px-3 rounded-xl bg-slate-100 dark:bg-white/5 hover:bg-slate-200 dark:hover:bg-white/10 border border-slate-200 dark:border-white/10 text-xs font-mono text-slate-700 dark:text-slate-300 hover:text-accent active:scale-95 transition cursor-pointer shrink-0 group shadow-xs"
+              title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชันและความเปลี่ยนแปลง (Changelog)"
+            >
+              <Tag className="size-3.5 text-accent group-hover:rotate-12 transition-transform shrink-0" />
+              <span className="font-bold tracking-wide">v{cleanVersion}</span>
+              <span className="size-1.5 rounded-full bg-emerald-500" />
+            </button>
+          )}
 
           {/* Utility Icon Group (Fullscreen, Theme Toggle, Palette Customizer) */}
           <div className="hidden sm:flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/10">
@@ -427,7 +437,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   {user?.name || 'นายเอกพล อันคำวงค์'}
                 </div>
                 <div
-                  className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate max-w-[170px] mt-0.5"
+                  className="text-xs text-slate-500 dark:text-slate-400 truncate max-w-[170px] mt-0.5"
                   title={user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                 >
                   {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
@@ -462,7 +472,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                           />
                         ) : (
-                          <User className="size-7 text-slate-400 dark:text-slate-500" />
+                          <User className="size-7 text-slate-400 dark:text-slate-400" />
                         )}
                         <div className="absolute inset-0 bg-black/45 opacity-0 group-hover:opacity-100 transition-opacity grid place-items-center text-white">
                           <Camera className="size-4.5 drop-shadow" />
@@ -473,12 +483,12 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                           {user?.name || 'ผู้ใช้งาน'}
                         </div>
                         <div
-                          className="text-[11px] text-teal-600 dark:text-teal-300 font-medium truncate mt-0.5"
+                          className="text-xs text-teal-600 dark:text-teal-300 font-medium truncate mt-0.5"
                           title={user?.position || user?.entryposition || ''}
                         >
                           {user?.position || user?.entryposition || user?.groupname || 'เจ้าหน้าที่ HOSxP'}
                         </div>
-                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
+                        <div className="text-xs text-slate-500 dark:text-slate-400 font-mono truncate mt-0.5">
                           @{user?.loginname} {user?.groupname && user?.position && user.position !== user.groupname ? `• สิทธิ์ ${user.groupname}` : ''}
                         </div>
                       </div>
@@ -486,7 +496,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     <div className="flex flex-wrap items-center gap-1.5">
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border',
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border',
                           user?.two_factor_enabled
                             ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30'
                             : 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30'
@@ -498,7 +508,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
                       <span
                         className={cn(
-                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold border',
+                          'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold border',
                           hasPin && pinEnabled
                             ? 'bg-teal-500/15 text-teal-700 dark:text-teal-300 border-teal-500/30'
                             : 'bg-slate-500/15 text-slate-600 dark:text-slate-400 border-slate-500/30'
@@ -530,9 +540,9 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                       <span>{hasPin ? 'ล็อกหน้าจอทันที' : 'ตั้ง PIN เพื่อล็อกหน้าจอ'}</span>
                     </div>
                     {hasPin ? (
-                      <kbd className="px-1.5 py-0.5 rounded bg-white/40 dark:bg-white/10 text-[11px] font-mono text-amber-800 dark:text-amber-200">Ctrl+L</kbd>
+                      <kbd className="px-1.5 py-0.5 rounded bg-white/40 dark:bg-white/10 text-xs font-mono text-amber-800 dark:text-amber-200">Ctrl+L</kbd>
                     ) : (
-                      <span className="text-[11px] px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">เริ่มตั้งค่า</span>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300 font-bold">เริ่มตั้งค่า</span>
                     )}
                   </button>
 
@@ -546,7 +556,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
                   >
                     <Camera className="size-4 text-accent" />
-                    <span>จัดการรูปโปรไฟล์ (Profile Photo)</span>
+                    <span>เปลี่ยนรูปโปรไฟล์</span>
                   </button>
 
                   {!isInstalled && (
@@ -574,7 +584,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                   >
                     <Palette className="size-4" style={{ color: accent.hex }} />
                     <span className="flex-1 text-left">ธีมและสี</span>
-                    <span className="text-[11px] text-slate-500 dark:text-slate-400">{mode === 'dark' ? 'โหมดมืด' : 'โหมดสว่าง'}</span>
+                    <span className="text-xs text-slate-500 dark:text-slate-400">{mode === 'dark' ? 'โหมดมืด' : 'โหมดสว่าง'}</span>
                   </button>
 
                   <button
@@ -587,7 +597,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
                   >
                     <ShieldCheck className="size-4 text-emerald-500 dark:text-emerald-400" />
-                    <span>ตั้งค่าความปลอดภัย (2FA & PIN)</span>
+                    <span>ความปลอดภัย: 2FA และ PIN</span>
                   </button>
 
                   <button
@@ -599,7 +609,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs font-semibold rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-500/15 transition cursor-pointer mt-0.5"
                   >
                     <LogOut className="size-4" />
-                    <span>ออกจากระบบ (Logout)</span>
+                    <span>ออกจากระบบ</span>
                   </button>
                 </div>
               </>

@@ -41,7 +41,7 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
   }[tone]
   return (
     <div className="rounded-lg bg-slate-50 dark:bg-white/5 px-2.5 py-2">
-      <p className="text-[11px] text-slate-500 dark:text-slate-400">{label}</p>
+      <p className="text-xs text-slate-500 dark:text-slate-400">{label}</p>
       <p className={`text-base font-bold tabular-nums ${toneClass}`}>{value.toLocaleString('th-TH')}</p>
     </div>
   )
@@ -227,6 +227,16 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     )
   }, [dxMap, search])
 
+  const [expandedDxRows, setExpandedDxRows] = useState<Set<string>>(new Set())
+  const toggleExpandDx = (icode: string) => {
+    setExpandedDxRows((prev) => {
+      const next = new Set(prev)
+      if (next.has(icode)) next.delete(icode)
+      else next.add(icode)
+      return next
+    })
+  }
+
   const columns = useMemo<ColumnDef<DxMapRecord>[]>(
     () => [
       {
@@ -282,25 +292,50 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                   setPrefixes(e.target.value)
                   setPreview(null)
                 }}
-                placeholder="เช่น M, S หรือ K30, R14"
+                placeholder="เช่น K30, R14, U6680"
                 className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
                 autoFocus
               />
             )
           }
+          const allCodes = item.dx_prefixes
+            ? item.dx_prefixes.split(',').map((p) => p.trim()).filter(Boolean)
+            : []
+          if (allCodes.length === 0) {
+            return <span className="text-rose-500 italic text-xs">ยังไม่กำหนดรหัส</span>
+          }
+          const isExpanded = expandedDxRows.has(item.icode)
+          const MAX_VISIBLE = 5
+          const visibleCodes = isExpanded ? allCodes : allCodes.slice(0, MAX_VISIBLE)
+          const remainingCount = allCodes.length - MAX_VISIBLE
+
           return (
-            <div className="flex flex-wrap gap-1 font-mono">
-              {item.dx_prefixes ? (
-                item.dx_prefixes.split(',').map((p) => (
+            <div className="flex flex-wrap items-center gap-1 font-mono">
+              {visibleCodes.map((p) => {
+                const isU = p.toUpperCase().startsWith('U')
+                return (
                   <span
                     key={p}
-                    className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/30 text-[11px] font-semibold"
+                    className={cn(
+                      'px-1.5 py-0.5 rounded text-xs font-semibold border transition-all',
+                      isU
+                        ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                    )}
                   >
-                    {p.trim()}
+                    {p}
                   </span>
-                ))
-              ) : (
-                <span className="text-rose-500 italic">ยังไม่กำหนดรหัส</span>
+                )
+              })}
+              {remainingCount > 0 && (
+                <button
+                  type="button"
+                  onClick={() => toggleExpandDx(item.icode)}
+                  title={isExpanded ? 'คลิกเพื่อย่อ' : `คลิกเพื่อดูทั้งหมด (${allCodes.join(', ')})`}
+                  className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-white/10 cursor-pointer transition-colors"
+                >
+                  {isExpanded ? 'ย่อลง' : `+${remainingCount}`}
+                </button>
               )}
             </div>
           )
@@ -385,7 +420,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                       type="button"
                       onClick={() => setIntervalDays(d)}
                       className={cn(
-                        'px-1.5 py-0.5 rounded text-[10px] font-bold border cursor-pointer transition-all',
+                        'px-1.5 py-0.5 rounded text-xs font-bold border cursor-pointer transition-all',
                         intervalDays === d
                           ? 'bg-amber-500/20 text-amber-800 dark:text-amber-300 border-amber-500/50 ring-1 ring-amber-500'
                           : 'bg-white/5 text-slate-500 hover:text-slate-800 dark:hover:text-white border-slate-200 dark:border-white/10'
@@ -404,7 +439,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     placeholder="0"
                     className="w-12 rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-1 py-0.5 font-mono text-center text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-1"
                   />
-                  <span className="text-[10px] text-slate-400">วัน</span>
+                  <span className="text-xs text-slate-400">วัน</span>
                 </div>
               </div>
             )
@@ -459,7 +494,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           if (!canEdit) {
             return (
               <div className="text-center whitespace-nowrap">
-                <span className="text-[11px] text-slate-400 dark:text-slate-500">ดูอย่างเดียว</span>
+                <span className="text-xs text-slate-400 dark:text-slate-400">ดูอย่างเดียว</span>
               </div>
             )
           }
@@ -478,7 +513,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         enableSorting: false,
       },
     ],
-    [editingIcode, prefixes, indication, isPending, canEdit]
+    [editingIcode, prefixes, indication, isPending, canEdit, expandedDxRows]
   )
 
   const table = useReactTable({
@@ -515,9 +550,9 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <Info className="size-3.5 sm:size-4 text-emerald-500 shrink-0" />
             <span className="hidden sm:inline font-bold">เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
-            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">เกณฑ์ ICD-10</span>
+            <span className="sm:hidden font-bold text-xs leading-tight text-center">เกณฑ์ ICD-10</span>
           </div>
-          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-white/10 font-mono font-bold shrink-0">
+          <span className="text-xs px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-white/10 font-mono font-bold shrink-0">
             {dxMap.length}
           </span>
         </button>
@@ -535,9 +570,9 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <Clock className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
             <span className="hidden sm:inline font-bold">เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
-            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">รอบจ่าย & สิทธิ</span>
+            <span className="sm:hidden font-bold text-xs leading-tight text-center">รอบจ่าย & สิทธิ</span>
           </div>
-          <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
+          <span className="text-xs sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
             <span className="hidden sm:inline">สปสช. / สิทธิ UC 7 วัน</span>
             <span className="sm:hidden">UC 7 วัน</span>
           </span>
@@ -556,9 +591,9 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
             <Layers className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
             <span className="hidden sm:inline font-bold">เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
-            <span className="sm:hidden font-bold text-[11px] leading-tight text-center">ค่าบริการซ้ำ</span>
+            <span className="sm:hidden font-bold text-xs leading-tight text-center">ค่าบริการซ้ำ</span>
           </div>
-          <span className="text-[9px] sm:text-[10px] px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
+          <span className="text-xs sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
             <span className="hidden sm:inline">คิดค่าบริการซ้ำ</span>
             <span className="sm:hidden">ตรวจซ้ำ</span>
           </span>
@@ -582,7 +617,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               เกณฑ์การจับคู่ยาสมุนไพรกับรหัสการวินิจฉัยโรค (ICD-10 / ICD-10-TM)
             </strong>
             {canEdit && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
                 <BadgeCheck className="size-3.5" /> บัญชีมีสิทธิ์จัดการเกณฑ์ (แพทย์แผนไทย / Admin)
               </span>
             )}
@@ -620,7 +655,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           />
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
-          <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
+          <div className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
             ทั้งหมด <strong className="font-bold text-slate-800 dark:text-slate-200">{dxMap.length}</strong> รายการ
           </div>
           {canEdit && (
@@ -651,8 +686,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
           <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
             <span className="font-semibold text-slate-900 dark:text-white">ตารางข้อมูล</span>
-            <span className="text-slate-400 dark:text-slate-500">•</span>
-            <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
+            <span className="text-slate-400 dark:text-slate-400">•</span>
+            <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ</span>
           </div>
           <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
             ค้นพบ {filtered.length} จาก {dxMap.length} รายการ
@@ -726,11 +761,11 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                                 <FlaskConical className="size-3.5" /> {previewLoading ? 'กำลังคำนวณ…' : 'ทดลองเกณฑ์'}
                               </button>
                             </div>
-                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
                               ผลนี้เป็นการจำลองจากข้อมูลย้อนหลังเพื่อช่วยตรวจผลกระทบ ไม่ใช่คำแนะนำว่ารหัสใดถูกต้องทางคลินิก กรุณายืนยันรหัสกับข้อบ่งใช้และแนวทางที่หน่วยงานรับรองก่อนบันทึก
                             </p>
                             {broadPrefixes.length > 0 && (
-                              <p className="text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                              <p className="text-xs font-medium text-amber-700 dark:text-amber-300">
                                 คำนำหน้า {broadPrefixes.join(', ')} เป็นรหัสกว้าง อาจครอบคลุมหลายโรค ควรตรวจรายการรหัสที่ระบบจำลองให้ละเอียดก่อนบันทึก
                               </p>
                             )}
@@ -745,12 +780,12 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                                   <PreviewStat label="ยังไม่มีเกณฑ์" value={preview.noMap} tone="amber" />
                                 </div>
                                 <div>
-                                  <p className="mb-1.5 text-[11px] font-semibold text-slate-700 dark:text-slate-200">รหัสวินิจฉัยที่พบในประวัติ (สูงสุด 12 รหัส)</p>
-                                  <p className="mb-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
+                                  <p className="mb-1.5 text-xs font-semibold text-slate-700 dark:text-slate-200">รหัสวินิจฉัยที่พบในประวัติ (สูงสุด 12 รหัส)</p>
+                                  <p className="mb-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
                                   {preview.frequentDx.length ? (
                                     <div className="flex flex-wrap gap-1.5">
                                       {preview.frequentDx.map(({ code, count, matches }) => (
-                                        <span key={code} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-[11px] ${matches ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-300'}`}>
+                                        <span key={code} className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 font-mono text-xs ${matches ? 'border-emerald-300 bg-emerald-50 text-emerald-800 dark:border-emerald-500/35 dark:bg-emerald-500/10 dark:text-emerald-300' : 'border-rose-300 bg-rose-50 text-rose-800 dark:border-rose-500/35 dark:bg-rose-500/10 dark:text-rose-300'}`}>
                                           {code} · {count} ครั้ง · {matches ? 'ตรงกับเกณฑ์ทดลอง' : 'ไม่ตรง'}
                                         </span>
                                       ))}
@@ -796,7 +831,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     <button type="button" onClick={() => handleStartEdit(item)} className="h-8 sm:h-9 shrink-0 inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5 px-2.5 text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-white/10 active:scale-95 transition-all touch-manipulation">
                       <Edit3 className="size-3.5 text-slate-500 dark:text-slate-400" /> แก้ไข
                     </button>
-                  ) : <span className="shrink-0 text-[11px] text-slate-400">ดูอย่างเดียว</span>
+                  ) : <span className="shrink-0 text-xs text-slate-400">ดูอย่างเดียว</span>
                 )}
               </div>
 
@@ -822,11 +857,11 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                       </select>
                       <button type="button" onClick={() => void handlePreview(item.icode)} disabled={previewLoading} className="min-h-11 shrink-0 rounded-xl bg-violet-600 px-3 text-xs font-semibold text-white disabled:opacity-50 touch-manipulation"><FlaskConical className="mr-1 inline size-3.5" />{previewLoading ? 'กำลังทดลอง…' : 'ทดลอง'}</button>
                     </div>
-                    {broadPrefixes.length > 0 && <p className="text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัส {broadPrefixes.join(', ')} ครอบคลุมกว้าง ควรตรวจผลทดลองก่อนบันทึก</p>}
+                    {broadPrefixes.length > 0 && <p className="text-xs leading-relaxed text-amber-700 dark:text-amber-300">รหัส {broadPrefixes.join(', ')} ครอบคลุมกว้าง ควรตรวจผลทดลองก่อนบันทึก</p>}
                     {previewError && <p className="text-xs text-rose-600 dark:text-rose-300">{previewError}</p>}
                     {preview?.icode === item.icode && (
                       <div className="grid grid-cols-2 gap-2">
-                        <p className="col-span-2 text-[11px] leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
+                        <p className="col-span-2 text-xs leading-relaxed text-amber-700 dark:text-amber-300">รหัสที่พบบ่อยเป็นข้อมูลประกอบเท่านั้น ไม่ได้ยืนยันข้อบ่งใช้ ห้ามเพิ่มเกณฑ์จากความถี่อย่างเดียว</p>
                         <PreviewStat label={`รายการใน ${preview.periodDays || 'ทุก'} วัน`} value={preview.total} tone="neutral" />
                         <PreviewStat label="ผ่าน" value={preview.pass} tone="green" />
                         <PreviewStat label="ไม่ผ่าน" value={preview.fail} tone="red" />
@@ -844,13 +879,13 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               ) : (
                 <div className="space-y-3 border-t border-slate-100 dark:border-white/10 pt-3">
                   <div>
-                    <p className="mb-1.5 text-[11px] font-semibold text-slate-500 dark:text-slate-400">รหัส ICD-10 ที่อนุญาต</p>
+                    <p className="mb-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">รหัส ICD-10 ที่อนุญาต</p>
                     <div className="flex flex-wrap gap-1.5">
                       {item.dx_prefixes ? item.dx_prefixes.split(',').map((prefix) => <span key={prefix} className="rounded-lg border border-emerald-200 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-1 font-mono text-xs font-semibold text-emerald-800 dark:text-emerald-300">{prefix.trim()}</span>) : <span className="text-xs italic text-rose-500">ยังไม่กำหนดรหัส</span>}
                     </div>
                   </div>
                   <div>
-                    <p className="mb-1 text-[11px] font-semibold text-slate-500 dark:text-slate-400">ข้อบ่งใช้ / สรรพคุณ</p>
+                    <p className="mb-1 text-xs font-semibold text-slate-500 dark:text-slate-400">ข้อบ่งใช้ / สรรพคุณ</p>
                     <p className="text-xs leading-relaxed text-slate-700 dark:text-slate-300 break-words">{item.indication || '-'}</p>
                   </div>
                 </div>
@@ -878,7 +913,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                   <h2 className="text-sm font-bold text-slate-900 dark:text-white">
                     ตั้งค่าเพิ่มรายการยา / เกณฑ์ ICD-10
                   </h2>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
                     ค้นหาและกำหนดยาสมุนไพรจากฐานข้อมูล HOSxP
                   </p>
                 </div>
@@ -922,7 +957,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
                 {searchResults.length > 0 && (
                   <div className="space-y-1.5 max-h-56 overflow-y-auto border border-slate-200 dark:border-[#2d284a] rounded-xl p-1 bg-slate-50/50 dark:bg-black/20">
-                    <p className="px-2 py-1 text-[10px] font-semibold text-slate-400">
+                    <p className="px-2 py-1 text-xs font-semibold text-slate-400">
                       พบ {searchResults.length} รายการ (คลิกเพื่อเลือก)
                     </p>
                     {searchResults.map((d) => {
@@ -940,18 +975,18 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                                 {d.name}
                               </p>
                               {isExisting && (
-                                <span className="text-[9px] px-1.5 py-0.2 rounded font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-300/50 dark:border-emerald-500/30">
+                                <span className="text-xs px-1.5 py-0.2 rounded font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400 border border-emerald-300/50 dark:border-emerald-500/30">
                                   มีในระบบแล้ว
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] font-mono text-slate-400">
+                            <p className="text-xs font-mono text-slate-400">
                               รหัส: {d.icode} {d.units ? `• หน่วย: ${d.units}` : ''}
                             </p>
                           </div>
                           <span
                             className={cn(
-                              'text-[10px] px-2 py-0.5 rounded transition-colors',
+                              'text-xs px-2 py-0.5 rounded transition-colors',
                               isExisting
                                 ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 group-hover:bg-amber-600 group-hover:text-white'
                                 : 'bg-slate-200 dark:bg-white/10 text-slate-600 dark:text-slate-300 group-hover:bg-violet-600 group-hover:text-white'
@@ -976,7 +1011,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                 {/* Selected Drug Card */}
                 <div className="flex items-center justify-between p-3 rounded-xl bg-violet-50/60 dark:bg-violet-950/20 border border-violet-200 dark:border-violet-500/25">
                   <div>
-                    <span className="text-[10px] font-bold text-violet-600 dark:text-violet-400 uppercase tracking-wider">
+                    <span className="text-xs font-bold text-violet-600 dark:text-violet-400">
                       รายการยาที่เลือก
                     </span>
                     <h3 className="text-sm font-bold text-slate-900 dark:text-white">
@@ -1003,7 +1038,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                       <p className="font-semibold text-amber-900 dark:text-amber-100">
                         ยานี้มีอยู่ในรายการเกณฑ์แล้ว (จะไม่เกิดรายการซ้ำ)
                       </p>
-                      <p className="text-[11px] text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
+                      <p className="text-xs text-amber-700/90 dark:text-amber-300/90 leading-relaxed">
                         ระบบได้ดึงเกณฑ์เดิมมาให้เรียบร้อยแล้ว การกดบันทึกจะเป็นการ <strong>"อัปเดตแก้ไขเกณฑ์เดิม"</strong> ของยานี้ จะไม่มีรายการซ้ำซ้อนในตารางอย่างแน่นอน
                       </p>
                     </div>
@@ -1015,7 +1050,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                       <p className="font-semibold text-emerald-900 dark:text-emerald-100">
                         รายการยาใหม่จาก HOSxP
                       </p>
-                      <p className="text-[11px] text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
+                      <p className="text-xs text-emerald-700/90 dark:text-emerald-300/90 leading-relaxed">
                         ยังไม่เคยตั้งค่าในระบบ เมื่อบันทึกแล้วระบบจะเพิ่มเข้าสู่ตารางเกณฑ์ตรวจและดึงมาประมวลผลทันที
                       </p>
                     </div>
@@ -1034,7 +1069,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                     autoFocus
                   />
-                  <span className="text-[10px] text-slate-400 block">
+                  <span className="text-xs text-slate-400 block">
                     ใส่คำนำหน้า เช่น <code className="text-teal-500">M</code> (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น <code className="text-teal-500">K30, R14</code>
                   </span>
                 </label>
@@ -1051,7 +1086,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     placeholder="0 (ไม่กำหนดขั้นต่ำ)"
                     className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
-                  <span className="text-[10px] text-slate-400 block">
+                  <span className="text-xs text-slate-400 block">
                     หากจ่ายน้อยกว่าเกณฑ์ ระบบจะตรวจเป็นสีแดง (ไม่ผ่าน) เพราะจะเบิกเคลมไม่ผ่าน
                   </span>
                 </label>
@@ -1075,7 +1110,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
                       รอบการจ่ายยาสมุนไพร & สิทธิ (Dispensing Interval)
                     </span>
-                    <span className="text-[11px] text-slate-400">
+                    <span className="text-xs text-slate-400">
                       (ซิ้งไปยังแท็บรอบการจ่ายอัตโนมัติ)
                     </span>
                   </div>
@@ -1111,7 +1146,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                       <span className="text-xs text-slate-400">วัน</span>
                     </div>
                   </div>
-                  <p className="text-[10px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     หากระบุ เช่น 7 วัน หรือ 15 วัน ระบบจะผูกเงื่อนไขรอบการจ่ายในแท็บ "เงื่อนไขรอบการจ่าย & สิทธิการรักษา" ให้พร้อมกันทันที
                   </p>
                 </div>

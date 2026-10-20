@@ -13,6 +13,7 @@ import {
   Upload,
 } from 'lucide-react'
 import { useAuth } from '@/context/AuthContext'
+import { ConfirmModal } from './ConfirmModal'
 
 interface ProfileAvatarModalProps {
   readonly isOpen: boolean
@@ -225,14 +226,20 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
     }
   }
 
-  const handleDelete = async () => {
-    if (!window.confirm('คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่?')) return
+  const [isConfirmDeleteOpen, setIsConfirmDeleteOpen] = useState(false)
+
+  const handleDelete = () => {
+    setIsConfirmDeleteOpen(true)
+  }
+
+  const handleExecuteDelete = async () => {
     setIsProcessing(true)
     setError(null)
     setSuccessMsg(null)
 
     const res = await deleteAvatar()
     setIsProcessing(false)
+    setIsConfirmDeleteOpen(false)
 
     if (!res.success) {
       setError(res.error || 'ลบรูปไม่สำเร็จ')
@@ -391,7 +398,7 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
                 <div className="text-xs font-semibold text-white mb-1">
                   ยังไม่ได้เลือกรูปภาพ
                 </div>
-                <div className="text-[11px] text-slate-400">
+                <div className="text-xs text-slate-400">
                   คลิกที่นี่ หรือปุ่ม "เลือกรูปอื่น" ด้านล่างเพื่ออัปโหลด
                 </div>
               </div>
@@ -437,11 +444,11 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
                   title="รีเซ็ตตำแหน่งและซูมกลับค่าเริ่มต้น (1.0x)"
                 >
                   <RotateCcw className="size-3 text-purple-400" />
-                  <span className="text-[11px] font-medium">รีเซ็ต</span>
+                  <span className="text-xs font-medium">รีเซ็ต</span>
                 </button>
               </div>
 
-              <p className="text-center text-[11px] text-slate-400 select-none">
+              <p className="text-center text-xs text-slate-400 select-none">
                 ลากรูปเพื่อจัดตำแหน่ง • เลื่อนลูกกลิ้ง/แถบเพื่อซูม
               </p>
             </div>
@@ -511,6 +518,18 @@ export const ProfileAvatarModal: FC<ProfileAvatarModalProps> = ({
           </div>
         </div>
       </div>
+
+      <ConfirmModal
+        isOpen={isConfirmDeleteOpen}
+        title="ยืนยันการลบรูปโปรไฟล์"
+        description="คุณต้องการลบรูปโปรไฟล์นี้ใช่หรือไม่? ระบบจะเปลี่ยนกลับไปใช้ตัวอักษรย่อเริ่มต้น"
+        confirmText="ลบรูปโปรไฟล์"
+        variant="danger"
+        icon="trash"
+        isLoading={isProcessing}
+        onClose={() => setIsConfirmDeleteOpen(false)}
+        onConfirm={handleExecuteDelete}
+      />
     </div>
   )
 }

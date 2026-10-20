@@ -114,7 +114,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30">
                   เงื่อนไขที่ 1, 2, 3
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
@@ -147,7 +147,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
                 <span className="size-2 rounded-full bg-amber-500"></span>
                 <span>1. ค่านวดและประคบ</span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+              <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
                 <div>• รหัส ADP: <code className="font-mono font-bold text-amber-600 dark:text-amber-400">58130</code> (บำบัดโรค 250.-)</div>
                 <div>• รหัส ADP: <code className="font-mono font-bold text-amber-600 dark:text-amber-400">58131</code> (ฟื้นฟู 250.-)</div>
               </div>
@@ -158,7 +158,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
                 <span className="size-2 rounded-full bg-blue-500"></span>
                 <span>2. ค่านวด (อย่างเดียว)</span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+              <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
                 <div>• รหัส ADP: <code className="font-mono font-bold text-blue-600 dark:text-blue-400">58101</code> (บำบัดโรค 200.-)</div>
                 <div>• รหัส ADP: <code className="font-mono font-bold text-blue-600 dark:text-blue-400">58102</code> (ฟื้นฟู 200.-)</div>
               </div>
@@ -169,7 +169,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
                 <span className="size-2 rounded-full bg-emerald-500"></span>
                 <span>3. ค่าประคบ (อย่างเดียว)</span>
               </div>
-              <div className="text-[11px] text-slate-500 dark:text-slate-400 space-y-0.5">
+              <div className="text-xs text-slate-500 dark:text-slate-400 space-y-0.5">
                 <div>• รหัส ADP: <code className="font-mono font-bold text-emerald-600 dark:text-emerald-400">58201</code> (ประคบสมุนไพร 150.-)</div>
               </div>
             </div>
@@ -181,7 +181,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
                   เงื่อนไขที่ 4
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
@@ -213,7 +213,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <span className="px-2 py-0.5 rounded-md text-[11px] font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
                   เงื่อนไขเสริม
                 </span>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">

@@ -100,6 +100,10 @@ export async function initAuthTables(dwPool) {
   try {
     await dwPool.query(`ALTER TABLE dw_hd_check_user_2fa ADD COLUMN admin_enabled TINYINT(1) NOT NULL DEFAULT 0`)
   } catch (_) {}
+  // บทบาทที่ IT กำหนดเองรายคน (NULL = อัตโนมัติตามตำแหน่ง/กลุ่มใน HOSxP)
+  try {
+    await dwPool.query(`ALTER TABLE dw_hd_check_user_2fa ADD COLUMN role_override VARCHAR(20) NULL`)
+  } catch (_) {}
 }
 
 /** Helper to clean and format Thai civil/hospital job position */
@@ -207,10 +211,11 @@ export async function authenticateHosUser(hosPool, dwPool, loginname, password) 
   }
 
   const [adminRows] = await dwPool.query(
-    `SELECT admin_enabled FROM dw_hd_check_user_2fa WHERE loginname = ? LIMIT 1`,
+    `SELECT admin_enabled, role_override FROM dw_hd_check_user_2fa WHERE loginname = ? LIMIT 1`,
     [user.loginname]
   )
   user.admin_enabled = Number(adminRows[0]?.admin_enabled ?? 0) === 1
+  user.role_override = adminRows[0]?.role_override || null
 
   // Check System Policies (2FA & PIN Lock)
   const [sysSettings] = await dwPool.query(
@@ -561,7 +566,7 @@ export async function listAllUsers2FA(hosPool, dwPool) {
 
   // Get 2FA and PIN state from DW_DB
   const [faRows] = await dwPool.query(
-    `SELECT loginname, name, user_type, groupname, position, entryposition, two_factor_enabled, admin_enabled, pin_hash, pin_enabled, pin_length, auto_lock_minutes, last_login_at, updated_at
+    `SELECT loginname, name, user_type, groupname, position, entryposition, two_factor_enabled, admin_enabled, role_override, pin_hash, pin_enabled, pin_length, auto_lock_minutes, last_login_at, updated_at
      FROM dw_hd_check_user_2fa`
   )
   const faMap = new Map()
@@ -586,6 +591,7 @@ export async function listAllUsers2FA(hosPool, dwPool) {
       account_disable: u.account_disable,
       two_factor_enabled: Boolean(fa && fa.two_factor_enabled === 1),
       admin_enabled: Boolean(fa && Number(fa.admin_enabled) === 1),
+      role_override: fa?.role_override || null,
       has_pin: Boolean(fa?.pin_hash),
       pin_enabled: Boolean(fa && fa.pin_enabled === 1 && fa.pin_hash),
       pin_length: fa?.pin_length ?? (fa?.pin_hash ? 6 : null),
@@ -607,6 +613,7 @@ export async function listAllUsers2FA(hosPool, dwPool) {
         account_disable: false,
         two_factor_enabled: Boolean(fa.two_factor_enabled === 1),
         admin_enabled: Boolean(Number(fa.admin_enabled) === 1),
+        role_override: fa.role_override || null,
         has_pin: Boolean(fa.pin_hash),
         pin_enabled: Boolean(fa.pin_enabled === 1 && fa.pin_hash),
         pin_length: fa?.pin_length ?? (fa?.pin_hash ? 6 : null),

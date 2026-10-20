@@ -9,7 +9,7 @@ import {
   Check,
   X,
   AlertCircle,
-  Sparkles,
+  ShieldCheck,
   Loader2,
 } from 'lucide-react'
 import {
@@ -21,6 +21,7 @@ import {
 } from '@/hooks/useHerbDx'
 import type { DispensingRule, DxMapRecord, PttypeItem } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
+import { ConfirmModal } from './ConfirmModal'
 
 interface DispensingRulesTabProps {
   readonly dxMap: readonly DxMapRecord[]
@@ -343,15 +344,13 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
     )
   }
 
+  // Delete confirm dialog state
+  const [deleteTargetRule, setDeleteTargetRule] = useState<DispensingRule | null>(null)
+
   // Handle delete
   const handleDelete = (rule: DispensingRule) => {
     if (!rule.id) return
-    const confirmed = window.confirm(
-      `ยืนยันการลบเงื่อนไขรอบการจ่าย:\n"${rule.drug_name} (${rule.pttype_name_label} ตัดการจ่าย ${rule.min_interval_days} วัน)" หรือไม่?`
-    )
-    if (confirmed) {
-      deleteRule(rule.id)
-    }
+    setDeleteTargetRule(rule)
   }
 
   // Filtered rules
@@ -390,8 +389,8 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
               ตั้งค่าเงื่อนไขรอบการจ่ายยาสมุนไพร & สิทธิการรักษา (Dispensing Interval Rules)
             </strong>
             {canEdit && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold border border-emerald-500/20">
-                <Sparkles className="size-3.5" /> บัญชีมีสิทธิ์จัดการเงื่อนไขรอบการจ่าย
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
+                <ShieldCheck className="size-3.5" /> บัญชีมีสิทธิ์จัดการเงื่อนไขรอบการจ่าย
               </span>
             )}
           </div>
@@ -399,7 +398,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             กำหนดระยะห่างขั้นต่ำในการสั่งจ่ายซ้ำสำหรับผู้ป่วยคนเดิม (HN เดียวกัน) ตามสิทธิการรักษา เช่น{' '}
             <strong className="text-amber-700 dark:text-amber-300">ยาธาตุอบเชย ขนาดบรรจุ ขวด (120 ml.) เงื่อนไขสิทธิ UC ตัดการจ่าย 7 วัน</strong>{' '}
             หากผู้ป่วยมารับยาก่อนครบระยะเวลาที่กำหนด ระบบจะตรวจจับและระบุสถานะเป็น{' '}
-            <span className="px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200 border border-rose-300 dark:border-rose-700">
+            <span className="px-1.5 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-200 border border-rose-300 dark:border-rose-700">
               จ่ายซ้ำไม่ครบ 7 วัน (สิทธิ UC)
             </span>{' '}
             ในหน้า <strong>"ตรวจสอบการจ่ายยาสมุนไพร"</strong> โดยอัตโนมัติ
@@ -426,7 +425,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
           />
         </div>
         <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
-          <div className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
+          <div className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
             เปิดใช้งาน <strong className="font-bold text-slate-800 dark:text-slate-200">{rules.filter((r) => r.is_active).length}</strong>/{rules.length} เงื่อนไข
           </div>
           {canEdit && (
@@ -447,29 +446,29 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-            <thead className="bg-slate-100 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440] text-slate-700 dark:text-slate-300 font-bold">
+            <thead className="bg-slate-100/80 dark:bg-[#1a1e36] border-b border-slate-200 dark:border-[#292440] text-slate-700 dark:text-slate-200 font-bold">
               <tr>
-                <th className="py-2.5 px-3 text-center w-12">ลำดับ</th>
-                <th className="py-2.5 px-3 w-24">รหัสยา</th>
-                <th className="py-2.5 px-3 min-w-[160px]">รายการยาสมุนไพร</th>
-                <th className="py-2.5 px-3 min-w-[180px]">สิทธิการรักษาที่บังคับใช้</th>
-                <th className="py-2.5 px-3 text-center min-w-[140px]">รอบการจ่าย (วัน)</th>
-                <th className="py-2.5 px-3 min-w-[220px]">คำอธิบายเงื่อนไข</th>
-                <th className="py-2.5 px-3 text-center w-24">สถานะ</th>
-                {canEdit && <th className="py-2.5 px-3 text-center w-28">จัดการ</th>}
+                <th className="py-3 px-3 text-center w-12">ลำดับ</th>
+                <th className="py-3 px-3 text-center w-24">รหัสยา</th>
+                <th className="py-3 px-4 min-w-[220px]">รายการยาสมุนไพร</th>
+                <th className="py-3 px-4 min-w-[190px]">สิทธิการรักษาที่บังคับใช้</th>
+                <th className="py-3 px-3 text-center min-w-[150px]">รอบการจ่าย (วัน)</th>
+                <th className="py-3 px-4 min-w-[240px]">คำอธิบายเงื่อนไข</th>
+                <th className="py-3 px-3 text-center w-24">สถานะ</th>
+                {canEdit && <th className="py-3 px-3 text-center w-24">จัดการ</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 dark:divide-[#292440]/60">
               {isLoading ? (
                 <tr>
-                  <td colSpan={canEdit ? 8 : 7} className="py-8 text-center text-slate-400">
-                    <Loader2 className="size-5 animate-spin mx-auto mb-2 text-emerald-500" />
+                  <td colSpan={canEdit ? 8 : 7} className="py-12 text-center text-slate-400">
+                    <Loader2 className="size-6 animate-spin mx-auto mb-2 text-emerald-500" />
                     กำลังโหลดเงื่อนไขรอบการจ่าย…
                   </td>
                 </tr>
               ) : filteredRules.length === 0 ? (
                 <tr>
-                  <td colSpan={canEdit ? 8 : 7} className="py-8 text-center text-slate-400">
+                  <td colSpan={canEdit ? 8 : 7} className="py-12 text-center text-slate-400">
                     ไม่พบเงื่อนไขรอบการจ่ายที่ค้นหา
                   </td>
                 </tr>
@@ -494,57 +493,79 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                     <tr
                       key={rule.id ?? idx}
                       className={cn(
-                        'hover:bg-slate-50 dark:hover:bg-white/5 transition-colors',
+                        'hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors',
                         !rule.is_active && 'opacity-60 bg-slate-50/50 dark:bg-slate-900/30'
                       )}
                     >
-                      <td className="py-3 px-3 text-center font-mono font-bold text-slate-400">
+                      <td className="py-3 px-3 text-center font-mono font-medium text-slate-400">
                         {idx + 1}
                       </td>
-                      <td className="py-3 px-3 font-mono font-bold text-slate-800 dark:text-slate-200">
-                        {rule.drug_icode}
+                      <td className="py-3 px-3 text-center">
+                        <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                          {rule.drug_icode}
+                        </span>
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="font-semibold text-slate-900 dark:text-white">
+                      <td className="py-3 px-4">
+                        <div className="font-bold text-sm text-slate-900 dark:text-white">
                           {rule.drug_name}
                         </div>
                         {(() => {
                           const matchedDx = dxMap.find((d) => d.icode === rule.drug_icode)
                           if (!matchedDx) return null
+                          const codes = (matchedDx.dx_prefixes || '')
+                            .split(/[,\s]+/)
+                            .map((c) => c.trim())
+                            .filter(Boolean)
+                          if (codes.length === 0) {
+                            return <div className="text-[11px] text-amber-500 italic mt-0.5">ยังไม่ได้กำหนด ICD</div>
+                          }
+                          const displayCodes = codes.slice(0, 4)
+                          const remainingCount = codes.length - 4
                           return (
-                            <div className="flex items-center gap-1 mt-0.5">
-                              <span className="text-[10px] text-slate-400">ผูกกับ ICD-10:</span>
-                              {matchedDx.dx_prefixes ? (
-                                <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-800 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30 font-semibold">
-                                  {matchedDx.dx_prefixes}
+                            <div className="flex flex-wrap items-center gap-1 mt-1">
+                              <span className="text-[10px] text-slate-400 font-medium">ICD:</span>
+                              {displayCodes.map((code) => (
+                                <span
+                                  key={code}
+                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 font-bold"
+                                >
+                                  {code}
                                 </span>
-                              ) : (
-                                <span className="text-[10px] text-amber-500 dark:text-amber-400 italic">ยังไม่กำหนด ICD</span>
+                              ))}
+                              {remainingCount > 0 && (
+                                <span
+                                  title={codes.slice(4).join(', ')}
+                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold cursor-help"
+                                >
+                                  +{remainingCount}
+                                </span>
                               )}
                             </div>
                           )
                         })()}
                       </td>
-                      <td className="py-3 px-3">
-                        <div className="space-y-0.5">
-                          <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border', rightBadgeClass)}>
+                      <td className="py-3 px-4">
+                        <div className="space-y-1">
+                          <span className={cn('inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg text-xs font-bold border shadow-2xs', rightBadgeClass)}>
                             {rule.pttype_name_label}
                           </span>
                           {rule.pttype_filter !== 'ALL' && (
-                            <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono truncate max-w-[200px]" title={rule.pttype_filter}>
-                              รหัสสิทธิ/คีย์เวิร์ด: {rule.pttype_filter}
+                            <div className="text-[11px] text-slate-400 dark:text-slate-500 font-mono truncate max-w-[200px]" title={rule.pttype_filter}>
+                              สิทธิ: {rule.pttype_filter}
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="py-3 px-3 text-center">
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap">
-                          <Clock className="size-3 text-amber-600 dark:text-amber-400" />
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 whitespace-nowrap shadow-2xs">
+                          <Clock className="size-3.5 text-amber-600 dark:text-amber-400" />
                           ตัดการจ่าย {rule.min_interval_days} วัน
                         </span>
                       </td>
-                      <td className="py-3 px-3 text-slate-600 dark:text-slate-300">
-                        {rule.rule_description || '-'}
+                      <td className="py-3 px-4">
+                        <div className="max-w-[260px] text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+                          {rule.rule_description || '-'}
+                        </div>
                       </td>
                       <td className="py-3 px-3 text-center">
                         {canEdit ? (
@@ -556,11 +577,11 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                             title={rule.is_active ? 'คลิกเพื่อปิดใช้งาน' : 'คลิกเพื่อเปิดใช้งาน'}
                           >
                             {rule.is_active ? (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                                 <Check className="size-3" /> เปิด
                               </span>
                             ) : (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-bold bg-slate-500/15 text-slate-500 border border-slate-500/20">
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-500/15 text-slate-500 border border-slate-500/20">
                                 <X className="size-3" /> ปิด
                               </span>
                             )}
@@ -578,7 +599,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                               className="p-1.5 rounded-lg text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-white/10 hover:text-slate-900 dark:hover:text-white cursor-pointer transition-colors"
                               title="แก้ไขเงื่อนไข"
                             >
-                              <Edit3 className="size-3.5" />
+                              <Edit3 className="size-4" />
                             </button>
                             <button
                               type="button"
@@ -587,7 +608,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                               className="p-1.5 rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950/40 cursor-pointer transition-colors"
                               title="ลบเงื่อนไข"
                             >
-                              <Trash2 className="size-3.5" />
+                              <Trash2 className="size-4" />
                             </button>
                           </div>
                         </td>
@@ -614,7 +635,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                   <h3 className="text-sm font-bold text-slate-900 dark:text-white">
                     {editingRule ? 'แก้ไขเงื่อนไขรอบการจ่าย' : 'เพิ่มเงื่อนไขรอบการจ่ายยาสมุนไพร'}
                   </h3>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-xs text-slate-400">
                     กำหนดรอบการสั่งจ่ายขั้นต่ำตามสิทธิการรักษา และเลือกยาสมุนไพรได้หลายรายการพร้อมกัน
                   </p>
                 </div>
@@ -644,7 +665,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                     <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                       1. เลือกรายการยาสมุนไพร <span className="text-rose-500">*</span>
                     </label>
-                    <span className="text-[11px] text-slate-400 font-medium">
+                    <span className="text-xs text-slate-400 font-medium">
                       (เลือกได้หลายรายการพร้อมกัน)
                     </span>
                   </div>
@@ -660,7 +681,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                         <button
                           type="button"
                           onClick={handleClearAllSelectedDrugs}
-                          className="text-[11px] text-rose-500 hover:underline cursor-pointer"
+                          className="text-xs text-rose-500 hover:underline cursor-pointer"
                         >
                           ล้างที่เลือกทั้งหมด
                         </button>
@@ -672,7 +693,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                             className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1a2035] text-slate-800 dark:text-slate-200 border border-emerald-500/30 shadow-2xs"
                           >
                             <span>{d.drug_name}</span>
-                            <code className="text-[10px] font-mono text-slate-400">({d.icode})</code>
+                            <code className="text-xs font-mono text-slate-400">({d.icode})</code>
                             <button
                               type="button"
                               onClick={() => handleRemoveSelectedDrug(d.icode)}
@@ -703,7 +724,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       <button
                         type="button"
                         onClick={handleSelectAllFilteredDrugs}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
                       >
                         เลือกที่ค้นพบ ({filteredDrugs.length})
                       </button>
@@ -712,7 +733,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       <button
                         type="button"
                         onClick={handleClearAllSelectedDrugs}
-                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
+                        className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
                       >
                         ล้าง
                       </button>
@@ -746,18 +767,18 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                               <div className="flex flex-col min-w-0">
                                 <div className="flex items-center gap-1.5 flex-wrap">
                                   <span className="truncate">{d.drug_name}</span>
-                                  <span className="font-mono text-[10px] text-slate-400 shrink-0">({d.icode})</span>
+                                  <span className="font-mono text-xs text-slate-400 shrink-0">({d.icode})</span>
                                 </div>
                                 <div className="flex items-center gap-1.5 mt-0.5">
                                   {d.dx_prefixes ? (
-                                    <span className="font-mono text-[10px] px-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30">
+                                    <span className="font-mono text-xs px-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30">
                                       ICD: {d.dx_prefixes}
                                     </span>
                                   ) : (
-                                    <span className="text-[10px] text-slate-400 italic">ยังไม่กำหนด ICD</span>
+                                    <span className="text-xs text-slate-400 italic">ยังไม่กำหนด ICD</span>
                                   )}
                                   {d.dispensing_interval_days && (
-                                    <span className="text-[10px] px-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/40">
+                                    <span className="text-xs px-1 rounded bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/40">
                                       รอบ {d.dispensing_interval_days} วัน
                                     </span>
                                   )}
@@ -765,7 +786,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                               </div>
                             </div>
                             {isSelected && (
-                              <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
+                              <span className="text-xs px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 font-bold shrink-0">
                                 เลือกแล้ว
                               </span>
                             )}
@@ -784,7 +805,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       <label className="block text-xs font-bold text-slate-700 dark:text-slate-200">
                         2. เลือกสิทธิการรักษา <span className="text-rose-500">*</span>
                       </label>
-                      <span className="text-[11px] text-slate-400 font-medium">
+                      <span className="text-xs text-slate-400 font-medium">
                         (เลือกสิทธิที่ต้องการบังคับใช้)
                       </span>
                     </div>
@@ -828,7 +849,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           <button
                             type="button"
                             onClick={handleSelectAllFiltered}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30 cursor-pointer transition-colors"
                           >
                             เลือกที่ค้นพบ ({filteredPttypes.length})
                           </button>
@@ -837,7 +858,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           <button
                             type="button"
                             onClick={handleClearAllSelected}
-                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
+                            className="shrink-0 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-slate-200 dark:bg-white/10 hover:bg-rose-500/20 text-slate-600 dark:text-slate-300 hover:text-rose-500 cursor-pointer transition-colors"
                           >
                             ล้างที่เลือก
                           </button>
@@ -877,13 +898,13 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                                     onClick={(e) => e.stopPropagation()}
                                     className="rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 size-3.5 cursor-pointer shrink-0"
                                   />
-                                  <span className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-white/10 shrink-0">
+                                  <span className="font-mono font-bold text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-white/10 text-emerald-700 dark:text-emerald-300 border border-slate-200 dark:border-white/10 shrink-0">
                                     [{p.pttype}]
                                   </span>
                                   <span className="truncate text-xs">{p.name}</span>
                                 </div>
                                 {p.pcode && (
-                                  <span className="text-[10px] font-mono text-slate-400 shrink-0">
+                                  <span className="text-xs font-mono text-slate-400 shrink-0">
                                     กลุ่ม {p.pcode}
                                   </span>
                                 )}
@@ -894,11 +915,11 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       </div>
 
                       {/* Selected count info & preview */}
-                      <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pt-0.5">
+                      <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400 pt-0.5">
                         <span>
                           เลือกแล้ว: <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{selectedPttypeTokens.length}</strong> สิทธิ
                         </span>
-                        <span className="text-[10px] text-slate-400">
+                        <span className="text-xs text-slate-400">
                           รหัสสิทธิ HOSxP ทั้งหมด: {pttypes.length} รายการ
                         </span>
                       </div>
@@ -907,7 +928,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                     {/* Display Label and Raw Filter Code Fields */}
                     <div className="grid grid-cols-2 gap-2 mt-1">
                       <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">ชื่อแสดงของสิทธิ:</span>
+                        <span className="text-xs text-slate-400 block mb-0.5 font-medium">ชื่อแสดงของสิทธิ:</span>
                         <input
                           type="text"
                           value={formPttypeLabel}
@@ -918,7 +939,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                         />
                       </div>
                       <div>
-                        <span className="text-[10px] text-slate-400 block mb-0.5 font-medium">รหัสสิทธิ/คีย์เวิร์ดกรอง:</span>
+                        <span className="text-xs text-slate-400 block mb-0.5 font-medium">รหัสสิทธิ/คีย์เวิร์ดกรอง:</span>
                         <input
                           type="text"
                           value={formPttypeFilter}
@@ -964,7 +985,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                         <span className="text-xs text-slate-500">วัน</span>
                       </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    <p className="text-xs text-slate-500 dark:text-slate-400">
                       หากคนไข้มารับยานี้อีกครั้งก่อนครบกำหนด <strong className="text-amber-700 dark:text-amber-300">{formIntervalDays} วัน</strong> ระบบจะตัดสินเป็น <strong>"ไม่ผ่าน"</strong> ในหน้าตรวจสอบการจ่ายยาสมุนไพร
                     </p>
                   </div>
@@ -1027,6 +1048,28 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modern Confirm Modal for deleting rule */}
+      {deleteTargetRule && (
+        <ConfirmModal
+          isOpen={Boolean(deleteTargetRule)}
+          title="ยืนยันการลบเงื่อนไขรอบการจ่าย"
+          description={`คุณต้องการลบเงื่อนไขรอบการจ่ายของยา "${deleteTargetRule.drug_name}" ใช่หรือไม่?`}
+          detail={`สิทธิที่ถูกควบคุม: ${deleteTargetRule.pttype_name_label} • ระยะเวลาตัดการจ่าย: ${deleteTargetRule.min_interval_days} วัน`}
+          confirmText="ลบเงื่อนไข"
+          variant="danger"
+          icon="trash"
+          isLoading={isDeleting}
+          onClose={() => setDeleteTargetRule(null)}
+          onConfirm={() => {
+            if (deleteTargetRule.id) {
+              deleteRule(deleteTargetRule.id, {
+                onSuccess: () => setDeleteTargetRule(null),
+              })
+            }
+          }}
+        />
       )}
     </div>
   )

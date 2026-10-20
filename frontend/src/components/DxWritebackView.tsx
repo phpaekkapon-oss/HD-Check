@@ -1,5 +1,5 @@
 import { useMemo, useState, type FC } from 'react'
-import { AlertTriangle, CalendarClock, CircleHelp, LockKeyhole, Send, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, CalendarClock, CircleHelp, LockKeyhole, Send, ShieldCheck, Sparkles } from 'lucide-react'
 import type { AuditRecord, DateRange } from '@/types/herbdx.types'
 import { DateRangeFields } from '@/components/AuditFilterBar'
 import { fmtNum, toThaiDateShort } from '@/lib/format'
@@ -33,12 +33,13 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
     const byVN = new Map<string, AuditRecord[]>()
     for (const record of records) {
       if (record.audit_result === 'PASS') continue
-      const group = byVN.get(record.vn) ?? []
+      const key = record.vn || (record.hn ? `${record.hn}_${record.visit_date}` : String(record.id))
+      const group = byVN.get(key) ?? []
       group.push(record)
-      byVN.set(record.vn, group)
+      byVN.set(key, group)
     }
     return [...byVN.entries()].map(([vn, rows]): VisitGroup => ({
-      vn,
+      vn: rows[0]?.vn || vn,
       hn: rows[0]?.hn ?? '',
       patientName: rows[0]?.patient_name ?? '',
       date: rows[0]?.visit_date ?? '',
@@ -66,7 +67,7 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
       <header className="flex flex-col gap-3 rounded-2xl border border-themed bg-themed-card p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3">
           <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-violet-100 text-violet-700 dark:bg-violet-500/15 dark:text-violet-300"><Send className="size-5" /></span>
-          <div><h1 id="dx-writeback-title" className="text-lg font-bold text-slate-900 dark:text-white">ทบทวน DX รายครั้งรับบริการ</h1><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">เลือกจากรายการตรวจที่ไม่ผ่าน เพื่อเตรียมทบทวนข้อมูลของ VN นั้นโดยเฉพาะ</p></div>
+          <div><h1 id="dx-writeback-title" className="text-lg font-bold text-slate-900 dark:text-white">ทบทวนรหัสโรค (DX) รายครั้งรับบริการ</h1><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">เลือกจากรายการตรวจที่ไม่ผ่าน เพื่อเตรียมทบทวนข้อมูลของ VN นั้นโดยเฉพาะ</p></div>
         </div>
         <div className="inline-flex items-center gap-2 self-start rounded-lg border border-amber-300/50 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-900 dark:border-amber-800/50 dark:bg-amber-950/30 dark:text-amber-200"><LockKeyhole className="size-4" /> โหมดตรวจทาน — ยังไม่เขียนลง HOSxP</div>
       </header>
@@ -96,7 +97,7 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
                       <span>{visit.patientName || 'ไม่พบชื่อผู้ป่วย'}</span>
                       {visit.patientName ? <CopyButton text={visit.patientName} title="คัดลอกชื่อผู้ป่วย" iconSize="size-3" /> : null}
                     </span>
-                    <span className="mt-1 flex items-center gap-1 font-mono text-[11px] text-slate-500">
+                    <span className="mt-1 flex items-center gap-1 font-mono text-xs text-slate-500">
                       <span>HN {visit.hn}</span>
                       <CopyButton text={visit.hn} title="คัดลอก HN" iconSize="size-3" />
                       <span>· VN {visit.vn}</span>
@@ -139,23 +140,64 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
                     {dx}{matched ? ' ✓' : ''}
                   </span>
                 }) : <span className="text-xs text-slate-500">ไม่พบ DX ในข้อมูลที่อ่านได้</span>}</div>
-                <p className="mt-1 text-[11px] text-slate-500">สีเขียว = ตรงกับเกณฑ์ ICD ที่ตั้งไว้ในแอป · สีแดง = ยังไม่ตรงกับเกณฑ์</p>
+                <p className="mt-1 text-xs text-slate-500">สีเขียว = ตรงกับเกณฑ์ ICD ที่ตั้งไว้ในแอป · สีแดง = ยังไม่ตรงกับเกณฑ์</p>
               </section>
               <section>
-                <h3 className="text-xs font-semibold text-slate-500">ตัวอย่างรหัสตามเกณฑ์ของยา</h3>
-                <div className="mt-1 space-y-1">{selected.records.map((row) => <div key={`rule-${row.id}`} className="rounded-lg border border-emerald-300/40 bg-emerald-50/60 px-3 py-2 dark:border-emerald-800/40 dark:bg-emerald-950/15">
-                  <p className="text-[11px] text-slate-600 dark:text-slate-400">{row.drug_name}</p>
-                  <div className="mt-1 flex flex-wrap gap-1.5">{row.allowed_dx.length ? row.allowed_dx.map((dx) => <span key={`${row.id}-${dx}`} className="rounded-md bg-emerald-100 px-2 py-1 font-mono text-xs font-semibold text-emerald-800 dark:bg-emerald-500/15 dark:text-emerald-300">{dx}</span>) : <span className="text-xs text-slate-500">ยังไม่ได้กำหนดเกณฑ์ ICD</span>}</div>
-                </div>)}</div>
-                <p className="mt-1 text-[11px] text-slate-500">เป็นตัวอย่างการเทียบกับเกณฑ์ที่ตั้งไว้ ไม่ใช่การยืนยันคำวินิจฉัยทางคลินิก</p>
+                <h3 className="text-xs font-semibold text-slate-500">รหัส ICD-10 ตามเกณฑ์ข้อบ่งใช้ของยา (นำไปลงใน HOSxP เพื่อให้ผ่านเกณฑ์)</h3>
+                <div className="mt-1 space-y-2">
+                  {selected.records.map((row) => (
+                    <div key={`rule-${row.id}`} className="rounded-xl border border-emerald-300/40 bg-emerald-50/60 p-3 dark:border-emerald-800/40 dark:bg-emerald-950/20">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-bold text-slate-900 dark:text-white">{row.drug_name}</p>
+                        <span className="font-mono text-[11px] text-slate-500">{row.drug_icode}</span>
+                      </div>
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {row.allowed_dx.length ? (
+                          row.allowed_dx.map((dx) => (
+                            <span
+                              key={`${row.id}-${dx}`}
+                              className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-1 font-mono text-xs font-semibold text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-300 border border-emerald-300/50 dark:border-emerald-700/50"
+                            >
+                              <span>{dx}</span>
+                              <CopyButton text={dx} title={`คัดลอกรหัส ${dx}`} iconSize="size-2.5" />
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-xs text-slate-500">ยังไม่ได้กำหนดเกณฑ์ ICD</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-slate-400">
+                  💡 คลิกไอคอนข้างรหัสเพื่อคัดลอกรหัส ICD-10 ไปใส่ใน HOSxP ได้ทันที
+                </p>
               </section>
             </div>
-            <div className="mt-4 rounded-lg border border-amber-300/50 bg-amber-50 p-3 text-xs leading-5 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-100"><div className="flex gap-2"><AlertTriangle className="mt-0.5 size-4 shrink-0" /><p><strong>ยังไม่บันทึก:</strong> หน้านี้ใช้ตรวจข้อมูลจากสำเนารายการก่อน การส่ง DX จริงต้องตรวจ VN กับ HOSxP โดยตรงและมีรหัสที่ผู้รับผิดชอบยืนยันก่อน</p></div></div>
-            <button type="button" disabled title={canEdit ? 'รอเปิดใช้การเชื่อมต่อเขียนกลับอย่างปลอดภัย' : 'จำกัดสิทธิ์ผู้ดูแลระบบ'} className="mt-3 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-violet-700 px-4 text-sm font-bold text-white opacity-50 disabled:cursor-not-allowed"><Send className="size-4" /> ยังไม่เปิดส่งข้อมูลจริง</button>
+
+            <div className="mt-4 rounded-xl border border-sky-300/60 bg-sky-50/70 p-3.5 text-xs text-sky-950 dark:border-sky-800/60 dark:bg-sky-950/30 dark:text-sky-100">
+              <h4 className="font-bold flex items-center gap-1.5 text-sky-900 dark:text-sky-200">
+                <Sparkles className="size-4 text-sky-600 dark:text-sky-400" />
+                วิธีแก้ไขให้เคสนี้ผ่านเกณฑ์ใน HOSxP:
+              </h4>
+              <ol className="mt-2 list-decimal list-inside space-y-1.5 text-xs leading-5">
+                <li>เปิดโปรแกรม <strong>HOSxP</strong> ➔ ระบบผู้ป่วยใน (IPD) ค้นหาด้วย <strong>AN: {selected.vn}</strong> (หรือ HN: {selected.hn})</li>
+                <li>ไปที่หน้าจอ <strong>สรุปชาร์จการรักษา (Discharge Summary)</strong> / บันทึกการวินิจฉัยโรค (iptdiag)</li>
+                <li>นำรหัส ICD-10 ตามข้อบ่งใช้ของยาด้านบน (เช่น {selected.records[0]?.allowed_dx.slice(0, 4).join(', ') || 'รหัสข้อบ่งใช้'}) ไปบันทึกในช่อง <strong>PDX</strong> หรือ <strong>Secondary DX</strong></li>
+                <li>บันทึกใน HOSxP แล้วกลับมากดปุ่มสีม่วง <strong>&quot;ดึงข้อมูล HOSxP&quot;</strong> ที่มุมขวาบนของ HD-Check รายการนี้จะเปลี่ยนเป็น <strong>ผ่านเกณฑ์</strong> ทันทีครับ</li>
+              </ol>
+            </div>
+
+            <div className="mt-3 rounded-lg border border-amber-300/50 bg-amber-50 p-3 text-xs leading-5 text-amber-950 dark:border-amber-900/50 dark:bg-amber-950/25 dark:text-amber-100">
+              <div className="flex gap-2">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <p><strong>ความปลอดภัยของข้อมูล:</strong> หน้านี้แสดงคำแนะนำรหัสที่ตรงเกณฑ์เพื่ออำนวยความสะดวก ระบบ HD-Check จะไม่แอบเขียนทับข้อมูลใน HOSxP จริง เพื่อรักษาความถูกต้องตามเวชระเบียนของผู้ป่วย</p>
+              </div>
+            </div>
           </>}
         </div>
       </div>
-      <p className="rounded-lg border border-themed bg-themed-card px-3 py-2 text-[11px] leading-5 text-slate-500 dark:text-slate-400">หน้านี้เป็นหน้าทบทวนตัวอย่างก่อนพัฒนาการเขียนกลับ ไม่ได้เพิ่มหรือลบ DX ใน HOSxP และไม่ใช้แทนการยืนยันของผู้รับผิดชอบทางคลินิก</p>
+      <p className="rounded-lg border border-themed bg-themed-card px-3 py-2 text-xs leading-5 text-slate-500 dark:text-slate-400">หน้านี้เป็นหน้าทบทวนตัวอย่างก่อนพัฒนาการเขียนกลับ ไม่ได้เพิ่มหรือลบ DX ใน HOSxP และไม่ใช้แทนการยืนยันของผู้รับผิดชอบทางคลินิก</p>
     </section>
   )
 }

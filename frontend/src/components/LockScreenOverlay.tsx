@@ -7,6 +7,7 @@ import {
   Delete,
   LogOut,
   Leaf,
+  Clock,
 } from 'lucide-react'
 import { clearStoredPinLock, usePinLock } from '@/context/PinLockContext'
 import { useAuth } from '@/context/AuthContext'
@@ -14,12 +15,36 @@ import { useTheme } from '@/context/ThemeContext'
 import { cn } from '@/lib/utils'
 
 export const LockScreenOverlay: FC = () => {
-  const { isLocked, unlockWithPin, unlockWithPassword, pinLength } = usePinLock()
+  const { isLocked, unlockWithPin, unlockWithPassword, pinLength, lockedAt, maxLockMinutes } = usePinLock()
   const { user, logout } = useAuth()
   const { accent } = useTheme()
 
   // Dynamic PIN length (defaults to 6 if not specified, or 4 if configured as 4)
   const targetLength = Math.max(4, Math.min(8, Number(user?.pin_length || pinLength || 6)))
+
+  // 15-minute Auto-Logout countdown timer while locked
+  const maxLockSec = (maxLockMinutes || 15) * 60
+  const [secondsLeft, setSecondsLeft] = useState<number>(() => {
+    if (!lockedAt) return maxLockSec
+    const elapsed = Math.floor((Date.now() - lockedAt) / 1000)
+    return Math.max(0, maxLockSec - elapsed)
+  })
+
+  useEffect(() => {
+    if (!isLocked) return
+    const update = () => {
+      const elapsed = lockedAt ? Math.floor((Date.now() - lockedAt) / 1000) : 0
+      const rem = Math.max(0, maxLockSec - elapsed)
+      setSecondsLeft(rem)
+    }
+    update()
+    const id = window.setInterval(update, 1000)
+    return () => window.clearInterval(id)
+  }, [isLocked, lockedAt, maxLockSec])
+
+  const remMinutes = Math.floor(secondsLeft / 60)
+  const remSeconds = secondsLeft % 60
+  const countdownText = `${remMinutes}:${String(remSeconds).padStart(2, '0')}`
 
   const [pin, setPin] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -182,6 +207,15 @@ export const LockScreenOverlay: FC = () => {
 
         <p className="text-xs text-slate-300 mt-3 font-semibold">
           หน้าจอถูกล็อก กรุณากรอกรหัส PIN เพื่อปลดล็อกเข้าใช้งาน
+        </p>
+
+        {/* Live Auto-Logout Countdown Badge */}
+        <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-500/10 border border-amber-500/25 text-[11.5px] text-amber-300 mt-2 font-mono shadow-xs">
+          <Clock className="size-3.5 text-amber-400 shrink-0" />
+          <span>ออกจากระบบอัตโนมัติในอีก <strong className="text-amber-200 font-bold">{countdownText}</strong> นาที</span>
+        </div>
+        <p className="text-[10.5px] text-slate-400 mt-1">
+          (เพื่อความปลอดภัย หากล็อกค้างไว้เกิน 15 นาที ระบบจะดีดออกไปหน้าเข้าสู่ระบบอัตโนมัติ)
         </p>
 
         {/* PIN Indicators (Matches user's PIN length: 4 or 6 dots) */}

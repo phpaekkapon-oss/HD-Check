@@ -60,9 +60,30 @@ export const LoginPage: FC = () => {
   const [copiedKey, setCopiedKey] = useState(false)
   const [copiedBackup, setCopiedBackup] = useState(false)
 
-  // The SSO callback redirects back with ?sso_error=… when sign-in fails
-  const [error, setError] = useState<string | null>(() => new URLSearchParams(window.location.search).get('sso_error'))
+  // The SSO callback redirects back with ?sso_error=… when sign-in fails, or auto-logout reason
+  const [error, setError] = useState<string | null>(() => {
+    const ssoErr = new URLSearchParams(window.location.search).get('sso_error')
+    if (ssoErr) return ssoErr
+    try {
+      const reason = sessionStorage.getItem('smarthoscheck_logout_reason')
+      if (reason) {
+        sessionStorage.removeItem('smarthoscheck_logout_reason')
+        return reason
+      }
+    } catch {}
+    return null
+  })
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  useEffect(() => {
+    try {
+      const reason = sessionStorage.getItem('smarthoscheck_logout_reason')
+      if (reason) {
+        sessionStorage.removeItem('smarthoscheck_logout_reason')
+        setError(reason)
+      }
+    } catch {}
+  }, [])
 
   // Mirrors the backend's 5-minute temp session so the user knows when to restart
   const [verifyExpiresAt, setVerifyExpiresAt] = useState(0)

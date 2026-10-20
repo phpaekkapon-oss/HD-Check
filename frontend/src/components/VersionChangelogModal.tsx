@@ -1,6 +1,5 @@
 import { useState, useMemo, type FC } from 'react'
 import {
-  Sparkles,
   X,
   CheckCircle2,
   Calendar,
@@ -123,7 +122,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
         <div className="relative p-4 sm:p-5 bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-indigo-500/10 dark:from-teal-500/15 dark:via-cyan-500/15 dark:to-indigo-500/15 border-b border-slate-200 dark:border-[#26233d] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="size-10 sm:size-11 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/25 text-white shrink-0">
-              <Sparkles className="size-5 sm:size-6" />
+              <History className="size-5 sm:size-6" />
             </div>
             <div>
               <div className="flex items-center gap-2">
@@ -244,7 +243,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
               </div>
 
               {/* Type Filter Pills */}
-              <div className="flex items-center gap-1 text-[11px]">
+              <div className="flex items-center gap-1 text-xs">
                 {(['ALL', 'minor', 'patch'] as const).map((t) => (
                   <button
                     key={t}
@@ -260,7 +259,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                     {t === 'ALL' ? 'ทั้งหมด' : t}
                   </button>
                 ))}
-                <span className="ml-auto text-[11px] text-slate-400 font-mono">
+                <span className="ml-auto text-xs text-slate-400 font-mono">
                   {filteredReleases.length} รุ่น
                 </span>
               </div>
@@ -294,17 +293,17 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
 
                       <div className="flex items-center gap-1">
                         {isLatest && (
-                          <span className="text-[11px] px-1.5 py-0.2 rounded font-black bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
+                          <span className="text-xs px-1.5 py-0.2 rounded font-black bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
                             ล่าสุด
                           </span>
                         )}
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className="text-xs text-slate-400 font-mono">
                           {rel.date}
                         </span>
                       </div>
                     </div>
 
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                    <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-1">
                       {rel.title}
                     </p>
                   </button>
@@ -359,7 +358,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
 
                 {/* Highlights */}
                 <div className="space-y-2">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 dark:text-slate-500 flex items-center gap-1.5">
+                  <h4 className="text-xs font-black text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
                     <History className="size-3.5 text-teal-500" />
                     ไฮไลท์เด่นในเวอร์ชันนี้
                   </h4>

@@ -47,6 +47,9 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
   const noDrugCode = rows.filter((row) => row.missingDrugCode).length
   const noIcd = rows.filter((row) => row.missingIcdRule).length
 
+  const failRecords = useMemo(() => mismatches.filter((row) => row.audit_result === 'FAIL'), [mismatches])
+  const noDxRecords = useMemo(() => mismatches.filter((row) => row.audit_result === 'NO_DX'), [mismatches])
+
   return (
     <section className="space-y-3" aria-labelledby="code-review-title">
       <div className="rounded-2xl border border-teal-200/70 bg-white/80 p-3.5 shadow-xs dark:border-teal-900/70 dark:bg-[#0d2028] sm:p-4">
@@ -59,25 +62,113 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
             </div>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-teal-900/10 pt-2.5 text-[11px] text-slate-600 dark:border-white/10 dark:text-slate-300">
+        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-teal-900/10 pt-2.5 text-xs text-slate-600 dark:border-white/10 dark:text-slate-300">
           <span className="inline-flex items-center gap-1.5"><Database className="size-3.5 text-teal-700 dark:text-teal-300" /> HOSxP + เกณฑ์ในระบบ</span>
           <span className="inline-flex items-center gap-1.5"><Clock3 className="size-3.5 text-slate-500" /> {loading ? 'กำลังโหลดข้อมูลตามช่วงวันที่…' : 'แสดงผลอัตโนมัติตามช่วงวันที่'}</span>
         </div>
       </div>
 
       <div className="grid grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-xl border border-themed bg-themed-card shadow-xs dark:divide-[#292440]">
-        <Metric icon={ClipboardList} label={mode === 'mismatch' ? 'รายการ DX ไม่ตรง' : 'รายการยาทั้งหมด'} value={mode === 'mismatch' ? mismatches.length : drugs.length} tone="slate" />
-        <Metric icon={AlertTriangle} label={mode === 'mismatch' ? 'รหัสยาที่พบปัญหา' : 'ไม่มีรหัสยาในข้อมูล'} value={mode === 'mismatch' ? new Set(mismatches.map((row) => row.drug_icode)).size : noDrugCode} tone="amber" />
-        <Metric icon={ShieldAlert} label={mode === 'mismatch' ? 'รายการยาที่ควรตรวจเกณฑ์' : 'ยังไม่มีเกณฑ์ ICD-10'} value={mode === 'mismatch' ? mismatches.filter((row) => row.audit_result === 'FAIL').length : noIcd} tone="rose" />
+        <Metric
+          icon={ClipboardList}
+          label={mode === 'mismatch' ? 'รายการ DX ไม่ตรง (FAIL)' : 'รายการยาทั้งหมด'}
+          value={mode === 'mismatch' ? failRecords.length : drugs.length}
+          tone={mode === 'mismatch' ? (failRecords.length > 0 ? 'rose' : 'slate') : 'slate'}
+        />
+        <Metric
+          icon={AlertTriangle}
+          label={mode === 'mismatch' ? 'ยังไม่ลง DX ใน HOSxP (IPD)' : 'ไม่มีรหัสยาในข้อมูล'}
+          value={mode === 'mismatch' ? noDxRecords.length : noDrugCode}
+          tone={noDxRecords.length > 0 ? 'amber' : 'slate'}
+        />
+        <Metric
+          icon={ShieldAlert}
+          label={mode === 'mismatch' ? 'ชนิดยาที่สั่งใช้ไม่ตรงเกณฑ์' : 'ยังไม่มีเกณฑ์ ICD-10'}
+          value={mode === 'mismatch' ? new Set(failRecords.map((row) => row.drug_icode)).size : noIcd}
+          tone={failRecords.length > 0 ? 'rose' : 'slate'}
+        />
       </div>
 
       <div className="grid grid-cols-2 gap-1 rounded-xl border border-themed bg-themed-card p-1" role="tablist" aria-label="ประเภทการตรวจ">
-        <button type="button" role="tab" aria-selected={mode === 'mismatch'} onClick={() => setMode('mismatch')} className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-hex)] sm:gap-2 sm:px-4 sm:text-sm ${mode === 'mismatch' ? 'bg-rose-50 text-rose-800 dark:bg-rose-950/35 dark:text-rose-200' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}><Stethoscope className="size-4 shrink-0" /> <span className="truncate">DX ไม่ตรง</span> <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[11px] dark:bg-black/20 sm:px-2 sm:text-xs">{fmtNum(mismatches.length)}</span></button>
-        <button type="button" role="tab" aria-selected={mode === 'missing'} onClick={() => setMode('missing')} className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-hex)] sm:gap-2 sm:px-4 sm:text-sm ${mode === 'missing' ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/35 dark:text-amber-200' : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'}`}><AlertTriangle className="size-4 shrink-0" /> <span className="truncate">รหัส/เกณฑ์ขาด</span> <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-[11px] dark:bg-black/20 sm:px-2 sm:text-xs">{fmtNum(rows.length)}</span></button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'mismatch'}
+          onClick={() => setMode('mismatch')}
+          className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-hex)] sm:gap-2 sm:px-4 sm:text-sm ${
+            mode === 'mismatch'
+              ? failRecords.length > 0
+                ? 'bg-rose-50 text-rose-800 dark:bg-rose-950/35 dark:text-rose-200'
+                : 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/35 dark:text-emerald-200'
+              : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
+          }`}
+        >
+          <Stethoscope className="size-4 shrink-0" />
+          <span className="truncate">ตรวจเกณฑ์ DX ไม่ตรง</span>
+          <span className={`rounded-full px-1.5 py-0.5 text-xs sm:px-2 ${
+            failRecords.length > 0
+              ? 'bg-rose-500 text-white'
+              : 'bg-emerald-200/80 text-emerald-900 dark:bg-emerald-900/60 dark:text-emerald-200 font-bold'
+          }`}>
+            {failRecords.length > 0 ? fmtNum(failRecords.length) : '0 ผ่านครบ'}
+          </span>
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'missing'}
+          onClick={() => setMode('missing')}
+          className={`inline-flex min-h-10 min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-hex)] sm:gap-2 sm:px-4 sm:text-sm ${
+            mode === 'missing'
+              ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/35 dark:text-amber-200'
+              : 'text-slate-600 hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-white/5'
+          }`}
+        >
+          <AlertTriangle className="size-4 shrink-0" />
+          <span className="truncate">รหัส/เกณฑ์ขาด</span>
+          <span className="rounded-full bg-white/70 px-1.5 py-0.5 text-xs dark:bg-black/20 sm:px-2 sm:text-xs">
+            {fmtNum(rows.length)}
+          </span>
+        </button>
       </div>
 
       {mode === 'mismatch' ? (
-        loading ? <QueueLoading /> : <DxMismatchReview records={mismatches} dxMap={dxMap} canEdit={canEdit} />
+        loading ? (
+          <QueueLoading />
+        ) : (
+          <div className="space-y-3">
+            {noDxRecords.length > 0 && (
+              <div className="rounded-2xl border border-amber-300/80 bg-gradient-to-r from-amber-50/90 via-orange-50/80 to-amber-50/90 p-4 text-amber-950 shadow-xs dark:border-amber-700/50 dark:from-amber-950/30 dark:via-orange-950/20 dark:to-amber-950/30 dark:text-amber-100">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-start gap-3">
+                    <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-amber-500 text-white dark:bg-amber-600">
+                      <AlertTriangle className="size-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                        พบผู้ป่วยใน (IPD) {fmtNum(noDxRecords.length)} รายการ ที่ยังไม่ลงรหัสวินิจฉัยใน HOSxP (NO_DX)
+                      </h3>
+                      <p className="mt-1 text-xs leading-5 text-amber-800 dark:text-amber-300">
+                        รายการเหล่านี้ <strong>ไม่ใช่เกณฑ์ผิด</strong> (เกณฑ์ยาสมุนไพรใน HD-Check ครอบคลุมครบ 100% แล้ว) แต่เกิดจากผู้ป่วยยังนอนพักรักษาตัวอยู่ในตึกผู้ป่วย (หอผู้ป่วยอายุรกรรม/ศัลยกรรม/ตึกเด็ก) แพทย์จึงยังไม่ได้ลงรหัสสรุปการวินิจฉัย (Discharge Summary) ในระบบ HOSxP
+                      </p>
+                      <div className="mt-2 text-xs text-amber-900 dark:text-amber-200">
+                        💡 <strong>วิธีดำเนินการ:</strong> เมื่อแพทย์ประจำตึกสรุปชาร์จใน HOSxP แล้ว ให้กดปุ่ม <strong>&quot;ดึงข้อมูล HOSxP&quot;</strong> รายการเหล่านี้จะเปลี่ยนเป็น &quot;ผ่าน&quot; ทันที
+                      </div>
+                    </div>
+                  </div>
+                  <a
+                    href="#/dxwriteback"
+                    className="inline-flex shrink-0 items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-xs transition hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500/50 dark:bg-amber-500 dark:text-slate-950 dark:hover:bg-amber-400"
+                  >
+                    <ClipboardList className="size-4" />
+                    <span>ดูรายชื่อและตึกผู้ป่วย {fmtNum(noDxRecords.length)} ราย</span>
+                  </a>
+                </div>
+              </div>
+            )}
+            <DxMismatchReview records={failRecords} dxMap={dxMap} canEdit={canEdit} />
+          </div>
+        )
       ) : <div className="overflow-hidden rounded-2xl border border-themed bg-themed-card shadow-xs">
         <div className="flex flex-col gap-3 border-b border-themed p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
@@ -121,13 +212,13 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
               </table>
             </div>
             <div className="space-y-3 p-3 md:hidden">
-              {filteredRows.map((row) => <article key={row.icode} className="rounded-xl border border-themed bg-themed-app p-4"><div className="flex items-start justify-between gap-3"><h3 className="text-sm font-bold leading-5 text-slate-900 dark:text-white">{row.name}</h3><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-600 dark:bg-white/5 dark:text-slate-300">{row.icode}</span></div><div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs"><span className="text-slate-500">รหัสที่อ่านได้</span><span className="break-all font-mono text-slate-700 dark:text-slate-300">{row.nhso_adp_code || '—'}</span><span className="text-slate-500">จำนวนจ่าย</span><span className="font-mono text-slate-700 dark:text-slate-300">{fmtNum(row.total_qty)}</span></div><div className="mt-3 border-t border-themed pt-3"><FlagList flags={row.flags} /></div></article>)}
+              {filteredRows.map((row) => <article key={row.icode} className="rounded-xl border border-themed bg-themed-app p-4"><div className="flex items-start justify-between gap-3"><h3 className="text-sm font-bold leading-5 text-slate-900 dark:text-white">{row.name}</h3><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">{row.icode}</span></div><div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs"><span className="text-slate-500">รหัสที่อ่านได้</span><span className="break-all font-mono text-slate-700 dark:text-slate-300">{row.nhso_adp_code || '—'}</span><span className="text-slate-500">จำนวนจ่าย</span><span className="font-mono text-slate-700 dark:text-slate-300">{fmtNum(row.total_qty)}</span></div><div className="mt-3 border-t border-themed pt-3"><FlagList flags={row.flags} /></div></article>)}
             </div>
           </>
         )}
       </div>}
 
-      <aside className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-[11px] leading-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/25 dark:text-amber-100">
+      <aside className="flex gap-2 rounded-lg border border-amber-200/80 bg-amber-50/70 px-3 py-2 text-xs leading-4 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/25 dark:text-amber-100">
         <CircleHelp className="mt-0.5 size-3.5 shrink-0" />
         <p><strong>โปรดตรวจยืนยัน:</strong> คิวนี้ช่วยชี้รายการให้ตรวจ ไม่ใช่การรับรองเกณฑ์เบิกจ่าย และไม่แก้ DX ใน HOSxP</p>
       </aside>
@@ -141,9 +232,9 @@ const Metric: FC<{ icon: typeof ClipboardList; label: string; value: number; ton
     amber: 'bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
     rose: 'bg-rose-50 text-rose-700 dark:bg-rose-950/40 dark:text-rose-300',
   }
-  return <div className="flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-4"><span className={`grid size-8 shrink-0 place-items-center rounded-lg ${colors[tone]}`}><Icon className="size-4" /></span><div className="min-w-0"><p className="text-base font-bold leading-5 text-slate-900 dark:text-white sm:text-lg">{fmtNum(value)}</p><p className="mt-0.5 truncate text-[11px] leading-4 text-slate-500 dark:text-slate-400 sm:text-xs">{label}</p></div></div>
+  return <div className="flex min-w-0 items-center gap-2 px-2.5 py-2.5 sm:gap-3 sm:px-4"><span className={`grid size-8 shrink-0 place-items-center rounded-lg ${colors[tone]}`}><Icon className="size-4" /></span><div className="min-w-0"><p className="text-base font-bold leading-5 text-slate-900 dark:text-white sm:text-lg">{fmtNum(value)}</p><p className="mt-0.5 truncate text-xs leading-4 text-slate-500 dark:text-slate-400 sm:text-xs">{label}</p></div></div>
 }
 
 const QueueLoading: FC = () => <div role="status" className="grid justify-items-center rounded-xl border border-themed bg-themed-card px-4 py-8 text-center"><span className="grid size-9 place-items-center rounded-xl bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-300"><ScanLine className="size-4 animate-pulse" /></span><p className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">กำลังโหลดข้อมูลตามช่วงวันที่</p><p className="mt-1 text-xs text-slate-500 dark:text-slate-400">เมื่อโหลดเสร็จ รายการจะแสดงอัตโนมัติ</p></div>
 
-const FlagList: FC<{ flags: readonly string[] }> = ({ flags }) => <div className="flex flex-wrap gap-1.5">{flags.map((flag) => <span key={flag} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-[11px] font-medium leading-4 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="size-3 shrink-0" />{flag}</span>)}</div>
+const FlagList: FC<{ flags: readonly string[] }> = ({ flags }) => <div className="flex flex-wrap gap-1.5">{flags.map((flag) => <span key={flag} className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-1 text-xs font-medium leading-4 text-amber-800 dark:bg-amber-950/50 dark:text-amber-200"><AlertTriangle className="size-3 shrink-0" />{flag}</span>)}</div>

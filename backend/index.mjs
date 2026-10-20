@@ -13,6 +13,8 @@ import {
 } from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
 import { analyzeHerbRecord } from './herb-advice.mjs'
+import { checkVisitIcd, claimState, loadIcdReference, fetchClaimVisits, fdhLastChecked } from './claims.mjs'
+import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
 import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
 import {
   initDispensingRulesTable,
@@ -207,19 +209,19 @@ function clearSessionCookie(res) {
 
 function isAdminUser(user) {
   if (!user) return false
+  // บทบาทที่ IT กำหนดรายคนมาก่อนกฎอัตโนมัติ (เช่น ให้คนนอกฝ่าย IT เป็นผู้ดูแลสูงสุด หรือถอดคนในกลุ่ม admin)
+  const override = validRoleOverride(user.role_override)
+  if (override) return override === 'it'
   if (user.admin_enabled === true || Number(user.admin_enabled) === 1) return true
   const login = String(user.loginname ?? '').toLowerCase().trim()
   const group = String(user.groupname ?? '').toLowerCase().trim()
   const pos = String(user.position || user.entryposition || '').toLowerCase().trim()
 
-  // Named admin logins
-  if (login === 'admin' || login === 'adminpk' || login === 'aekkapon') return true
-
-  // HOSxP admin groups (admin, administrator, ผู้ดูแลระบบ, it)
-  if (group.includes('admin') || group.includes('administrator') || group.includes('ผู้ดูแลระบบ') || group.includes('it')) return true
-
-  // IT & Computer positions
-  if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('it') || pos.includes('โปรแกรมเมอร์')) return true
+  // ผู้ดูแลระบบ HD-Check = งาน IT เท่านั้น (ต้องตรงกับ frontend/src/types/auth.types.ts)
+  // ไม่นับกลุ่ม HOSxP "ผู้ดูแลระบบ_ระดับที่_2/3" (หัวหน้างานทั่วไป) และไม่จับคำว่า "it" ในชื่อกลุ่ม/ตำแหน่ง
+  if (login === 'aekkapon') return true
+  if (group === 'admin' || group === 'administrator') return true
+  if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('โปรแกรมเมอร์')) return true
 
   return false
 }
@@ -240,7 +242,21 @@ function requireSession(req, res, next) {
     .then(async (session) => {
       if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
       // Screen lock is enforced here, not only in the browser: no data while locked
-      if (session.locked) return res.status(423).json({ success: false, locked: true, error: 'หน้าจอถูกล็อก กรุณาปลดล็อกด้วยรหัส PIN' })
+      if (session.locked) {
+        const lockedAt = Number(session.lockedAt || 0)
+        const MAX_LOCK_MS = 15 * 60 * 1000 // 15 minutes max lock duration
+        if (lockedAt > 0 && Date.now() - lockedAt >= MAX_LOCK_MS) {
+          console.warn(`[LOCK EXPIRED] ${session.user?.loginname}: screen locked for >= 15 mins, auto-logout`)
+          await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
+          clearSessionCookie(res)
+          return res.status(401).json({
+            success: false,
+            forceLogout: true,
+            error: 'หน้าจอถูกล็อกเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน',
+          })
+        }
+        return res.status(423).json({ success: false, locked: true, error: 'หน้าจอถูกล็อก กรุณาปลดล็อกด้วยรหัส PIN' })
+      }
       // Hospital enforces PIN lock: no data until this user has set a PIN (account routes stay open so they can)
       if (!req.path.startsWith('/api/auth/')) {
         const pin = await cachedPinState(session.user.loginname)
@@ -267,6 +283,8 @@ function requireAdmin(req, res, next) {
 
 function canManageHerbDx(user) {
   if (!user) return false
+  const override = validRoleOverride(user.role_override)
+  if (override) return ['it', 'thaimed', 'pharmacist'].includes(override)
   if (isAdminUser(user)) return true
   const group = String(user.groupname ?? '').toLowerCase().trim()
   const pos = String(user.position || user.entryposition || '').toLowerCase().trim()
@@ -289,6 +307,29 @@ function canManageHerbDx(user) {
   }
 
   return false
+}
+
+// ---- สิทธิ์เมนูตามกลุ่ม (IT ตั้งค่า) ----
+let menuPermsCache = { at: 0, perms: null }
+async function loadMenuPerms() {
+  if (menuPermsCache.perms && Date.now() - menuPermsCache.at < 15_000) return menuPermsCache.perms
+  const perms = await getMenuPermissions(dwPool)
+  menuPermsCache = { at: Date.now(), perms }
+  return perms
+}
+const userRole = (user) => resolveRole(user, isAdminUser(user))
+
+/** ปิด API ของเมนูที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (ไม่ใช่แค่ซ่อนเมนูในหน้าเว็บ) */
+function requireMenu(menuId) {
+  return (req, res, next) =>
+    requireSession(req, res, async () => {
+      try {
+        if (canAccessMenu(await loadMenuPerms(), userRole(req.authUser), menuId)) return next()
+        res.status(403).json({ success: false, error: 'บัญชีนี้ไม่มีสิทธิ์เข้าถึงเมนูนี้ กรุณาติดต่อผู้ดูแลระบบ (IT)' })
+      } catch (err) {
+        fail(res, err)
+      }
+    })
 }
 
 function requireHerbDxManager(req, res, next) {
@@ -487,9 +528,10 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
       activeDispensingRules = []
     }
 
-    // หาแถวที่เข้าข่ายเงื่อนไขรอบการจ่ายยา
+    // หาแถวที่เข้าข่ายเงื่อนไขรอบการจ่ายยา (เฉพาะผู้ป่วยนอก OPD - ผู้ป่วยใน IPD ได้รับยาตามคำสั่งแพทย์ประจำวันขณะนอนรพ.)
     const candidateRows = []
     for (const r of rows) {
+      if (String(r.vn).startsWith('AN:')) continue
       for (const rule of activeDispensingRules) {
         const isDrug =
           (rule.drug_icode && String(r.drug_icode) === String(rule.drug_icode)) ||
@@ -506,15 +548,32 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
     const historyByKey = new Map()
 
     if (candidateHns.length > 0 && candidateIcodes.length > 0) {
-      const [historyRows] = await dwPool.query(
-        `SELECT hn, drug_icode, drug_name, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
-         FROM dw_hd_check_prescriptions
-         WHERE hn IN (?)
-           AND drug_icode IN (?)
-           AND drug_qty > 0
-         ORDER BY hn, drug_icode, visit_date ASC, id ASC`,
-        [candidateHns, candidateIcodes]
-      )
+      let historyRows = []
+      if (candidateHns.length <= 500) {
+        ;[historyRows] = await dwPool.query(
+          `SELECT hn, drug_icode, drug_name, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
+           FROM dw_hd_check_prescriptions
+           WHERE hn IN (?)
+             AND drug_icode IN (?)
+             AND drug_qty > 0
+             AND vn NOT LIKE 'AN:%'
+           ORDER BY hn, drug_icode, visit_date ASC, id ASC`,
+          [candidateHns, candidateIcodes]
+        )
+      } else {
+        // เมื่อเลือกช่วงเวลายาว (เช่น ทั้งปีงบประมาณ มีผู้ป่วยนับหมื่น HN)
+        // ตรวจสอบเฉพาะช่วงเวลาไม่เกิน 30 วันก่อนหน้าด้วย index แทน IN (?) ขนาดใหญ่
+        ;[historyRows] = await dwPool.query(
+          `SELECT hn, drug_icode, drug_name, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time, id, vn, drug_qty
+           FROM dw_hd_check_prescriptions
+           WHERE drug_icode IN (?)
+             AND visit_date BETWEEN DATE_SUB(?, INTERVAL 30 DAY) AND ?
+             AND drug_qty > 0
+             AND vn NOT LIKE 'AN:%'
+           ORDER BY hn, drug_icode, visit_date ASC, id ASC`,
+          [candidateIcodes, startDate, endDate]
+        )
+      }
       for (const h of historyRows) {
         const key = `${h.hn}__${h.drug_icode}`
         if (!historyByKey.has(key)) historyByKey.set(key, [])
@@ -528,7 +587,8 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
       let interval_days_diff = null
       let interval_rule_info = null
 
-      const matchedRule = activeDispensingRules.find((rule) => {
+      const isIpdRow = String(r.vn).startsWith('AN:')
+      const matchedRule = !isIpdRow && activeDispensingRules.find((rule) => {
         const isDrug =
           (rule.drug_icode && String(r.drug_icode) === String(rule.drug_icode)) ||
           (rule.drug_name && r.drug_name && r.drug_name.includes(rule.drug_name))
@@ -616,7 +676,7 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
   }
 })
 
-app.get('/api/healthmed/audit', requireSession, async (req, res) => {
+app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
     const resultFilter = String(req.query.result ?? 'ALL').toUpperCase()
@@ -873,6 +933,64 @@ app.get('/api/healthmed/audit', requireSession, async (req, res) => {
   }
 })
 
+// ตรวจการเบิก สปสช. (เฟส 1): ตรวจรหัสก่อนเบิก + ผลเบิกจาก FDH ของ visit แผนกแพทย์แผนไทย
+app.get('/api/claims/check', requireMenu('claims'), async (req, res) => {
+  try {
+    const { startDate, endDate } = readRange(req.query)
+    const [ref, visits, lastChecked] = await Promise.all([
+      loadIcdReference(hosPool),
+      fetchClaimVisits(hosPool, startDate, endDate),
+      fdhLastChecked(hosPool),
+    ])
+    const rows = visits.map((v) => {
+      const issues = checkVisitIcd(v, ref)
+      return { ...v, icd_issues: issues, claim_state: claimState(v) }
+    })
+    const count = (fn) => rows.filter(fn).length
+    const uc = rows.filter((r) => r.hip === 'UCS')
+    const kpi = {
+      visits: rows.length,
+      ucVisits: uc.length,
+      icdIssueVisits: count((r) => r.icd_issues.some((i) => i.level === 'error')),
+      noResult: count((r) => r.claim_state === 'no_result'),
+      pending: count((r) => r.claim_state === 'pending'),
+      settled: count((r) => r.claim_state === 'settled'),
+      rejected: count((r) => r.claim_state === 'rejected'),
+      settledAmount: Math.round(rows.reduce((s, r) => s + (r.claim_state === 'settled' ? r.fdh_amount ?? 0 : 0), 0) * 100) / 100,
+    }
+    res.json({ success: true, data: rows, kpi, meta: { startDate, endDate, fdhLastChecked: lastChecked } })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+// สิทธิ์เมนูของผู้ใช้ปัจจุบัน (+ ตารางสิทธิ์ทั้งหมดสำหรับ IT)
+app.get('/api/permissions/menus', requireSession, async (req, res) => {
+  try {
+    const perms = await loadMenuPerms()
+    const role = userRole(req.authUser)
+    res.json({
+      success: true,
+      myRole: role,
+      myMenus: allowedMenus(perms, role),
+      ...(role === 'it' ? { roles: ROLES, menus: MENUS, alwaysAllowed: ALWAYS_ALLOWED, permissions: perms } : {}),
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.put('/api/permissions/menus', requireAdmin, async (req, res) => {
+  try {
+    const perms = await saveMenuPermissions(dwPool, req.body?.permissions)
+    menuPermsCache = { at: Date.now(), perms }
+    console.log(`[MENU PERMISSIONS] updated by ${req.authUser?.loginname}`)
+    res.json({ success: true, permissions: perms })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
 app.get('/api/healthmed/settings', requireSession, async (_req, res) => {
   try {
     const rules = await getDuplicateRules(dwPool)
@@ -990,12 +1108,12 @@ ${list(analysis.keyErrors)}
     const advice = ai
       ? { ...ai.data, aiModel: `Google Gemini (${ai.model})` }
       : {
-          summary: analysis.summary,
-          keyingError: analysis.keyErrors.join('\n'),
-          hosxpAction: analysis.hosxpSteps.map((s, i) => `${i + 1}. ${s}`).join('\n'),
-          caution: analysis.cautions.join('\n'),
-          aiModel: 'Smart Rule Engine (AI Offline Mode)',
-        }
+        summary: analysis.summary,
+        keyingError: analysis.keyErrors.join('\n'),
+        hosxpAction: analysis.hosxpSteps.map((s, i) => `${i + 1}. ${s}`).join('\n'),
+        caution: analysis.cautions.join('\n'),
+        aiModel: 'Smart Rule Engine (AI Offline Mode)',
+      }
     if (ai) putCache(herbAdviceCache, cacheKey, advice)
     res.json({ success: true, analysis, advice, source: ai ? 'gemini-ai' : 'rule-engine' })
   } catch (err) {
@@ -1291,6 +1409,40 @@ app.get('/api/drugs', requireSession, async (req, res) => {
           })
         }
       }
+
+      // 2) หากไม่มี snapshot ตรงเป๊ะ แต่ในคลังข้อมูลมีใบสั่งยาช่วงนี้อยู่แล้ว
+      // สรุปจากคลังข้อมูล DW ได้ทันที (เสร็จใน 10ms แทนที่จะไปสแกน opitemrece หลายล้านแถวใน HOSxP)
+      const [[dwCount]] = await dwPool.query(
+        'SELECT COUNT(*) AS cnt FROM dw_hd_check_prescriptions WHERE visit_date BETWEEN ? AND ? AND drug_icode IN (?)',
+        [startDate, endDate, activeCodes]
+      )
+      if (Number(dwCount?.cnt || 0) > 0) {
+        const [warehouseSummary] = await dwPool.query(
+          `SELECT 
+             p.drug_icode AS icode,
+             p.drug_name AS name,
+             COALESCE(MAX(d.units), p.drug_units, '') AS units,
+             SUM(CASE WHEN p.vn NOT LIKE 'AN:%' THEN p.drug_qty ELSE 0 END) AS opd_qty,
+             SUM(CASE WHEN p.vn LIKE 'AN:%' THEN p.drug_qty ELSE 0 END) AS ipd_qty,
+             COALESCE(MAX(d.unitcost), 0) AS unitcost,
+             SUM(p.drug_qty) AS total_qty,
+             SUM(p.drug_qty * COALESCE(d.unitcost, 0)) AS total_cost,
+             COALESCE(MAX(d.nhso_adp_code), '') AS nhso_adp_code
+           FROM dw_hd_check_prescriptions p
+           LEFT JOIN dw_hd_check_drugs d ON p.drug_icode = d.icode
+           WHERE p.visit_date BETWEEN ? AND ?
+             AND p.drug_qty > 0
+             AND p.drug_icode IN (?)
+           GROUP BY p.drug_icode, p.drug_name
+           ORDER BY total_qty DESC, p.drug_name ASC`,
+          [startDate, endDate, activeCodes]
+        )
+        return res.json({
+          success: true,
+          data: warehouseSummary,
+          meta: { total: warehouseSummary.length, startDate, endDate, source: 'warehouse_aggregated' },
+        })
+      }
     }
 
     const data = await fetchDrugSummary(hosPool, startDate, endDate, activeCodes)
@@ -1424,7 +1576,7 @@ app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) =>
       else totals.noMap += 1
 
       const uniqueDx = [...new Set([row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
-      .map(normalizeIcdCode)
+        .map(normalizeIcdCode)
         .filter(Boolean))]
       for (const code of uniqueDx) {
         codeCounts.set(code, (codeCounts.get(code) ?? 0) + 1)
@@ -1441,6 +1593,62 @@ app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) =>
       .slice(0, 12)
 
     res.json({ success: true, icode, periodDays, min_qty: proposedMinQty, total: rows.length, ...totals, frequentDx })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/dx-map/batch-update', requireHerbDxManager, async (req, res) => {
+  try {
+    const items = req.body?.items || []
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ success: false, error: 'ไม่พบรายการยาที่ต้องการบันทึก' })
+    }
+
+    let updatedCount = 0
+    for (const item of items) {
+      const icode = String(item.icode || '').trim()
+      if (!icode) continue
+
+      const [existing] = await dwPool.query(
+        'SELECT drug_name, dx_prefixes, min_qty, indication FROM dw_hd_check_drug_dx_map WHERE icode = ? LIMIT 1',
+        [icode]
+      )
+
+      let drugName = String(item.drug_name ?? '').trim()
+      if (!drugName && existing.length) {
+        drugName = existing[0].drug_name
+      }
+      if (!drugName) {
+        const [hosDrugs] = await hosPool.query('SELECT name FROM drugitems WHERE icode = ? LIMIT 1', [icode])
+        if (hosDrugs.length) drugName = hosDrugs[0].name
+      }
+      if (!drugName) drugName = String(icode)
+
+      const { valid: newPrefixes } = parseDxPrefixes(item.dx_prefixes)
+      let finalPrefixes = newPrefixes
+      if (item.mergeWithExisting && existing.length > 0) {
+        const existingPrefixes = parseDxPrefixes(existing[0].dx_prefixes).valid
+        finalPrefixes = [...new Set([...existingPrefixes, ...newPrefixes])]
+      }
+
+      const indication = String(item.indication ?? (existing[0]?.indication ?? '')).slice(0, 255)
+      const min_qty = Number(existing[0]?.min_qty ?? 0)
+
+      await dwPool.query(
+        `INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name, dx_prefixes, min_qty, indication)
+         VALUES (?, ?, ?, ?, ?)
+         ON DUPLICATE KEY UPDATE
+           drug_name = COALESCE(VALUES(drug_name), drug_name),
+           dx_prefixes = VALUES(dx_prefixes),
+           indication = VALUES(indication)`,
+        [icode, drugName, finalPrefixes.join(','), min_qty, indication]
+      )
+      updatedCount++
+    }
+
+    activeHerbCacheAt = 0
+    res.json({ success: true, updatedCount })
   } catch (err) {
     fail(res, err)
   }
@@ -1642,7 +1850,7 @@ app.get('/api/auth/sso/:p/callback', async (req, res) => {
     const token = generateToken()
     await saveSession(dwPool, token, { user, loginAt: new Date().toISOString(), loginMethod: p, expiresAt: Date.now() + SESSION_MAX_AGE * 1000 })
     await touchIdentity(dwPool, user.loginname, p, info.cid, info.subject).catch((e) => console.error('[SSO] identity:', e.message))
-    await dwPool.query('UPDATE dw_hd_check_user_2fa SET last_login_at = NOW() WHERE loginname = ?', [user.loginname]).catch(() => {})
+    await dwPool.query('UPDATE dw_hd_check_user_2fa SET last_login_at = NOW() WHERE loginname = ?', [user.loginname]).catch(() => { })
     console.log(`[SSO] ${user.loginname} เข้าสู่ระบบด้วย ${SSO_LABEL[p]}`)
     setSessionCookie(res, token)
     return res.redirect(302, `${c.public_base}/`)
@@ -1904,11 +2112,34 @@ app.get('/api/auth/me', async (req, res) => {
   if (!session) {
     return res.json({ success: false, user: null })
   }
+
+  // If screen locked for >= 15 minutes, end session immediately
+  if (session.locked) {
+    const lockedAt = Number(session.lockedAt || 0)
+    const MAX_LOCK_MS = 15 * 60 * 1000
+    if (lockedAt > 0 && Date.now() - lockedAt >= MAX_LOCK_MS) {
+      console.warn(`[LOCK EXPIRED in /me] ${session.user?.loginname}: screen locked for >= 15 mins, auto-logout`)
+      await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
+      clearSessionCookie(res)
+      return res.json({
+        success: false,
+        user: null,
+        forceLogout: true,
+        error: 'หน้าจอถูกล็อกเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน',
+      })
+    }
+  }
+
   const avatarUrl = await getUserAvatarUrl(dwPool, session.user.loginname)
   session.user.avatar_url = avatarUrl
   // The session keeps a login-time snapshot; PIN settings may have changed since
   const pinState = await getPinState(dwPool, session.user.loginname).catch(() => ({}))
-  res.json({ success: true, user: { ...session.user, ...pinState }, locked: Boolean(session.locked) })
+  res.json({
+    success: true,
+    user: { ...session.user, ...pinState },
+    locked: Boolean(session.locked),
+    lockedAt: session.lockedAt || null,
+  })
 })
 
 /* ---------------- Screen lock (server-side) ----------------
@@ -1942,13 +2173,30 @@ app.post('/api/auth/lock', async (req, res) => {
   if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
   const pinState = await getPinState(dwPool, session.user.loginname)
   if (!pinState.has_pin) return res.status(400).json({ success: false, error: 'กรุณาตั้งรหัส PIN ก่อนใช้การล็อกหน้าจอ' })
-  if (!session.locked) await updateSession(req, session, { locked: true, pinFails: 0 })
-  res.json({ success: true, locked: true })
+  const now = Date.now()
+  if (!session.locked) {
+    await updateSession(req, session, { locked: true, lockedAt: now, pinFails: 0 })
+  }
+  res.json({ success: true, locked: true, lockedAt: session.lockedAt || now })
 })
 
 app.post('/api/auth/unlock-password', async (req, res) => {
   const session = await getSession(req)
   if (!session) return res.status(401).json({ success: false, error: 'กรุณาเข้าสู่ระบบใหม่' })
+
+  // Check if locked duration exceeded 15 minutes
+  const lockedAt = Number(session.lockedAt || 0)
+  const MAX_LOCK_MS = 15 * 60 * 1000
+  if (session.locked && lockedAt > 0 && Date.now() - lockedAt >= MAX_LOCK_MS) {
+    await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
+    clearSessionCookie(res)
+    return res.status(401).json({
+      success: false,
+      forceLogout: true,
+      error: 'หน้าจอถูกล็อกเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน',
+    })
+  }
+
   const password = String(req.body?.password ?? '')
   if (!password) return res.status(400).json({ success: false, error: 'กรุณากรอกรหัสผ่าน' })
   try {
@@ -1959,7 +2207,7 @@ app.post('/api/auth/unlock-password', async (req, res) => {
     if (err.code === 'AUTH_INVALID_CREDENTIALS') return failUnlock(req, res, session, 'รหัสผ่าน HOSxP ไม่ถูกต้อง')
     return res.status(err.code === 'AUTH_ACCOUNT_DISABLED' ? 403 : 503).json({ success: false, error: err.message })
   }
-  await updateSession(req, session, { locked: false, pinFails: 0 })
+  await updateSession(req, session, { locked: false, lockedAt: null, pinFails: 0 })
   res.json({ success: true, message: 'ปลดล็อกหน้าจอสำเร็จ' })
 })
 
@@ -1990,7 +2238,7 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
           entryposition,
         }
       }
-    } catch (_) {}
+    } catch (_) { }
 
     // 2) Try HOSxP doctor if not found in opduser
     if (!profile) {
@@ -2009,7 +2257,7 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
             entryposition: null,
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     // 3) Try DW fallback if offline
@@ -2029,7 +2277,7 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
             entryposition: row.entryposition,
           }
         }
-      } catch (_) {}
+      } catch (_) { }
     }
 
     if (!profile) {
@@ -2041,7 +2289,7 @@ app.get('/api/auth/profile', requireSession, async (req, res) => {
       dwPool.query(
         `UPDATE dw_hd_check_user_2fa SET position = ?, entryposition = ? WHERE loginname = ?`,
         [profile.position, profile.entryposition || null, profile.loginname]
-      ).catch(() => {})
+      ).catch(() => { })
     }
 
     res.json({ success: true, profile })
@@ -2188,7 +2436,38 @@ app.post('/api/admin/2fa-policy', requireAdmin, async (req, res) => {
 app.get('/api/admin/users-2fa', requireAdmin, async (_req, res) => {
   try {
     const users = await listAllUsers2FA(hosPool, dwPool)
-    res.json({ success: true, data: users })
+    // บทบาทที่ใช้จริง (อัตโนมัติ หรือที่ IT กำหนด) ให้หน้าเว็บแสดง
+    res.json({ success: true, data: users.map((u) => ({ ...u, effective_role: userRole(u) })) })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+// กำหนดบทบาทรายคน: 'auto' = ตามตำแหน่ง/กลุ่มใน HOSxP, หรือ it / thaimed / doctor / pharmacist / general
+app.put('/api/admin/users/:loginname/role', requireAdmin, async (req, res) => {
+  try {
+    const loginname = String(req.params.loginname ?? '').trim()
+    const role = String(req.body?.role ?? '')
+    const override = role === 'auto' ? null : validRoleOverride(role)
+    if (!loginname || (role !== 'auto' && !override)) {
+      return res.status(400).json({ success: false, error: 'ระบุผู้ใช้และบทบาทให้ถูกต้อง' })
+    }
+    const [users] = await hosPool.query('SELECT loginname, name, groupname, entryposition FROM opduser WHERE loginname = ? LIMIT 1', [loginname])
+    if (!users.length) return res.status(404).json({ success: false, error: 'ไม่พบบัญชีนี้ใน HOSxP' })
+    const target = users[0]
+    // กันล็อกตัวเองออก: บัญชีที่กำลังใช้งานต้องยังเป็นผู้ดูแลสูงสุดหลังเปลี่ยน
+    if (loginname.toLowerCase() === String(req.authUser.loginname ?? '').toLowerCase()) {
+      const after = isAdminUser({ ...req.authUser, role_override: override })
+      if (!after) return res.status(400).json({ success: false, error: 'ไม่สามารถลดบทบาทของบัญชีที่กำลังใช้งานอยู่ได้ ให้ผู้ดูแลคนอื่นเป็นผู้เปลี่ยน' })
+    }
+    await dwPool.query(
+      `INSERT INTO dw_hd_check_user_2fa (loginname, name, user_type, groupname, role_override)
+       VALUES (?, ?, 'opduser', ?, ?)
+       ON DUPLICATE KEY UPDATE role_override = VALUES(role_override), name = VALUES(name), groupname = VALUES(groupname)`,
+      [target.loginname, target.name || target.loginname, target.groupname || null, override]
+    )
+    console.log(`[ROLE] ${req.authUser?.loginname} set ${target.loginname} -> ${override ?? 'auto'}`)
+    res.json({ success: true, loginname: target.loginname, role_override: override, effective_role: userRole({ ...target, role_override: override }) })
   } catch (err) {
     fail(res, err)
   }
@@ -2278,12 +2557,26 @@ app.post('/api/auth/pin/verify', async (req, res) => {
       return res.status(401).json({ success: false, forceLogout: true, error: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน' })
     }
 
+    // Check if locked duration exceeded 15 minutes: if so, force full logout
+    const lockedAt = Number(session.lockedAt || 0)
+    const MAX_LOCK_MS = 15 * 60 * 1000 // 15 minutes max lock duration
+    if (session.locked && lockedAt > 0 && Date.now() - lockedAt >= MAX_LOCK_MS) {
+      console.warn(`[LOCK EXPIRED in pin/verify] ${session.user.loginname}: screen locked for >= 15 mins, auto-logout`)
+      await logoutSession(readCookie(req, SESSION_COOKIE), dwPool)
+      clearSessionCookie(res)
+      return res.status(401).json({
+        success: false,
+        forceLogout: true,
+        error: 'หน้าจอถูกล็อกเกิน 15 นาที ระบบออกจากระบบอัตโนมัติเพื่อความปลอดภัย กรุณาเข้าสู่ระบบใหม่ด้วยรหัสผ่าน',
+      })
+    }
+
     try {
       await verifyUserPin(dwPool, session.user.loginname, pin)
     } catch (err) {
       return failUnlock(req, res, session, err.message)
     }
-    await updateSession(req, session, { locked: false, pinFails: 0 })
+    await updateSession(req, session, { locked: false, lockedAt: null, pinFails: 0 })
     res.json({ success: true, message: 'ปลดล็อกหน้าจอสำเร็จ' })
   } catch (err) {
     fail(res, err)
@@ -2366,7 +2659,7 @@ for (let attempt = 1; ; attempt++) {
       UPDATE dw_hd_check_drug_dx_map 
       SET dx_prefixes = IF(dx_prefixes LIKE '%M%', dx_prefixes, CONCAT(IFNULL(dx_prefixes, ''), ',M,M62'))
       WHERE icode = '1560016'
-    `).catch(() => {})
+    `).catch(() => { })
     break
   } catch (err) {
     const delaySec = Math.min(5 * attempt, 30)

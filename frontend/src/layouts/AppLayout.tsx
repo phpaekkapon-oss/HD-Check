@@ -1,6 +1,9 @@
 import { useEffect, useState, type FC, type ReactNode } from 'react'
 import { ArrowUp, MoreHorizontal } from 'lucide-react'
-import { Sidebar, NAV_ITEMS } from '@/components/Sidebar'
+import { Sidebar, visibleNavItems } from '@/components/Sidebar'
+import { useAuth } from '@/context/AuthContext'
+import { isAdminUser } from '@/types/auth.types'
+import { useMenuPermissions } from '@/hooks/useHerbDx'
 import { AuditHeader } from '@/components/AuditHeader'
 import { VersionChangelogModal } from '@/components/VersionChangelogModal'
 import { VersionUpdateNotice } from '@/components/VersionUpdateNotice'
@@ -35,6 +38,9 @@ export const AppLayout: FC<AppLayoutProps> = ({
   syncError,
   children,
 }) => {
+  const { user } = useAuth()
+  const { data: menuPerms } = useMenuPermissions(Boolean(user))
+  const navItems = visibleNavItems(isAdminUser(user), menuPerms?.myMenus)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)
@@ -111,7 +117,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-300 dark:bg-white/20" />
             <div className="grid grid-cols-3 gap-2">
-              {NAV_ITEMS.filter((n) => !PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => (
+              {navItems.filter((n) => !PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => (
                 <button
                   key={id}
                   type="button"
@@ -135,7 +141,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
       )}
 
       <nav className={cn("lg:hidden fixed bottom-0 inset-x-0 z-50 bg-themed-header backdrop-blur-md border-t border-slate-200 dark:border-[#30364b] py-1 px-2 flex items-stretch justify-around shadow-2xl select-none safe-bottom", mobileMenuOpen && "hidden")}>
-        {NAV_ITEMS.filter((n) => PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => {
+        {navItems.filter((n) => PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => {
           const isActive = activePage === id
           return (
             <button
@@ -155,7 +161,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
                 <span className="absolute -top-1 size-1.5 rounded-full bg-emerald-500 dark:bg-teal-400 shadow-sm shadow-emerald-400" />
               )}
               <Icon className={cn('size-5 transition-transform', isActive && 'scale-110 text-accent')} />
-              <span className="text-[11px] leading-tight tracking-tight truncate max-w-full px-0.5">{shortLabel}</span>
+              <span className="text-xs leading-tight tracking-tight truncate max-w-full px-0.5">{shortLabel}</span>
             </button>
           )
         })}
@@ -169,7 +175,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           )}
         >
           <MoreHorizontal className="size-5" />
-          <span className="text-[11px] leading-tight">เพิ่มเติม</span>
+          <span className="text-xs leading-tight">เพิ่มเติม</span>
         </button>
       </nav>
 
@@ -190,42 +196,52 @@ export const AppLayout: FC<AppLayoutProps> = ({
       </button>
 
       {/* Hospital System Desktop Bottom Status Bar */}
-      <footer className="hidden lg:flex fixed bottom-0 inset-x-0 z-30 h-9 bg-themed-card border-t border-themed px-4 text-[11px] text-slate-600 dark:text-slate-300 items-center justify-between gap-3 whitespace-nowrap overflow-hidden select-none">
-        <div className="flex items-center gap-3 min-w-0 overflow-hidden">
-          <span>
-            HOSxP Database :{' '}
-            <strong className="text-teal-700 dark:text-teal-300">เชื่อมต่อแล้ว (Connected)</strong>
+      <footer className="hidden lg:flex fixed bottom-0 inset-x-0 z-30 h-9 bg-themed-card border-t border-themed pr-4 text-xs text-slate-600 dark:text-slate-300 items-center justify-between gap-3 whitespace-nowrap overflow-hidden select-none">
+        <div className="flex h-full items-center gap-3 min-w-0 overflow-hidden">
+          {/* ช่องแรกกว้างเท่าแถบเมนู พื้นเดียวกัน และเส้นขอบขวาต่อลงมาตรงกับเส้นของแถบเมนู */}
+          <span
+            className={cn(
+              'h-full shrink-0 inline-flex items-center gap-1.5 bg-[var(--sidebar-bg)] border-r border-slate-200 dark:border-[var(--sidebar-border)] transition-all duration-300 ease-in-out',
+              collapsed ? 'w-18 justify-center' : 'w-64 px-4'
+            )}
+            title={collapsed ? 'ฐานข้อมูล HOSxP เชื่อมต่อแล้ว' : undefined}
+          >
+            <span className="size-2 shrink-0 rounded-full bg-emerald-500 dark:bg-emerald-400" />
+            {!collapsed && (
+              <span className="truncate">
+                ฐานข้อมูล HOSxP <strong className="font-medium text-emerald-700 dark:text-emerald-300">เชื่อมต่อแล้ว</strong>
+              </span>
+            )}
           </span>
+          <span>กลุ่มงาน <strong className="font-medium text-slate-900 dark:text-white">การแพทย์แผนไทย</strong></span>
           <span className="text-slate-300 dark:text-white/20">|</span>
-          <span>ระบบ : <strong className="text-slate-900 dark:text-white">แผนกการแพทย์แผนไทย</strong></span>
-          <span className="text-slate-300 dark:text-white/20">|</span>
-          <span className="inline-flex items-center gap-1.5 text-slate-700 dark:text-slate-200">
+          <button
+            type="button"
+            onClick={() => window.dispatchEvent(new Event('open-about-system'))}
+            className="inline-flex items-center gap-1.5 rounded-md px-1 -mx-1 text-slate-700 dark:text-slate-200 transition hover:bg-slate-100 dark:hover:bg-white/[0.06] cursor-pointer"
+            title="ดูข้อมูลผู้พัฒนาและการทำงานของระบบ"
+          >
             <img
               src="/api/auth/avatar/aekkapon"
               alt="นายเอกพล อันคำวงศ์"
               className="size-5 rounded-full object-cover border border-teal-500/50 shadow-xs inline-block"
               onError={(e) => { e.currentTarget.style.display = 'none' }}
             />
-            <span className="font-bold text-violet-600 dark:text-violet-400">ผู้พัฒนา:</span>
-            <strong className="text-slate-900 dark:text-white">นายเอกพล อันคำวงศ์</strong>
+            <span className="text-slate-500 dark:text-slate-400">ผู้พัฒนา</span>
+            <strong className="font-medium text-slate-900 dark:text-white">นายเอกพล อันคำวงศ์</strong>
             <span className="hidden 2xl:inline text-slate-500 dark:text-slate-400">(นักวิชาการคอมพิวเตอร์ปฏิบัติการ)</span>
-            <span className="hidden xl:inline text-slate-500 dark:text-slate-400 font-sans">• โทร. 257 IT กลุ่มงานสุขภาพดิจิทัล</span>
-          </span>
+            <span className="hidden xl:inline text-slate-500 dark:text-slate-400">· โทร. 257 กลุ่มงานสุขภาพดิจิทัล</span>
+          </button>
         </div>
 
-        <div className="flex items-center gap-3 font-mono shrink-0">
-          <span className="inline-flex items-center gap-1.5">
-            <span className="size-2 rounded-full bg-emerald-500 dark:bg-emerald-400 animate-pulse" />
-            Online
-          </span>
+        <div className="flex items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => setChangelogOpen(true)}
-            className="inline-flex items-center gap-1.5 hover:text-teal-600 dark:hover:text-teal-400 transition-colors cursor-pointer group"
+            className="inline-flex items-center gap-1.5 hover:text-accent transition-colors cursor-pointer"
             title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
           >
-            <span>SMART-HOSCHECK • HerbDx v{__APP_VERSION__}</span>
-            <span className="size-1.5 rounded-full bg-teal-500 group-hover:scale-125 transition-transform" />
+            <span>SMART-HOSCHECK</span>
           </button>
         </div>
       </footer>

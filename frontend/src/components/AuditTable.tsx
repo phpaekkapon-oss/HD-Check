@@ -40,7 +40,7 @@ function DxCodeCell({ code, record }: { readonly code: string; readonly record: 
     return (
       <span
         title={record.audit_result === 'NO_DX' ? 'ไม่มีรหัสวินิจฉัยในช่องนี้' : undefined}
-        className={record.audit_result === 'NO_DX' ? 'text-rose-500' : 'text-slate-400 dark:text-slate-500'}
+        className={record.audit_result === 'NO_DX' ? 'text-rose-500' : 'text-slate-400 dark:text-slate-400'}
       >
         —
       </span>
@@ -64,7 +64,7 @@ function DxCodeCell({ code, record }: { readonly code: string; readonly record: 
         : 'รหัสวินิจฉัย'
 
   return (
-    <span title={title} className={cn('inline-flex rounded px-1.5 py-0.5 font-mono text-[11px] font-bold', colorClass)}>
+    <span title={title} className={cn('inline-flex rounded px-1.5 py-0.5 font-mono text-xs font-bold', colorClass)}>
       {code}
     </span>
   )
@@ -163,7 +163,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           const pageIndex = table.getState().pagination.pageIndex
           const pageSize = table.getState().pagination.pageSize
           return (
-            <div className="text-center font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+            <div className="text-center font-mono text-slate-500 dark:text-slate-400 text-xs">
               {pageIndex * pageSize + row.index + 1}
             </div>
           )
@@ -205,7 +205,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           <DataTableColumnHeader column={column} title="เวลา" />
         ),
         cell: ({ row }) => (
-          <span className="font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap text-[11px]">
+          <span className="font-mono text-slate-600 dark:text-slate-400 whitespace-nowrap text-xs">
             {row.original.visit_time}
           </span>
         ),
@@ -268,7 +268,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
                 {row.original.drug_name}
               </span>
               {row.original.drug_units ? (
-                <span className="text-[11px] font-normal text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                <span className="text-xs font-normal text-slate-400 dark:text-slate-400 whitespace-nowrap">
                   ขนาดบรรจุ: {row.original.drug_units}
                 </span>
               ) : null}
@@ -301,7 +301,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
                 {shortUnit ? (
                   <span
                     className={cn(
-                      'inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-medium font-sans border',
+                      'inline-flex items-center px-1.5 py-0.5 rounded text-xs font-medium font-sans border',
                       isQtyFail
                         ? 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-300 border-rose-200 dark:border-rose-900/60'
                         : 'bg-slate-100 dark:bg-slate-800/80 text-slate-600 dark:text-slate-400 border-slate-200/60 dark:border-slate-700/60'
@@ -312,7 +312,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
                 ) : null}
               </div>
               {isQtyFail && minQty > 0 ? (
-                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800">
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-xs font-bold text-rose-700 dark:text-rose-300 bg-rose-100 dark:bg-rose-950/60 border border-rose-300 dark:border-rose-800">
                   ขั้นต่ำ {minQty} {shortUnit}
                 </span>
               ) : null}
@@ -345,7 +345,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             <div className="flex justify-center whitespace-nowrap min-w-[75px]">
               <span
                 className={cn(
-                  'px-2 py-0.5 rounded text-[11px] font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
+                  'px-2 py-0.5 rounded text-xs font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
                   isPrimaryMatched
                     ? 'bg-blue-100 text-blue-900 border-blue-300 dark:bg-blue-950/60 dark:text-blue-200 dark:border-blue-700/60 ring-1 ring-blue-400/40'
                     : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:border-white/10'
@@ -368,7 +368,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           if (!secondaryUCode) {
             return (
               <div className="flex justify-center whitespace-nowrap min-w-[75px]">
-                <span className="text-amber-600 dark:text-amber-400 font-mono text-[10.5px] italic">
+                <span className="text-amber-600 dark:text-amber-400 font-mono text-xs italic">
                   ไม่มีรหัส U
                 </span>
               </div>
@@ -378,7 +378,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             <div className="flex justify-center whitespace-nowrap min-w-[75px]">
               <span
                 className={cn(
-                  'px-2 py-0.5 rounded text-[11px] font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
+                  'px-2 py-0.5 rounded text-xs font-mono font-bold border shadow-2xs inline-flex items-center gap-1',
                   isSecondaryMatched
                     ? 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-200 dark:border-emerald-700/60 ring-1 ring-emerald-400/40'
                     : 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-white/10 dark:text-slate-300 dark:border-white/10'
@@ -402,7 +402,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           return (
             <span
               className={cn(
-                'px-1.5 py-0.5 rounded text-[11px] font-mono font-bold text-slate-800 dark:text-slate-100',
+                'px-1.5 py-0.5 rounded text-xs font-mono font-bold text-slate-800 dark:text-slate-100',
               )}
             >
               {val}
@@ -453,7 +453,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
         accessorKey: 'doctor_code',
         header: 'รหัส',
         cell: ({ row }) => (
-          <span className="font-mono text-slate-500 dark:text-slate-400 text-[11px]">
+          <span className="font-mono text-slate-500 dark:text-slate-400 text-xs">
             {row.original.doctor_code}
           </span>
         ),
@@ -478,7 +478,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           const r = row.original
           if (r.audit_result === 'PASS') {
             return (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-300 dark:bg-emerald-500/15 dark:text-emerald-300 dark:border-emerald-500/30 whitespace-nowrap">
                 <CheckCircle2 className="size-3 text-emerald-600" /> ผ่านเกณฑ์
               </span>
             )
@@ -504,7 +504,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             return (
               <span
                 className={cn(
-                  'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold border whitespace-nowrap',
+                  'inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap',
                   isIntervalFail
                     ? 'bg-rose-100 text-rose-900 border-rose-400 dark:bg-rose-950/60 dark:text-rose-200 dark:border-rose-700 animate-pulse'
                     : 'bg-rose-100 text-rose-800 border border-rose-300 dark:bg-rose-500/15 dark:text-rose-300 dark:border-rose-500/30'
@@ -519,7 +519,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
           if (r.audit_result === 'NO_DX') {
             return (
               <span
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-200 text-rose-900 border border-rose-400 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40 font-mono whitespace-nowrap"
+                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-200 text-rose-900 border border-rose-400 dark:bg-rose-500/20 dark:text-rose-200 dark:border-rose-500/40 font-mono whitespace-nowrap"
                 title={r.audit_reason}
               >
                 <FileQuestion className="size-3 text-rose-700" /> ไม่มี DX
@@ -530,14 +530,14 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
             <button
               type="button"
               onClick={() => onConfigureDrug(r)}
-              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-[11px] font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
+              className="inline-flex items-center gap-1 rounded-full border border-amber-300 bg-amber-100 px-2.5 py-1 text-xs font-semibold text-amber-800 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-300 dark:hover:bg-amber-500/25"
               title="เปิดหน้าตั้งค่าเกณฑ์ ICD-10 สำหรับยานี้"
             >
               <Settings2 className="size-3" /> ตั้งค่า
             </button>
           ) : (
             <span
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 whitespace-nowrap"
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-300 dark:bg-amber-500/15 dark:text-amber-300 dark:border-amber-500/30 whitespace-nowrap"
               title={r.audit_reason}
             >
               <HelpCircle className="size-3 text-amber-600" /> รอตั้งค่า
@@ -580,8 +580,8 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
       <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/80 dark:bg-[#1d2035]/80 border-b border-slate-200 dark:border-[#292440]">
         <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
           <span className="font-semibold text-slate-900 dark:text-white">ตารางข้อมูล</span>
-          <span className="text-slate-400 dark:text-slate-500">•</span>
-          <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ (Sort)</span>
+          <span className="text-slate-400 dark:text-slate-400">•</span>
+          <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ</span>
         </div>
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <span className="text-xs text-slate-500 dark:text-slate-400 font-mono">
@@ -596,7 +596,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
       </div>
 
       {/* Main Shadcn Data Table with sticky header and vertical scroll */}
-      {expanded && <div className="border-b border-themed px-4 py-1.5 text-[11px] text-slate-500 dark:text-slate-400">มุมมองเต็มหน้าจอ · เลื่อนแนวนอนเพื่อดูคอลัมน์ที่เหลือ · กด Esc เพื่อย่อ</div>}
+      {expanded && <div className="border-b border-themed px-4 py-1.5 text-xs text-slate-500 dark:text-slate-400">มุมมองเต็มหน้าจอ · เลื่อนแนวนอนเพื่อดูคอลัมน์ที่เหลือ · กด Esc เพื่อย่อ</div>}
       <Table className={expanded ? 'min-w-max' : undefined} containerClassName={expanded ? 'min-h-0 flex-1 overflow-auto' : 'max-h-[68vh] min-h-[420px] overflow-auto'}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
