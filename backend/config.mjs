@@ -103,8 +103,21 @@ export const MIN_QTY_EXEMPT_PTTYPES = [
 /** รายชื่อแพทย์แผนไทย 5 ท่านที่ต้องมีรหัสการวินิจฉัยแพทย์แผนไทย (รหัสขึ้นต้นด้วย U) ควบคู่เสมอ */
 export const THAI_MED_DOCTORS_REQUIRE_U = [
   'นภัสกร มวลชัยภูมิ',
+  'ศาสตรา คำมุลตรี',
   'ศาสตรา คำมูลตรี',
   'แคทริยา แสนหูม',
   'ศุภาวรรณ ลูกเงาะ',
   'กชวรรณ ดวงแก้ว',
 ]
+
+/** SQL filter สำหรับแพทย์แผนไทย 5 ท่าน (หน้า แพทย์ผู้ตรวจ) */
+export function buildThaiMedDoctorSql(alias = 'doc') {
+  return `(
+    ${alias}.name LIKE '%นภัสกร%มวลชัยภูมิ%'
+    OR ${alias}.name LIKE '%ศาสตรา%คำมุลตรี%'
+    OR ${alias}.name LIKE '%ศาสตรา%คำมูลตรี%'
+    OR ${alias}.name LIKE '%แคทริยา%แสนหูม%'
+    OR ${alias}.name LIKE '%ศุภาวรรณ%ลูกเงาะ%'
+    OR ${alias}.name LIKE '%กชวรรณ%ดวงแก้ว%'
+  )`
+}

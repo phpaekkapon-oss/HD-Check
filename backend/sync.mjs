@@ -1,5 +1,5 @@
 import mysql from 'mysql2/promise'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED } from './config.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED, buildThaiMedDoctorSql } from './config.mjs'
 
 export function buildHerbFilter(customIcodes = []) {
   const cleanIcodes = (customIcodes || [])
@@ -15,6 +15,7 @@ export function buildHerbFilter(customIcodes = []) {
 
 export function buildDrugSummarySql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
+  const docFilter = buildThaiMedDoctorSql('doc')
   return `
   SELECT
       d.icode,
@@ -32,9 +33,10 @@ export function buildDrugSummarySql(customIcodes = []) {
     FROM opitemrece op
     LEFT JOIN ovst o ON op.vn = o.vn
     LEFT JOIN spclty sp ON o.spclty = sp.spclty
+    LEFT JOIN doctor doc ON o.doctor = doc.code
     WHERE op.vstdate BETWEEN ? AND ?
       AND (
-        ((op.an IS NULL OR op.an = '') AND ${THAI_MED_FILTER})
+        ((op.an IS NULL OR op.an = '') AND ${docFilter})
         OR
         (op.an IS NOT NULL AND op.an <> '')
       )
@@ -51,11 +53,16 @@ const getCodeAt = (field, n) =>
      SUBSTRING_INDEX(SUBSTRING_INDEX(${field}, ',', ${n}), ',', -1), '')`
 
 const ipdDx = (n) => getCodeAt("COALESCE(NULLIF(dgx.codes, ''), adx.codes, '')", n)
-const opdDx = (n) => getCodeAt('odx.codes', n)
+const opdSecDx = (n) => getCodeAt('sec.all_sec_codes', n)
 
-/** Placeholders: OPD lv (start, end), OPD odx (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD (start, end) */
+/** Placeholders: OPD lv (start, end), OPD sec o2 (start, end), OPD sec hms (start, end), OPD sec o3 (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD adx (start, end), IPD (start, end) */
 export function buildPrescriptionSql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
+  const docFilter = buildThaiMedDoctorSql('doc')
+  const dMaxFilter = buildThaiMedDoctorSql('d_max')
+  const d2Filter = buildThaiMedDoctorSql('d2')
+  const d3Filter = buildThaiMedDoctorSql('d3')
+  const dMFilter = buildThaiMedDoctorSql('d_m')
   return `
   (
     SELECT
@@ -70,23 +77,21 @@ export function buildPrescriptionSql(customIcodes = []) {
         op.qty AS drug_qty,
         IFNULL(d.units, '') AS drug_units,
         sp.name AS department_name,
-        COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
-        COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS pdx,
-        COALESCE(NULLIF(${opdDx(1)}, ''), NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), '') AS dx0,
-        COALESCE(NULLIF(${opdDx(2)}, ''), NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), '') AS dx1,
-        COALESCE(NULLIF(${opdDx(3)}, ''), NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), '') AS dx2,
-        COALESCE(NULLIF(${opdDx(4)}, ''), NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), '') AS dx3,
-        COALESCE(NULLIF(${opdDx(5)}, ''), NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), '') AS dx4,
-        COALESCE(NULLIF(${opdDx(6)}, ''), NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), '') AS dx5,
+        COALESCE(NULLIF(TRIM(od_pdx.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
+        COALESCE(NULLIF(TRIM(od_pdx.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS pdx,
+        ${opdSecDx(1)} AS dx0,
+        ${opdSecDx(2)} AS dx1,
+        ${opdSecDx(3)} AS dx2,
+        ${opdSecDx(4)} AS dx3,
+        ${opdSecDx(5)} AS dx4,
+        ${opdSecDx(6)} AS dx5,
         o.doctor AS doctor_code,
         doc.name AS doctor_name,
         CASE
-            WHEN COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
+            WHEN COALESCE(NULLIF(TRIM(od_pdx.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
             WHEN (
-              COALESCE(ov_latest.pdx, od1.icd10, ov.pdx, ov_period.pdx, '') LIKE 'U%'
-              OR COALESCE(ov_latest.dx0, ov.dx0, ov_period.dx0, '') LIKE 'U%'
-              OR COALESCE(ov_latest.dx1, ov.dx1, ov_period.dx1, '') LIKE 'U%'
-              OR CONCAT(',', IFNULL(odx.codes, '')) LIKE '%,U%'
+              COALESCE(od_pdx.icd10, ov.pdx, od1.icd10, ov_latest.pdx, ov_period.pdx, '') LIKE 'U%'
+              OR CONCAT(',', IFNULL(sec.all_sec_codes, '')) LIKE '%,U%'
             ) THEN 'COMPLETE'
             ELSE 'INCOMPLETE'
         END AS audit_status
@@ -96,32 +101,55 @@ export function buildPrescriptionSql(customIcodes = []) {
     INNER JOIN patient pt ON o.hn = pt.hn
     INNER JOIN drugitems d ON op.icode = d.icode
     LEFT JOIN pttype ps ON o.pttype = ps.pttype
-    INNER JOIN spclty sp ON o.spclty = sp.spclty AND ${THAI_MED_FILTER}
-    LEFT JOIN doctor doc ON o.doctor = doc.code
-    -- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (Latest Visit of the day for this HN)
+    LEFT JOIN spclty sp ON o.spclty = sp.spclty
+    INNER JOIN doctor doc ON o.doctor = doc.code AND ${docFilter}
+    -- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (เฉพาะแพทย์แผนไทย 5 ท่าน)
     LEFT JOIN (
       SELECT o_max.hn, o_max.vstdate, MAX(o_max.vn) AS latest_vn
       FROM ovst o_max
+      INNER JOIN doctor d_max ON o_max.doctor = d_max.code AND ${dMaxFilter}
       WHERE o_max.vstdate BETWEEN ? AND ?
       GROUP BY o_max.hn, o_max.vstdate
     ) lv ON o.hn = lv.hn AND o.vstdate = lv.vstdate
     LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
-    -- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag เผื่อ vn_stat ของ visit ล่าสุดยังไม่อัปเดต
-    LEFT JOIN ovstdiag od1 ON od1.vn = COALESCE(lv.latest_vn, o.vn) AND od1.diagtype = '1'
-    -- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (เรียง non-U ขึ้นก่อน เพื่อไม่ให้ U-codes เบียดรหัสโรคแผนปัจจุบันหลุดจาก 6 ช่อง)
+    -- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag ของ visit นี้ หรือ visit ล่าสุดของแพทย์แผนไทย
+    LEFT JOIN ovstdiag od_pdx ON od_pdx.vn = o.vn AND od_pdx.diagtype = '1'
+    LEFT JOIN ovstdiag od1 ON od1.vn = lv.latest_vn AND od1.diagtype = '1'
+    -- 3) รหัสวินิจฉัยรองทั้งหมด: รวมรหัสแผนปัจจุบันจาก ovstdiag (priority 1) + รหัส U จาก F7 health_med_service_diagnosis (priority 2) + รหัส U จาก ovstdiag (priority 3)
     LEFT JOIN (
-      SELECT o2.hn, o2.vstdate, 
-             GROUP_CONCAT(DISTINCT od.icd10 ORDER BY (od.icd10 LIKE 'U%') ASC, od.diagtype, od.icd10 SEPARATOR ',') AS codes
-      FROM ovstdiag od
-      INNER JOIN ovst o2 ON od.vn = o2.vn
-      WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> ''
-        AND o2.vstdate BETWEEN ? AND ?
-      GROUP BY o2.hn, o2.vstdate
-    ) odx ON o.hn = odx.hn AND o.vstdate = odx.vstdate
-    -- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เผื่อกรณีมารับยาต่อเนื่องแต่รหัสวินิจฉัยอยู่ที่ visit ล่าสุดในรอบเดือน)
+      SELECT t.hn, t.vstdate, GROUP_CONCAT(DISTINCT t.icd10 ORDER BY t.priority, t.icd10 SEPARATOR ',') AS all_sec_codes
+      FROM (
+        SELECT o2.hn, o2.vstdate, od.icd10, 1 AS priority
+        FROM ovstdiag od
+        INNER JOIN ovst o2 ON od.vn = o2.vn
+        INNER JOIN doctor d2 ON o2.doctor = d2.code AND ${d2Filter}
+        WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> '' AND od.icd10 NOT LIKE 'U%'
+          AND o2.vstdate BETWEEN ? AND ?
+
+        UNION
+
+        SELECT hms.hn, hms.service_date AS vstdate, hmd.icd10, 2 AS priority
+        FROM health_med_service_diagnosis hmd
+        JOIN health_med_service hms ON hms.health_med_service_id = hmd.health_med_service_id
+        WHERE hms.service_date BETWEEN ? AND ?
+          AND hmd.icd10 IS NOT NULL AND hmd.icd10 <> '' AND hmd.icd10 LIKE 'U%'
+
+        UNION
+
+        SELECT o3.hn, o3.vstdate, od3.icd10, 3 AS priority
+        FROM ovstdiag od3
+        INNER JOIN ovst o3 ON od3.vn = o3.vn
+        INNER JOIN doctor d3 ON o3.doctor = d3.code AND ${d3Filter}
+        WHERE od3.icd10 IS NOT NULL AND od3.icd10 <> '' AND od3.icd10 LIKE 'U%'
+          AND o3.vstdate BETWEEN ? AND ?
+      ) t
+      GROUP BY t.hn, t.vstdate
+    ) sec ON o.hn = sec.hn AND o.vstdate = sec.vstdate
+    -- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เฉพาะแพทย์แผนไทย 5 ท่าน)
     LEFT JOIN (
       SELECT o_m.hn, MAX(o_m.vn) AS period_latest_vn
       FROM ovst o_m
+      INNER JOIN doctor d_m ON o_m.doctor = d_m.code AND ${dMFilter}
       WHERE o_m.vstdate BETWEEN ? AND ?
       GROUP BY o_m.hn
     ) plv ON o.hn = plv.hn
@@ -265,9 +293,11 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
     const drugs = await fetchDrugSummary(hos, startDate, endDate, customIcodes)
     const prescSql = customIcodes.length > 0 ? buildPrescriptionSql(customIcodes) : PRESCRIPTION_SQL
     const prescParams = [
-      startDate, endDate, // OPD lv: latest visit of the day
-      startDate, endDate, // OPD odx: ovstdiag secondary codes of the day
-      startDate, endDate, // OPD plv: latest visit in period
+      startDate, endDate, // OPD lv: latest visit of the day (เฉพาะแพทย์แผนไทย 5 ท่าน)
+      startDate, endDate, // OPD sec: o2 non-U secondary from ovstdiag
+      startDate, endDate, // OPD sec: hms U-codes from F7
+      startDate, endDate, // OPD sec: o3 U-codes from ovstdiag
+      startDate, endDate, // OPD plv: latest visit in period (เฉพาะแพทย์แผนไทย 5 ท่าน)
       startDate, endDate, // OPD main: vstdate
       startDate, endDate, // IPD dgx: iptdiag secondary codes
       startDate, endDate, // IPD adx: ovstdiag secondary admitting codes

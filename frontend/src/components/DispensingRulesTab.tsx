@@ -11,6 +11,9 @@ import {
   AlertCircle,
   ShieldCheck,
   Loader2,
+  Copy,
+  BookOpen,
+  Info,
 } from 'lucide-react'
 import {
   useDispensingRules,
@@ -76,6 +79,24 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<DispensingRule | null>(null)
+
+  // ICD Codes viewing & expansion
+  const [viewingDxDrug, setViewingDxDrug] = useState<{
+    icode: string
+    name: string
+    codes: string[]
+    indication?: string
+  } | null>(null)
+  const [expandedIcodes, setExpandedIcodes] = useState<Set<string>>(new Set())
+
+  const toggleExpandIcode = (icode: string) => {
+    setExpandedIcodes((prev) => {
+      const next = new Set(prev)
+      if (next.has(icode)) next.delete(icode)
+      else next.add(icode)
+      return next
+    })
+  }
 
   // Modal Form State (Multi-drug selection)
   const [selectedDrugs, setSelectedDrugs] = useState<SelectedDrugItem[]>([])
@@ -519,27 +540,75 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           if (codes.length === 0) {
                             return <div className="text-[11px] text-amber-500 italic mt-0.5">ยังไม่ได้กำหนด ICD</div>
                           }
-                          const displayCodes = codes.slice(0, 4)
+                          const isExpanded = expandedIcodes.has(rule.drug_icode)
+                          const displayCodes = isExpanded ? codes : codes.slice(0, 4)
                           const remainingCount = codes.length - 4
+
                           return (
                             <div className="flex flex-wrap items-center gap-1 mt-1">
                               <span className="text-[10px] text-slate-400 font-medium">ICD:</span>
                               {displayCodes.map((code) => (
-                                <span
+                                <button
+                                  type="button"
                                   key={code}
-                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 font-bold"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setViewingDxDrug({
+                                      icode: rule.drug_icode,
+                                      name: rule.drug_name,
+                                      codes,
+                                      indication: matchedDx.indication,
+                                    })
+                                  }}
+                                  title="คลิกเพื่อดูรายการรหัส ICD-10 ทั้งหมด"
+                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-700/50 font-bold hover:bg-teal-100 dark:hover:bg-teal-900/80 transition-colors cursor-pointer"
                                 >
                                   {code}
-                                </span>
+                                </button>
                               ))}
-                              {remainingCount > 0 && (
-                                <span
-                                  title={codes.slice(4).join(', ')}
-                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 font-semibold cursor-help"
+                              {remainingCount > 0 && !isExpanded && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleExpandIcode(rule.drug_icode)
+                                  }}
+                                  title={`คลิกเพื่อขยายดูรหัส ICD อีก ${remainingCount} รหัส`}
+                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-teal-600/15 dark:bg-teal-400/15 text-teal-700 dark:text-teal-300 border border-teal-500/40 font-bold hover:bg-teal-500/25 active:scale-95 transition-all cursor-pointer shadow-2xs"
                                 >
                                   +{remainingCount}
-                                </span>
+                                </button>
                               )}
+                              {isExpanded && remainingCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    toggleExpandIcode(rule.drug_icode)
+                                  }}
+                                  title="คลิกเพื่อย่อรหัส"
+                                  className="font-mono text-[10px] px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600 font-medium hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors cursor-pointer"
+                                >
+                                  ย่อ
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setViewingDxDrug({
+                                    icode: rule.drug_icode,
+                                    name: rule.drug_name,
+                                    codes,
+                                    indication: matchedDx.indication,
+                                  })
+                                }}
+                                title="คลิกเพื่อดูหน้าต่างสรุปและค้นหารหัส ICD-10 ทั้งหมด"
+                                className="inline-flex items-center gap-0.5 text-[10px] text-teal-600 dark:text-teal-400 hover:underline cursor-pointer ml-1 font-medium"
+                              >
+                                <Info className="size-3" />
+                                <span>ดูทั้งหมด ({codes.length})</span>
+                              </button>
                             </div>
                           )
                         })()}
@@ -1070,6 +1139,106 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             }
           }}
         />
+      )}
+      {viewingDxDrug && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          onClick={() => setViewingDxDrug(null)}
+        >
+          <div
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#181528] border border-slate-200 dark:border-[#2d2845] p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Modal Header */}
+            <div className="flex items-start justify-between gap-3 border-b border-slate-100 dark:border-white/10 pb-3">
+              <div className="flex items-center gap-3">
+                <span className="p-2.5 rounded-xl bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/20">
+                  <BookOpen className="size-5" />
+                </span>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white">
+                      {viewingDxDrug.name}
+                    </h3>
+                    <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                      {viewingDxDrug.icode}
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    รหัสวินิจฉัยโรค (ICD-10) ที่ตรงข้อบ่งใช้ • ทั้งหมด {viewingDxDrug.codes.length} รหัส
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewingDxDrug(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-slate-600 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-white/10 transition-colors cursor-pointer"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            {/* Indication Note */}
+            {viewingDxDrug.indication && (
+              <div className="p-3 rounded-xl bg-teal-50/60 dark:bg-teal-950/40 border border-teal-200/60 dark:border-teal-800/40 text-xs text-teal-900 dark:text-teal-200 leading-relaxed">
+                <span className="font-bold text-teal-800 dark:text-teal-300">ข้อบ่งใช้ตามเกณฑ์: </span>
+                {viewingDxDrug.indication}
+              </div>
+            )}
+
+            {/* ICD Codes Grid */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2">
+              <div className="text-xs font-semibold text-slate-700 dark:text-slate-300 flex items-center justify-between">
+                <span>รายการรหัส ICD-10 ที่อนุญาต:</span>
+                <span className="text-[11px] text-slate-400 font-normal">คลิกที่รหัสเพื่อคัดลอกเดี่ยว</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5 p-3 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200 dark:border-white/10 max-h-60 overflow-y-auto">
+                {viewingDxDrug.codes.map((code) => {
+                  const isU = code.startsWith('U')
+                  return (
+                    <button
+                      type="button"
+                      key={code}
+                      onClick={() => {
+                        navigator.clipboard?.writeText(code)
+                      }}
+                      title={`คลิกเพื่อคัดลอกรหัส ${code}`}
+                      className={cn(
+                        "font-mono text-xs px-2.5 py-1 rounded-lg font-bold border transition-all cursor-pointer active:scale-95 hover:shadow-xs",
+                        isU
+                          ? "bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-400/30 hover:bg-purple-500/20"
+                          : "bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-400/30 hover:bg-teal-500/20"
+                      )}
+                    >
+                      {code}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard?.writeText(viewingDxDrug.codes.join(', '))
+                }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 dark:text-slate-300 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/15 transition-colors cursor-pointer"
+              >
+                <Copy className="size-3.5" />
+                <span>คัดลอกรหัสทั้งหมด ({viewingDxDrug.codes.length})</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewingDxDrug(null)}
+                className="px-4 py-1.5 rounded-xl text-xs font-semibold bg-teal-600 text-white hover:bg-teal-700 transition-colors cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

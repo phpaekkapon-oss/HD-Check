@@ -278,65 +278,148 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
       {
         accessorKey: 'dx_prefixes',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)" />
+          <DataTableColumnHeader
+            column={column}
+            title="รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)"
+            className="min-w-[380px] lg:min-w-[460px]"
+          />
         ),
         cell: ({ row }) => {
           const item = row.original
           const isEditing = editingIcode === item.icode
           if (isEditing) {
+            const editCodes = prefixes
+              ? prefixes
+                  .split(',')
+                  .map((p) => p.trim())
+                  .filter(Boolean)
+              : []
+
+            const handleRemoveCode = (codeToRemove: string) => {
+              const remaining = editCodes.filter(
+                (c) => c.toUpperCase() !== codeToRemove.toUpperCase()
+              )
+              setPrefixes(remaining.join(', '))
+              setPreview(null)
+            }
+
             return (
-              <input
-                type="text"
-                value={prefixes}
-                onChange={(e) => {
-                  setPrefixes(e.target.value)
-                  setPreview(null)
-                }}
-                placeholder="เช่น K30, R14, U6680"
-                className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
-                autoFocus
-              />
+              <div className="min-w-[380px] lg:min-w-[460px] max-w-[600px] space-y-2 py-1">
+                {/* แถบชิปรหัส ICD-10 พร้อมปุ่ม ✕ สำหรับคลิกลบออกทีละรหัสได้ทันที */}
+                {editCodes.length > 0 ? (
+                  <div className="p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
+                      <span>รหัสปัจจุบัน (<strong>{editCodes.length}</strong> รหัส) • คลิก ✕ เพื่อลบออก</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrefixes('')
+                          setPreview(null)
+                        }}
+                        className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+                      >
+                        ลบทั้งหมด
+                      </button>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-1.5 max-h-36 overflow-y-auto pr-1">
+                      {editCodes.map((p) => {
+                        const isU = p.toUpperCase().startsWith('U')
+                        return (
+                          <span
+                            key={p}
+                            className={cn(
+                              'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border transition-all shadow-2xs',
+                              isU
+                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
+                                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
+                            )}
+                          >
+                            <span>{p}</span>
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveCode(p)}
+                              title={`คลิกเพื่อลบรหัส ${p}`}
+                              className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 dark:hover:bg-rose-600 transition-colors cursor-pointer"
+                            >
+                              <X className="size-3" />
+                            </button>
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="text-[11px] text-rose-500 dark:text-rose-400 italic px-1">
+                    ยังไม่มีรหัส (พิมพ์รหัสในช่องด้านล่าง เช่น K30, R14, U6680)
+                  </div>
+                )}
+
+                {/* กล่องข้อความแบบกว้างและหลายบรรทัด สำหรับพิมพ์เพิ่ม ลบ หรือวางหลายรหัส */}
+                <div className="space-y-1">
+                  <textarea
+                    rows={2}
+                    value={prefixes}
+                    onChange={(e) => {
+                      setPrefixes(e.target.value)
+                      setPreview(null)
+                    }}
+                    placeholder="พิมพ์รหัส ICD-10 คั่นด้วยจุลภาค เช่น K30, R14, U6680"
+                    className="w-full min-h-[56px] rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y leading-relaxed"
+                    autoFocus
+                  />
+                  <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+                    <span>คั่นรหัสด้วยจุลภาค (,) พิมพ์รหัสเดี่ยวหรือคำนำหน้ากลุ่มโรคได้</span>
+                    <span className="hidden sm:inline text-slate-400">ขยายความสูงได้จากมุมขวาล่าง</span>
+                  </div>
+                </div>
+              </div>
             )
           }
           const allCodes = item.dx_prefixes
             ? item.dx_prefixes.split(',').map((p) => p.trim()).filter(Boolean)
             : []
           if (allCodes.length === 0) {
-            return <span className="text-rose-500 italic text-xs">ยังไม่กำหนดรหัส</span>
+            return (
+              <div className="min-w-[380px] lg:min-w-[460px]">
+                <span className="text-rose-500 italic text-xs">ยังไม่กำหนดรหัส</span>
+              </div>
+            )
           }
           const isExpanded = expandedDxRows.has(item.icode)
-          const MAX_VISIBLE = 5
+          const MAX_VISIBLE = 8
           const visibleCodes = isExpanded ? allCodes : allCodes.slice(0, MAX_VISIBLE)
           const remainingCount = allCodes.length - MAX_VISIBLE
 
           return (
-            <div className="flex flex-wrap items-center gap-1 font-mono">
-              {visibleCodes.map((p) => {
-                const isU = p.toUpperCase().startsWith('U')
-                return (
-                  <span
-                    key={p}
-                    className={cn(
-                      'px-1.5 py-0.5 rounded text-xs font-semibold border transition-all',
-                      isU
-                        ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30'
-                        : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
-                    )}
+            <div className="min-w-[380px] lg:min-w-[460px] max-w-[600px]">
+              <div className="flex flex-wrap items-center gap-1 font-mono">
+                {visibleCodes.map((p) => {
+                  const isU = p.toUpperCase().startsWith('U')
+                  return (
+                    <span
+                      key={p}
+                      className={cn(
+                        'px-1.5 py-0.5 rounded text-xs font-semibold border transition-all',
+                        isU
+                          ? 'bg-purple-500/10 text-purple-700 dark:text-purple-300 border-purple-500/30'
+                          : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-500/30'
+                      )}
+                    >
+                      {p}
+                    </span>
+                  )
+                })}
+                {remainingCount > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => toggleExpandDx(item.icode)}
+                    title={isExpanded ? 'คลิกเพื่อย่อ' : `คลิกเพื่อดูทั้งหมด (${allCodes.join(', ')})`}
+                    className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-white/10 cursor-pointer transition-colors"
                   >
-                    {p}
-                  </span>
-                )
-              })}
-              {remainingCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => toggleExpandDx(item.icode)}
-                  title={isExpanded ? 'คลิกเพื่อย่อ' : `คลิกเพื่อดูทั้งหมด (${allCodes.join(', ')})`}
-                  className="px-1.5 py-0.5 rounded text-xs font-bold bg-slate-100 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/20 text-slate-600 dark:text-slate-300 border border-slate-300 dark:border-white/10 cursor-pointer transition-colors"
-                >
-                  {isExpanded ? 'ย่อลง' : `+${remainingCount}`}
-                </button>
-              )}
+                    {isExpanded ? 'ย่อลง' : `+${remainingCount}`}
+                  </button>
+                )}
+              </div>
             </div>
           )
         },
@@ -379,26 +462,30 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
       {
         accessorKey: 'indication',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="ข้อบ่งใช้ / สรรพคุณ" />
+          <DataTableColumnHeader column={column} title="ข้อบ่งใช้ / สรรพคุณ" className="min-w-[180px]" />
         ),
         cell: ({ row }) => {
           const item = row.original
           const isEditing = editingIcode === item.icode
           if (isEditing) {
             return (
-              <input
-                type="text"
-                value={indication}
-                onChange={(e) => setIndication(e.target.value)}
-                placeholder="ข้อบ่งใช้ของยา"
-                className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2 py-1 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2"
-              />
+              <div className="min-w-[180px] max-w-[280px]">
+                <textarea
+                  rows={2}
+                  value={indication}
+                  onChange={(e) => setIndication(e.target.value)}
+                  placeholder="ข้อบ่งใช้ของยา"
+                  className="w-full rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 resize-y"
+                />
+              </div>
             )
           }
           return (
-            <span className="text-slate-600 dark:text-slate-300">
-              {item.indication || '-'}
-            </span>
+            <div className="min-w-[180px] max-w-[280px]">
+              <span className="text-slate-600 dark:text-slate-300 line-clamp-3">
+                {item.indication || '-'}
+              </span>
+            </div>
           )
         },
       },
@@ -837,13 +924,73 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
               {isEditing ? (
                 <div className="space-y-3 border-t border-slate-100 dark:border-white/10 pt-3">
-                  <label className="block space-y-1.5">
-                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">รหัส ICD-10 ที่อนุญาต</span>
-                    <input type="text" value={prefixes} onChange={(e) => { setPrefixes(e.target.value); setPreview(null) }} placeholder="เช่น M, S หรือ K30, R14" className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 font-mono text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2" />
-                  </label>
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">รหัส ICD-10 ที่อนุญาต</span>
+                      {prefixes && (
+                        <button
+                          type="button"
+                          onClick={() => { setPrefixes(''); setPreview(null) }}
+                          className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+                        >
+                          ลบทั้งหมด
+                        </button>
+                      )}
+                    </div>
+                    {(() => {
+                      const mCodes = prefixes ? prefixes.split(',').map((p) => p.trim()).filter(Boolean) : []
+                      if (mCodes.length === 0) return null
+                      return (
+                        <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] max-h-32 overflow-y-auto">
+                          {mCodes.map((p) => {
+                            const isU = p.toUpperCase().startsWith('U')
+                            return (
+                              <span
+                                key={p}
+                                className={cn(
+                                  'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border',
+                                  isU
+                                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
+                                )}
+                              >
+                                <span>{p}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const rem = mCodes.filter((c) => c.toUpperCase() !== p.toUpperCase())
+                                    setPrefixes(rem.join(', '))
+                                    setPreview(null)
+                                  }}
+                                  className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 cursor-pointer"
+                                  title={`คลิกลบรหัส ${p}`}
+                                >
+                                  <X className="size-3" />
+                                </button>
+                              </span>
+                            )
+                          })}
+                        </div>
+                      )
+                    })()}
+                    <textarea
+                      rows={2}
+                      value={prefixes}
+                      onChange={(e) => { setPrefixes(e.target.value); setPreview(null) }}
+                      placeholder="เช่น M, S หรือ K30, R14, U6680"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 font-mono text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+                    />
+                    <p className="text-[11px] text-slate-400">แตะปุ่ม ✕ ที่รหัสเพื่อลบออกได้ทันที หรือพิมพ์แก้ไขในช่องข้อความ</p>
+                  </div>
                   <label className="block space-y-1.5">
                     <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">ข้อบ่งใช้ / สรรพคุณ</span>
-                    <input type="text" value={indication} onChange={(e) => setIndication(e.target.value)} placeholder="ระบุข้อบ่งใช้ของยา" className="w-full min-h-11 rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 text-base sm:text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2" />
+                    <textarea
+                      rows={2}
+                      value={indication}
+                      onChange={(e) => setIndication(e.target.value)}
+                      placeholder="ระบุข้อบ่งใช้ของยา"
+                      className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 resize-y"
+                    />
                   </label>
                   <div className="flex gap-2">
                     <button type="button" disabled={isPending} onClick={handleSave} className="btn-pill-action min-h-11 flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-semibold disabled:opacity-50 touch-manipulation"><Check className="size-4" /> บันทึก</button>
@@ -1057,22 +1204,68 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                   </div>
                 )}
 
-                <label className="block space-y-1">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)
-                  </span>
-                  <input
-                    type="text"
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)
+                    </span>
+                    {newPrefixes && (
+                      <button
+                        type="button"
+                        onClick={() => setNewPrefixes('')}
+                        className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+                      >
+                        ลบทั้งหมด
+                      </button>
+                    )}
+                  </div>
+                  {(() => {
+                    const nCodes = newPrefixes ? newPrefixes.split(',').map((p) => p.trim()).filter(Boolean) : []
+                    if (nCodes.length === 0) return null
+                    return (
+                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] max-h-28 overflow-y-auto">
+                        {nCodes.map((p) => {
+                          const isU = p.toUpperCase().startsWith('U')
+                          return (
+                            <span
+                              key={p}
+                              className={cn(
+                                'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border',
+                                isU
+                                  ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
+                                  : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
+                              )}
+                            >
+                              <span>{p}</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const rem = nCodes.filter((c) => c.toUpperCase() !== p.toUpperCase())
+                                  setNewPrefixes(rem.join(', '))
+                                }}
+                                className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 cursor-pointer"
+                                title={`คลิกลบรหัส ${p}`}
+                              >
+                                <X className="size-3" />
+                              </button>
+                            </span>
+                          )
+                        })}
+                      </div>
+                    )
+                  })()}
+                  <textarea
+                    rows={2}
                     value={newPrefixes}
                     onChange={(e) => setNewPrefixes(e.target.value)}
-                    placeholder="เช่น M, S หรือ K30, R14"
-                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
+                    placeholder="เช่น M, S หรือ K30, R14, U6680"
+                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
                     autoFocus
                   />
                   <span className="text-xs text-slate-400 block">
-                    ใส่คำนำหน้า เช่น <code className="text-teal-500">M</code> (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น <code className="text-teal-500">K30, R14</code>
+                    ใส่คำนำหน้า เช่น <code className="text-teal-500">M</code> (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น <code className="text-teal-500">K30, R14</code> (คลิก ✕ ที่รหัสเพื่อลบออกได้)
                   </span>
-                </label>
+                </div>
 
                 <label className="block space-y-1">
                   <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">

@@ -10,20 +10,21 @@ const QUERY_1 = `SELECT
     d.name AS drug_name,
     op.qty AS drug_qty,
     sp.name AS department_name,
-    COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
-    COALESCE(NULLIF(TRIM(ov_latest.dx0), ''), NULLIF(TRIM(ov.dx0), ''), NULLIF(TRIM(ov_period.dx0), ''), SUBSTRING_INDEX(odx.codes, ',', 1), '') AS dx0,
-    COALESCE(NULLIF(TRIM(ov_latest.dx1), ''), NULLIF(TRIM(ov.dx1), ''), NULLIF(TRIM(ov_period.dx1), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 2), ',', -1), '') AS dx1,
-    COALESCE(NULLIF(TRIM(ov_latest.dx2), ''), NULLIF(TRIM(ov.dx2), ''), NULLIF(TRIM(ov_period.dx2), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 3), ',', -1), '') AS dx2,
-    COALESCE(NULLIF(TRIM(ov_latest.dx3), ''), NULLIF(TRIM(ov.dx3), ''), NULLIF(TRIM(ov_period.dx3), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 4), ',', -1), '') AS dx3,
-    COALESCE(NULLIF(TRIM(ov_latest.dx4), ''), NULLIF(TRIM(ov.dx4), ''), NULLIF(TRIM(ov_period.dx4), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 5), ',', -1), '') AS dx4,
-    COALESCE(NULLIF(TRIM(ov_latest.dx5), ''), NULLIF(TRIM(ov.dx5), ''), NULLIF(TRIM(ov_period.dx5), ''), SUBSTRING_INDEX(SUBSTRING_INDEX(odx.codes, ',', 6), ',', -1), '') AS dx5,
+    COALESCE(NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(od_pdx.icd10), ''), NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov_period.pdx), ''), '') AS main_pdx,
+    SUBSTRING_INDEX(sec.all_sec_codes, ',', 1) AS dx0,
+    SUBSTRING_INDEX(SUBSTRING_INDEX(sec.all_sec_codes, ',', 2), ',', -1) AS dx1,
+    SUBSTRING_INDEX(SUBSTRING_INDEX(sec.all_sec_codes, ',', 3), ',', -1) AS dx2,
+    SUBSTRING_INDEX(SUBSTRING_INDEX(sec.all_sec_codes, ',', 4), ',', -1) AS dx3,
+    SUBSTRING_INDEX(SUBSTRING_INDEX(sec.all_sec_codes, ',', 5), ',', -1) AS dx4,
+    SUBSTRING_INDEX(SUBSTRING_INDEX(sec.all_sec_codes, ',', 6), ',', -1) AS dx5,
     doc.name AS doctor_name,
     CASE 
-        WHEN COALESCE(NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
+        WHEN COALESCE(NULLIF(TRIM(ov.pdx), ''), NULLIF(TRIM(od_pdx.icd10), ''), NULLIF(TRIM(ov_latest.pdx), ''), NULLIF(TRIM(od1.icd10), ''), NULLIF(TRIM(ov_period.pdx), '')) IS NULL THEN 'INCOMPLETE'
         WHEN (
-          COALESCE(ov_latest.pdx, od1.icd10, ov.pdx, ov_period.pdx, '') LIKE 'U%'
-          OR COALESCE(ov_latest.dx0, ov.dx0, ov_period.dx0, '') LIKE 'U%'
-          OR COALESCE(ov_latest.dx1, ov.dx1, ov_period.dx1, '') LIKE 'U%'
+          COALESCE(ov.pdx, od_pdx.icd10, ov_latest.pdx, od1.icd10, ov_period.pdx, '') LIKE 'U%'
+          OR COALESCE(ov.dx0, ov_latest.dx0, ov_period.dx0, '') LIKE 'U%'
+          OR COALESCE(ov.dx1, ov_latest.dx1, ov_period.dx1, '') LIKE 'U%'
+          OR CONCAT(',', IFNULL(hmdx.u_codes, '')) LIKE '%,U%'
           OR CONCAT(',', IFNULL(odx.codes, '')) LIKE '%,U%'
         ) THEN 'COMPLETE'
         ELSE 'INCOMPLETE'
@@ -35,44 +36,92 @@ INNER JOIN patient pt ON o.hn = pt.hn
 INNER JOIN drugitems d ON op.icode = d.icode
 LEFT JOIN pttype ps ON o.pttype = ps.pttype
 LEFT JOIN spclty sp ON o.spclty = sp.spclty
-LEFT JOIN doctor doc ON o.doctor = doc.code
--- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (Latest Visit of the day)
+-- กรองเฉพาะแพทย์แผนไทย 5 ท่านจากหน้าแพทย์ผู้ตรวจ (One Stop Service)
+INNER JOIN doctor doc ON o.doctor = doc.code AND (
+  doc.name LIKE '%นภัสกร%มวลชัยภูมิ%'
+  OR doc.name LIKE '%ศาสตรา%คำมุลตรี%'
+  OR doc.name LIKE '%ศาสตรา%คำมูลตรี%'
+  OR doc.name LIKE '%แคทริยา%แสนหูม%'
+  OR doc.name LIKE '%ศุภาวรรณ%ลูกเงาะ%'
+  OR doc.name LIKE '%กชวรรณ%ดวงแก้ว%'
+)
+-- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (เฉพาะแพทย์แผนไทย 5 ท่าน)
 LEFT JOIN (
   SELECT o_max.hn, o_max.vstdate, MAX(o_max.vn) AS latest_vn
   FROM ovst o_max
+  INNER JOIN doctor d_max ON o_max.doctor = d_max.code AND (
+    d_max.name LIKE '%นภัสกร%มวลชัยภูมิ%'
+    OR d_max.name LIKE '%ศาสตรา%คำมุลตรี%'
+    OR d_max.name LIKE '%ศาสตรา%คำมูลตรี%'
+    OR d_max.name LIKE '%แคทริยา%แสนหูม%'
+    OR d_max.name LIKE '%ศุภาวรรณ%ลูกเงาะ%'
+    OR d_max.name LIKE '%กชวรรณ%ดวงแก้ว%'
+  )
   WHERE o_max.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
   GROUP BY o_max.hn, o_max.vstdate
 ) lv ON o.hn = lv.hn AND o.vstdate = lv.vstdate
 LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
--- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag เผื่อ vn_stat ยังไม่อัปเดต
-LEFT JOIN ovstdiag od1 ON od1.vn = COALESCE(lv.latest_vn, o.vn) AND od1.diagtype = '1'
--- 3) รหัสวินิจฉัยรอง/อื่นๆ ทั้งหมดของผู้ป่วยในวันนั้นจาก ovstdiag (รวมทุก visit เช่น Visit คัดกรอง + Visit แพทย์แผนไทย)
+-- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag ของ visit นี้ หรือ visit ล่าสุดของแพทย์แผนไทย
+LEFT JOIN ovstdiag od_pdx ON od_pdx.vn = o.vn AND od_pdx.diagtype = '1'
+LEFT JOIN ovstdiag od1 ON od1.vn = lv.latest_vn AND od1.diagtype = '1'
+-- 3) รหัสวินิจฉัยรองทั้งหมด: รวมรหัสแผนปัจจุบันจาก ovstdiag (priority 1) + รหัส U จาก F7 health_med_service_diagnosis (priority 2) + รหัส U จาก ovstdiag (priority 3)
 LEFT JOIN (
-  SELECT o2.hn, o2.vstdate, 
-         GROUP_CONCAT(DISTINCT od.icd10 ORDER BY od.diagtype, od.icd10 SEPARATOR ',') AS codes
-  FROM ovstdiag od
-  INNER JOIN ovst o2 ON od.vn = o2.vn
-  WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> ''
-    AND o2.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
-  GROUP BY o2.hn, o2.vstdate
-) odx ON o.hn = odx.hn AND o.vstdate = odx.vstdate
--- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เผื่อกรณีมารับยาต่อเนื่องแต่รหัสวินิจฉัยอยู่ที่ visit ล่าสุดในรอบเดือน)
+  SELECT t.hn, t.vstdate, GROUP_CONCAT(DISTINCT t.icd10 ORDER BY t.priority, t.icd10 SEPARATOR ',') AS all_sec_codes
+  FROM (
+    SELECT o2.hn, o2.vstdate, od.icd10, 1 AS priority
+    FROM ovstdiag od
+    INNER JOIN ovst o2 ON od.vn = o2.vn
+    INNER JOIN doctor d2 ON o2.doctor = d2.code AND (
+      d2.name LIKE '%นภัสกร%มวลชัยภูมิ%' OR d2.name LIKE '%ศาสตรา%คำมุลตรี%' OR d2.name LIKE '%ศาสตรา%คำมูลตรี%' OR d2.name LIKE '%แคทริยา%แสนหูม%' OR d2.name LIKE '%ศุภาวรรณ%ลูกเงาะ%' OR d2.name LIKE '%กชวรรณ%ดวงแก้ว%'
+    )
+    WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> '' AND od.icd10 NOT LIKE 'U%'
+      AND o2.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+
+    UNION
+
+    SELECT hms.hn, hms.service_date AS vstdate, hmd.icd10, 2 AS priority
+    FROM health_med_service_diagnosis hmd
+    JOIN health_med_service hms ON hms.health_med_service_id = hmd.health_med_service_id
+    WHERE hms.service_date BETWEEN '2026-10-01' AND '2026-10-31'
+      AND hmd.icd10 IS NOT NULL AND hmd.icd10 <> '' AND hmd.icd10 LIKE 'U%'
+
+    UNION
+
+    SELECT o3.hn, o3.vstdate, od3.icd10, 3 AS priority
+    FROM ovstdiag od3
+    INNER JOIN ovst o3 ON od3.vn = o3.vn
+    INNER JOIN doctor d3 ON o3.doctor = d3.code AND (
+      d3.name LIKE '%นภัสกร%มวลชัยภูมิ%' OR d3.name LIKE '%ศาสตรา%คำมุลตรี%' OR d3.name LIKE '%ศาสตรา%คำมูลตรี%' OR d3.name LIKE '%แคทริยา%แสนหูม%' OR d3.name LIKE '%ศุภาวรรณ%ลูกเงาะ%' OR d3.name LIKE '%กชวรรณ%ดวงแก้ว%'
+    )
+    WHERE od3.icd10 IS NOT NULL AND od3.icd10 <> '' AND od3.icd10 LIKE 'U%'
+      AND o3.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
+  ) t
+  GROUP BY t.hn, t.vstdate
+) sec ON o.hn = sec.hn AND o.vstdate = sec.vstdate
+-- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เฉพาะแพทย์แผนไทย 5 ท่าน)
 LEFT JOIN (
   SELECT o_m.hn, MAX(o_m.vn) AS period_latest_vn
   FROM ovst o_m
+  INNER JOIN doctor d_m ON o_m.doctor = d_m.code AND (
+    d_m.name LIKE '%นภัสกร%มวลชัยภูมิ%'
+    OR d_m.name LIKE '%ศาสตรา%คำมุลตรี%'
+    OR d_m.name LIKE '%ศาสตรา%คำมูลตรี%'
+    OR d_m.name LIKE '%แคทริยา%แสนหูม%'
+    OR d_m.name LIKE '%ศุภาวรรณ%ลูกเงาะ%'
+    OR d_m.name LIKE '%กชวรรณ%ดวงแก้ว%'
+  )
   WHERE o_m.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
   GROUP BY o_m.hn
 ) plv ON o.hn = plv.hn
 LEFT JOIN vn_stat ov_period ON ov_period.vn = plv.period_latest_vn
 WHERE o.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
-  AND (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16')
-  AND (d.drugcategory LIKE '%สมุนไพร%' OR d.name LIKE '%มะแว้ง%' OR d.name LIKE '%มะขามแขก%' OR d.name LIKE '%เถาวัลย์เปรียง%' OR d.icode IN ('1550003', '1540013', '1560028', '1560031'))
+  AND (op.an IS NULL OR op.an = '')
 ORDER BY o.vstdate DESC, o.vsttime DESC;`
 
 const QUERY_2 = `SELECT 
     d.icode AS \`รหัสยา\`,
     d.name AS \`รายการยา\`,
-    -- จ่ายผู้ป่วยนอก (OPD) แผนกแพทย์แผนไทย
+    -- จ่ายผู้ป่วยนอก (OPD) เฉพาะแพทย์แผนไทย 5 ท่าน
     SUM(CASE WHEN (op.an IS NULL OR op.an = '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS \`จ่ายผู้ป่วยนอก\`,
     -- จ่ายผู้ป่วยใน (IPD) ทุกหอผู้ป่วย
     SUM(CASE WHEN (op.an IS NOT NULL AND op.an <> '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS \`จ่ายผู้ป่วยใน\`,
@@ -90,10 +139,18 @@ LEFT JOIN (
   FROM opitemrece op
   LEFT JOIN ovst o ON op.vn = o.vn
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
+  LEFT JOIN doctor doc ON o.doctor = doc.code
   WHERE op.vstdate BETWEEN '2026-10-01' AND '2026-10-31'
     AND (
-      -- ผู้ป่วยนอก: เฉพาะแผนกแพทย์แผนไทย
-      ((op.an IS NULL OR op.an = '') AND (sp.name LIKE '%แพทย์แผนไทย%' OR sp.spclty = '16'))
+      -- ผู้ป่วยนอก: เฉพาะแพทย์แผนไทย 5 ท่าน
+      ((op.an IS NULL OR op.an = '') AND (
+        doc.name LIKE '%นภัสกร%มวลชัยภูมิ%'
+        OR doc.name LIKE '%ศาสตรา%คำมุลตรี%'
+        OR doc.name LIKE '%ศาสตรา%คำมูลตรี%'
+        OR doc.name LIKE '%แคทริยา%แสนหูม%'
+        OR doc.name LIKE '%ศุภาวรรณ%ลูกเงาะ%'
+        OR doc.name LIKE '%กชวรรณ%ดวงแก้ว%'
+      ))
       OR
       -- ผู้ป่วยใน: ทุกหอผู้ป่วยที่มีการสั่งใช้ยาสมุนไพร
       (op.an IS NOT NULL AND op.an <> '')

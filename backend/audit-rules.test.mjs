@@ -68,9 +68,17 @@ test('no minimum configured means quantity is not checked', () => {
 })
 
 test('target Thai-medicine doctor needs a U-code diagnosis', () => {
-  const doctor = 'นภัสกร มวลชัยภูมิ'
-  assert.equal(run({ pdx: 'K30', doctor_name: doctor }).audit_result, 'FAIL')
-  assert.equal(run({ pdx: 'K30', dx0: 'U57.1', doctor_name: doctor }).audit_result, 'PASS')
+  const doctors = [
+    'นางสาวนภัสกร มวลชัยภูมิ',
+    'นายศาสตรา คำมุลตรี',
+    'นางสาวแคทริยา แสนหูม',
+    'นางสาวศุภาวรรณ ลูกเงาะ',
+    'นางสาวกชวรรณ ดวงแก้ว',
+  ]
+  for (const doc of doctors) {
+    assert.equal(run({ pdx: 'K30', doctor_name: doc }).audit_result, 'FAIL', `${doc} should fail without U-code`)
+    assert.equal(run({ pdx: 'K30', dx0: 'U57.1', doctor_name: doc }).audit_result, 'PASS', `${doc} should pass with U-code`)
+  }
   // other doctors are unaffected
   assert.equal(run({ pdx: 'K30', doctor_name: 'แพทย์ทั่วไป' }).audit_result, 'PASS')
 })
