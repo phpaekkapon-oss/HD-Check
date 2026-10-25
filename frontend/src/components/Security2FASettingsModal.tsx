@@ -1001,16 +1001,25 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     })
   }
 
+  // มือถือ: เลื่อนแถบแท็บให้แท็บที่เลือกอยู่กลางจอเสมอ (ไม่ให้แท็บหลุดขอบ)
+  const tabsRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!isOpen) return
+    tabsRef.current
+      ?.querySelector<HTMLElement>(`[data-tab-id="${activeTab}"]`)
+      ?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' })
+  }, [activeTab, isOpen])
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-0 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
       <div className="fixed inset-0" onClick={handleModalClose} />
       {/* Modal Dialog */}
-      <div className="relative w-full max-w-3xl sm:max-w-4xl lg:max-w-6xl max-sm:h-dvh sm:h-[min(860px,90dvh)] bg-slate-900 dark:bg-[var(--card-bg)] border border-slate-800 dark:border-[var(--card-border)] max-sm:rounded-none sm:rounded-2xl shadow-2xl shadow-black/80 flex flex-col z-10 overflow-hidden text-white animate-scale-in">
+      <div className="sec-modal relative w-full max-w-3xl sm:max-w-4xl lg:max-w-6xl max-sm:h-dvh sm:h-[min(860px,90dvh)] bg-[var(--card-bg)] border border-[var(--card-border)] max-sm:rounded-none sm:rounded-2xl shadow-2xl shadow-black/40 flex flex-col z-10 overflow-hidden text-[var(--text-main)] animate-scale-in pb-[env(safe-area-inset-bottom,0px)]">
         {/* Header */}
-        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-white/[0.06] bg-slate-950/80 dark:bg-[var(--card-header)] shrink-0">
-          <div className="flex items-center gap-3.5">
+        <div className="flex items-center justify-between gap-3 px-4 sm:px-6 py-3 sm:py-4.5 border-b border-white/[0.06] bg-[var(--card-header)] shrink-0">
+          <div className="flex min-w-0 items-center gap-3.5">
             <div className={cn(
               'grid place-items-center size-10 rounded-xl border shadow-sm shrink-0 transition-colors',
               activeTab === 'admin_system'
@@ -1024,7 +1033,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
               )}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-white tracking-tight flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-white tracking-tight flex items-center gap-2">
                 {activeTab === 'admin_system'
                   ? 'ศูนย์จัดการระบบ & ควบคุมเวอร์ชัน (Admin Hub)'
                   : 'ศูนย์ตั้งค่าความปลอดภัย & จัดการบัญชี'}
@@ -1050,9 +1059,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
         <div className="flex-1 min-h-0 flex flex-col sm:flex-row">
           <nav
             aria-label="หมวดการตั้งค่า"
-            className="shrink-0 border-b sm:border-b-0 sm:border-r border-white/[0.06] bg-slate-950/40 dark:bg-[var(--card-header)] sm:w-52 lg:w-56 sm:overflow-y-auto"
+            className="shrink-0 border-b sm:border-b-0 sm:border-r border-white/[0.06] bg-[var(--card-header)] sm:w-52 lg:w-56 sm:overflow-y-auto"
           >
-            <div className="flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible p-2 sm:p-3 scrollbar-none">
+            <div ref={tabsRef} className="sec-tabs flex sm:flex-col gap-1 overflow-x-auto sm:overflow-visible p-2 sm:p-3 scrollbar-none">
               {(
                 [
                   { group: 'บัญชีของฉัน' },
@@ -1094,6 +1103,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     key={item.id}
                     type="button"
                     aria-current={isActive ? 'page' : undefined}
+                    data-tab-id={item.id}
                     onClick={() => {
                       setActiveTab(item.id as typeof activeTab)
                       if ('onOpen' in item && item.onOpen) item.onOpen()
@@ -1760,7 +1770,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     <div className={cn('grid size-9 shrink-0 place-items-center rounded-lg', row.on ? 'bg-accent-soft text-accent' : 'bg-white/[0.05] text-slate-400')}>
                       <row.icon className="size-4.5" />
                     </div>
-                    <div className="min-w-0 flex-1">
+                    {/* basis 12rem: จอแคบให้ตัวควบคุมตกลงบรรทัดใหม่ ไม่บีบข้อความจนขึ้นทีละตัวอักษร */}
+                    <div className="min-w-0 flex-1 basis-[12rem]">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="text-sm font-semibold text-white">{row.title}</h3>
                         <span
@@ -1990,7 +2001,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 )}
 
                 {/* Mobile card list (< md) */}
-                <div className="md:hidden space-y-2 max-h-[60dvh] overflow-y-auto">
+                <div className="md:hidden space-y-2">
                   {usersLoading ? (
                     <div className="py-8 text-center text-sm text-slate-400">
                       <Loader2 className="size-5 animate-spin mx-auto mb-2 text-emerald-400" />
@@ -2135,7 +2146,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 </div>
 
                 {/* แถบแบ่งหน้า (มือถือ) */}
-                <div className="dark md:hidden rounded-xl overflow-hidden">
+                <div className="md:hidden rounded-xl overflow-hidden">
                   <PaginationBar {...usersBarProps} pageSizeOptions={[25, 50, 100, 200]} />
                 </div>
 
@@ -2386,7 +2397,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   </div>
 
                   {/* แถบแบ่งหน้า */}
-                  <div className="dark">
+                  <div>
                     <PaginationBar {...usersBarProps} pageSizeOptions={[25, 50, 100, 200]} />
                   </div>
                 </div>
