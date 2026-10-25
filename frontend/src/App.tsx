@@ -337,10 +337,10 @@ const DashboardView: FC = () => {
               aria-live="polite"
               className={`mb-3 flex flex-col gap-2 rounded-xl border px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between ${
                 isAuditError || isStatusError
-                  ? 'border-rose-500/30 bg-rose-500/10 text-rose-200'
+                  ? 'border-rose-500/30 bg-rose-500/10 text-rose-800 dark:text-rose-200'
                   : auditResponse?.data.length === 0 && !isAuditFetching
-                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-100'
-                    : 'border-sky-500/30 bg-sky-500/10 text-sky-100'
+                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-900 dark:text-amber-100'
+                    : 'border-sky-500/30 bg-sky-500/10 text-sky-900 dark:text-sky-100'
               }`}
             >
               <div>

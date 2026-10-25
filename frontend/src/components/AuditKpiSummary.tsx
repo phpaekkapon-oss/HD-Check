@@ -37,7 +37,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
       valueColor: 'text-slate-900 dark:text-white',
       subColor: 'text-slate-500 dark:text-slate-400',
       activeBorder: 'border-indigo-500 dark:border-indigo-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(99,102,241,0.3)]',
+      activeShadow: 'shadow-[0_0_0_3px_rgba(99,102,241,0.12),0_2px_8px_rgba(99,102,241,0.12)]',
       activeBg: 'bg-indigo-500/[0.06] dark:bg-indigo-950/40',
       hoverBorder: 'hover:border-indigo-400/60 dark:hover:border-indigo-500/40',
     },
@@ -51,7 +51,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
       valueColor: 'text-emerald-600 dark:text-emerald-400',
       subColor: 'text-emerald-700/80 dark:text-emerald-400/80',
       activeBorder: 'border-emerald-500 dark:border-emerald-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(16,185,129,0.3)]',
+      activeShadow: 'shadow-[0_0_0_3px_rgba(16,185,129,0.12),0_2px_8px_rgba(16,185,129,0.12)]',
       activeBg: 'bg-emerald-500/[0.06] dark:bg-emerald-950/40',
       hoverBorder: 'hover:border-emerald-400/60 dark:hover:border-emerald-500/40',
       rate: kpi.passRate,
@@ -66,7 +66,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
       valueColor: 'text-rose-600 dark:text-rose-400',
       subColor: 'text-rose-700/80 dark:text-rose-400/80',
       activeBorder: 'border-rose-500 dark:border-rose-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(244,63,94,0.3)]',
+      activeShadow: 'shadow-[0_0_0_3px_rgba(244,63,94,0.12),0_2px_8px_rgba(244,63,94,0.12)]',
       activeBg: 'bg-rose-500/[0.06] dark:bg-rose-950/40',
       hoverBorder: 'hover:border-rose-400/60 dark:hover:border-rose-500/40',
     },
@@ -80,7 +80,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
       valueColor: 'text-amber-600 dark:text-amber-400',
       subColor: 'text-amber-700/80 dark:text-amber-400/80',
       activeBorder: 'border-amber-500 dark:border-amber-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]',
+      activeShadow: 'shadow-[0_0_0_3px_rgba(245,158,11,0.12),0_2px_8px_rgba(245,158,11,0.12)]',
       activeBg: 'bg-amber-500/[0.06] dark:bg-amber-950/40',
       hoverBorder: 'hover:border-amber-400/60 dark:hover:border-amber-500/40',
     },
@@ -94,7 +94,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
       valueColor: 'text-slate-700 dark:text-slate-300',
       subColor: 'text-slate-500 dark:text-slate-400',
       activeBorder: 'border-slate-400 dark:border-slate-300',
-      activeShadow: 'shadow-[0_0_20px_rgba(148,163,184,0.3)]',
+      activeShadow: 'shadow-[0_0_0_3px_rgba(148,163,184,0.12),0_2px_8px_rgba(148,163,184,0.12)]',
       activeBg: 'bg-slate-500/[0.06] dark:bg-slate-900/40',
       hoverBorder: 'hover:border-slate-400/60 dark:hover:border-slate-500/40',
     },
@@ -115,7 +115,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
             onClick={() => onSelect(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
             className={cn(
               'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group',
-              'border-2 flex flex-col justify-between min-h-[132px]',
+              'border flex flex-col justify-between min-h-[132px]',
               'backdrop-blur-md',
               isSelected
                 ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5')

@@ -691,7 +691,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('PASS')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูรายชื่อผู้รับบริการและรายการสั่งยาที่ผ่านเกณฑ์"
         >
           <div>
@@ -741,7 +741,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('TOTAL')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูประวัติการสั่งใช้ยาสมุนไพรทั้งหมด"
         >
           <div>
@@ -783,7 +783,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('PATIENTS')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูรายชื่อผู้รับบริการสั่งใช้สมุนไพรทุกคน"
         >
           <div>
@@ -818,7 +818,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('PROBLEMS')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-rose-500/[0.04] dark:bg-rose-950/20 border-rose-500/30 dark:border-rose-500/30 shadow-2xs hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:border-rose-500 dark:hover:border-rose-400 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-rose-500/[0.04] dark:bg-rose-950/20 border-rose-500/30 dark:border-rose-500/30 shadow-2xs hover:shadow-[0_0_20px_rgba(244,63,94,0.3)] hover:border-rose-500 dark:hover:border-rose-400 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูรายการที่ต้องทบทวนหรือแก้ไขรหัสโรค"
         >
           <div>
