@@ -3,6 +3,7 @@ import { AlertCircle, Check, Loader2, Lock, RotateCcw, ShieldCheck } from 'lucid
 import { useMenuPermissions, useSaveMenuPermissions } from '@/hooks/useHerbDx'
 import type { MenuPermissionMatrix } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 
 /** ตารางติ๊กสิทธิ์เมนูตามกลุ่มผู้ใช้ — เฉพาะ IT (ผู้ดูแลระบบสูงสุด) */
 export const MenuPermissionsPanel: FC = () => {
@@ -22,9 +23,7 @@ export const MenuPermissionsPanel: FC = () => {
 
   if (isLoading || (!draft && !error)) {
     return (
-      <div className="flex items-center justify-center gap-2 py-10 text-sm text-slate-400">
-        <Loader2 className="size-4 animate-spin" /> กำลังโหลดสิทธิ์เมนู…
-      </div>
+      <LoadingSkeleton rows={6} label="กำลังโหลดสิทธิ์เมนู" />
     )
   }
   if (error || !data?.roles || !data.menus || !draft) {

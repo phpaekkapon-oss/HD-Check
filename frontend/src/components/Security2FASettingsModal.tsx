@@ -38,6 +38,7 @@ import { usePinLock } from '@/context/PinLockContext'
 import { isAdminUser, type TotpSetupData, type User2FAAdminItem, type PinPolicy } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 import { PaginationBar } from '@/components/PaginationBar'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { usePagination } from '@/hooks/usePagination'
 import { ProfileAvatarModal } from './ProfileAvatarModal'
 import { SsoSettingsPanel } from './SsoSettingsPanel'
@@ -2003,10 +2004,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                 {/* Mobile card list (< md) */}
                 <div className="md:hidden space-y-2">
                   {usersLoading ? (
-                    <div className="py-8 text-center text-sm text-slate-400">
-                      <Loader2 className="size-5 animate-spin mx-auto mb-2 text-emerald-400" />
-                      กำลังโหลดรายชื่อผู้ใช้จาก HOSxP…
-                    </div>
+                    <LoadingSkeleton rows={5} label="กำลังโหลดรายชื่อผู้ใช้จาก HOSxP" />
                   ) : filteredUsers.length === 0 ? (
                     <div className="py-8 text-center text-sm text-slate-400 font-medium">
                       {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากรในหมวดนี้'}
@@ -2175,9 +2173,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       <tbody className="divide-y divide-slate-800/60 font-sans">
                         {usersLoading ? (
                           <tr>
-                            <td colSpan={6} className="py-8 text-center text-slate-400">
-                              <Loader2 className="size-5 animate-spin mx-auto mb-2 text-emerald-400" />
-                              กำลังโหลดรายชื่อผู้ใช้จาก HOSxP…
+                            <td colSpan={6}>
+                              <LoadingSkeleton rows={6} label="กำลังโหลดรายชื่อผู้ใช้จาก HOSxP" />
                             </td>
                           </tr>
                         ) : filteredUsers.length === 0 ? (

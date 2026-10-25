@@ -2,6 +2,17 @@ import { useState, useEffect, useRef, type FC } from 'react'
 import { Tag, X, ChevronRight, ExternalLink, RefreshCw, Zap } from 'lucide-react'
 import changelogData from '@/data/changelog.json'
 
+const ATTEMPT_KEY = 'hd_check_update_attempt'
+
+/** เวอร์ชันที่เคยกด "ยืนยัน" ไว้ในแท็บนี้ (ใช้ตรวจว่ารีโหลดแล้วหน้าเว็บยังไม่ถึงเวอร์ชันนั้น) */
+const readAttempt = (): string | null => {
+  try {
+    return sessionStorage.getItem(ATTEMPT_KEY)
+  } catch {
+    return null
+  }
+}
+
 interface RemoteRelease {
   readonly version: string
   readonly date?: string
@@ -26,6 +37,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   const [showNotice, setShowNotice] = useState(false)
   // เวอร์ชันบนเซิร์ฟเวอร์ที่ผู้ใช้กดปิดแล้ว: ระบบเช็กซ้ำทุก 15 วินาที ต้องไม่เด้งป้ายเดิมกลับมา
   const dismissedRemoteRef = useRef<string | null>(null)
+  const [attemptedVersion] = useState<string | null>(readAttempt)
   const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
   const [isReloading, setIsReloading] = useState(false)
   const latestRelease = changelogData[0]
@@ -126,6 +138,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   const handleInstantUpdate = async () => {
     setIsReloading(true)
     try {
+      sessionStorage.setItem(ATTEMPT_KEY, activeVersion)
       localStorage.setItem('hd_check_last_seen_version', activeVersion)
       // Flush client caches if CacheStorage is available
       if ('caches' in window) {
@@ -140,6 +153,34 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
     const url = new URL(window.location.href)
     url.searchParams.set('_v', Date.now().toString())
     window.location.replace(url.toString())
+  }
+
+  // เคยกดยืนยันแล้ว รีโหลดแล้ว แต่หน้าเว็บยังเป็นเลขเก่า (เช่น dev server ยังไม่รีสตาร์ท): ไม่ชวนกดซ้ำให้วนไม่รู้จบ บอกสาเหตุแทน
+  const isStuck = isServerUpgradePending && attemptedVersion === remoteVersion
+  if (isStuck) {
+    return (
+      <ToastShell autoCloseMs={0} onAutoClose={handleDismiss}>
+        <div className="relative flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-white/95 p-3 shadow-2xl shadow-amber-500/20 backdrop-blur-md dark:bg-[#161a2f]/95 lg:p-4">
+          <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-300">
+            <RefreshCw className="size-4" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-black text-slate-900 dark:text-white">รีโหลดแล้ว แต่หน้าเว็บยังเป็น v{currentVersion}</p>
+            <p className="mt-1 text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              เซิร์ฟเวอร์เป็น v{remoteVersion} ถ้าเปิดแบบพัฒนา (dev) ให้รีสตาร์ท vite หรือ build ใหม่ ถ้าเป็นเครื่องใช้งานจริง ลองกด Ctrl+F5
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            className="grid size-9 shrink-0 cursor-pointer place-items-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:hover:bg-white/5 dark:hover:text-white lg:size-7"
+            aria-label="ปิดการแจ้งเตือน"
+          >
+            <X className="size-4 lg:size-3.5" />
+          </button>
+        </div>
+      </ToastShell>
+    )
   }
 
   const titleText = isServerUpgradePending

@@ -26,6 +26,7 @@ import type { DispensingRule, DxMapRecord, PttypeItem } from '@/types/herbdx.typ
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
 import { PaginationBar } from '@/components/PaginationBar'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { usePagination } from '@/hooks/usePagination'
 
 interface DispensingRulesTabProps {
@@ -485,9 +486,8 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             <tbody className="divide-y divide-slate-100 dark:divide-[#292440]/60">
               {isLoading ? (
                 <tr>
-                  <td colSpan={canEdit ? 8 : 7} className="py-12 text-center text-slate-400">
-                    <Loader2 className="size-6 animate-spin mx-auto mb-2 text-emerald-500" />
-                    กำลังโหลดเงื่อนไขรอบการจ่าย…
+                  <td colSpan={canEdit ? 8 : 7}>
+                    <LoadingSkeleton rows={5} label="กำลังโหลดเงื่อนไขรอบการจ่าย" />
                   </td>
                 </tr>
               ) : filteredRules.length === 0 ? (

@@ -535,12 +535,9 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   return (
     <div
       aria-busy={loading}
-      className={cn(
-        'space-y-4 animate-fade-in pb-8 text-slate-800 dark:text-slate-100',
-        // ระหว่างโหลดช่วงใหม่ ตัวเลขและกราฟด้านล่างยังเป็นของช่วงก่อนหน้า จึงจางลงและกดไม่ได้จนกว่าจะโหลดเสร็จ
-        loading &&
-          '[&>*:not([data-keep])]:opacity-40 [&>*:not([data-keep])]:pointer-events-none [&>*:not([data-keep])]:transition-opacity'
-      )}
+      // ระหว่างโหลดช่วงใหม่ การ์ดและกราฟด้านล่างยังเป็นข้อมูลช่วงก่อนหน้า: คลุมด้วย shimmer และกดไม่ได้จนกว่าจะโหลดเสร็จ (ดู index.css)
+      data-loading={loading ? 'true' : undefined}
+      className="space-y-4 animate-fade-in pb-8 text-slate-800 dark:text-slate-100"
     >
       {loading && (
         <div

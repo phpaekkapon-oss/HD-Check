@@ -26,6 +26,7 @@ import {
 } from '@/components/ui/table'
 import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { cn } from '@/lib/utils'
 
 interface DxMapSettingsModalProps {
@@ -901,8 +902,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="py-8 text-center text-slate-400">
-                  กำลังโหลดข้อมูลการตั้งค่า…
+                <TableCell colSpan={columns.length}>
+                  <LoadingSkeleton rows={8} label="กำลังโหลดข้อมูลการตั้งค่า" />
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows.length === 0 ? (
@@ -1002,7 +1003,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
       <div className="md:hidden space-y-3">
         {isLoading ? (
-          <div className="rounded-2xl border border-themed bg-themed-card p-6 text-center text-sm text-slate-500 dark:text-slate-400">กำลังโหลดข้อมูลการตั้งค่า…</div>
+          <div className="rounded-2xl border border-themed bg-themed-card"><LoadingSkeleton rows={4} label="กำลังโหลดข้อมูลการตั้งค่า" /></div>
         ) : table.getRowModel().rows.length === 0 ? (
           <div className="rounded-2xl border border-themed bg-themed-card p-6 text-center text-sm text-slate-500 dark:text-slate-400">ไม่พบรายการยาที่ค้นหา</div>
         ) : table.getRowModel().rows.map((row) => {

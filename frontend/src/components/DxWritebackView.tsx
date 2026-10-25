@@ -5,6 +5,7 @@ import { DateRangeFields } from '@/components/AuditFilterBar'
 import { fmtNum, toThaiDateShort } from '@/lib/format'
 import { CopyButton } from '@/components/CopyButton'
 import { PhiHn } from '@/components/Phi'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 
 interface DxWritebackViewProps {
   readonly records: readonly AuditRecord[]
@@ -89,7 +90,7 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
           <div className="border-b border-themed p-3">
             <label className="block"><span className="sr-only">ค้นหา HN, VN หรือชื่อผู้ป่วย</span><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ค้นหา HN, VN หรือชื่อผู้ป่วย" className="min-h-10 w-full rounded-lg border border-themed bg-themed-app px-3 text-sm text-slate-900 outline-none placeholder:text-slate-400 focus:ring-2 focus:ring-violet-500/40 dark:text-white" /></label>
           </div>
-          {loading ? <div role="status" className="p-8 text-center text-sm text-slate-500">กำลังโหลดรายการตามช่วงวันที่…</div> : filtered.length === 0 ? <div className="p-8 text-center"><CircleHelp className="mx-auto size-6 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">ไม่พบ VN ที่ต้องทบทวนในช่วงนี้</p><p className="mt-1 text-xs text-slate-500">ลองเปลี่ยนช่วงวันที่ หรือเลือกเดือนที่มีข้อมูลล่าสุด</p></div> : (
+          {loading ? <LoadingSkeleton rows={6} label="กำลังโหลดรายการตามช่วงวันที่" /> : filtered.length === 0 ? <div className="p-8 text-center"><CircleHelp className="mx-auto size-6 text-slate-400" /><p className="mt-2 text-sm font-semibold text-slate-700 dark:text-slate-200">ไม่พบ VN ที่ต้องทบทวนในช่วงนี้</p><p className="mt-1 text-xs text-slate-500">ลองเปลี่ยนช่วงวันที่ หรือเลือกเดือนที่มีข้อมูลล่าสุด</p></div> : (
             <div className="max-h-[60vh] overflow-auto divide-y divide-slate-100 dark:divide-white/5">
               {filtered.slice(0, 300).map((visit) => <button key={visit.vn} type="button" onClick={() => setSelectedVN(visit.vn)} className={`w-full px-3 py-3 text-left transition hover:bg-slate-50 dark:hover:bg-white/[0.03] ${selectedVN === visit.vn ? 'bg-violet-50 dark:bg-violet-950/25' : ''}`}>
                 <span className="flex items-start justify-between gap-3">

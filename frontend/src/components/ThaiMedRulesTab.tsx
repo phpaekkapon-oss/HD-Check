@@ -9,6 +9,7 @@ import {
 } from 'lucide-react'
 import { useHealthMedSettings, useSaveHealthMedSettings } from '@/hooks/useHerbDx'
 import type { ThaiMedDuplicateRules } from '@/types/herbdx.types'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 
 interface ThaiMedRulesTabProps {
   readonly canEdit: boolean
@@ -64,10 +65,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 text-slate-400 gap-3">
-        <Loader2 className="size-8 animate-spin text-amber-500" />
-        <span className="text-sm">กำลังโหลดการตั้งค่าเกณฑ์แพทย์แผนไทย…</span>
-      </div>
+      <LoadingSkeleton rows={6} label="กำลังโหลดการตั้งค่าเกณฑ์แพทย์แผนไทย" />
     )
   }
 

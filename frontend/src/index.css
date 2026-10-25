@@ -737,3 +737,41 @@ html:not(.dark) .sec-modal :is([class*=" bg-purple-950"], [class^="bg-purple-950
   }
   .sec-tabs > button { scroll-snap-align: center; }
 }
+
+/* ==========================================================================
+   โครงโหลดแบบ shimmer: แถบแสงวิ่งผ่านบล็อกเทา ใช้ transform อย่างเดียว (ลื่นบนจอ 120Hz)
+   ใช้ .skeleton กับบล็อกเดี่ยว และ [data-loading="true"] กับคอนเทนเนอร์ที่ต้องการคลุมทุกการ์ดลูก
+   ========================================================================== */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.5rem;
+  background-color: rgba(203, 213, 225, 0.55);
+}
+.dark .skeleton { background-color: rgba(255, 255, 255, 0.07); }
+.skeleton::after,
+[data-loading="true"] > :not([data-keep])::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.7), transparent);
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+.dark .skeleton::after,
+.dark [data-loading="true"] > :not([data-keep])::after {
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.08), transparent);
+}
+[data-loading="true"] > :not([data-keep]) {
+  position: relative;
+  overflow: hidden;
+  opacity: 0.6;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+@keyframes skeleton-shimmer { to { transform: translateX(100%); } }
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after,
+  [data-loading="true"] > :not([data-keep])::after { animation: none; opacity: 0; }
+}

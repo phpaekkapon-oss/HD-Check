@@ -41,6 +41,7 @@ import type { DateRange, HealthMedRecord } from '@/types/herbdx.types'
 import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
 import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
+import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CopyButton } from '@/components/CopyButton'
 import {
@@ -986,9 +987,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             <TableBody className="divide-y divide-slate-100 dark:divide-white/5">
               {isLoading ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length} className="py-12 text-center text-slate-400">
-                    <Loader2 className="size-6 animate-spin mx-auto text-teal-500 mb-2" />
-                    <span>กำลังโหลดข้อมูลการให้บริการแพทย์แผนไทย…</span>
+                  <TableCell colSpan={columns.length}>
+                    <LoadingSkeleton rows={8} label="กำลังโหลดข้อมูลการให้บริการแพทย์แผนไทย" />
                   </TableCell>
                 </TableRow>
               ) : table.getRowModel().rows.length === 0 ? (

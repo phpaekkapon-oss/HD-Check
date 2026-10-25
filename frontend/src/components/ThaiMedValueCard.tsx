@@ -1,5 +1,5 @@
 import type { FC } from 'react'
-import { Banknote, Loader2, ShieldAlert } from 'lucide-react'
+import { Banknote, ShieldAlert } from 'lucide-react'
 import type { DateRange } from '@/types/herbdx.types'
 import { useThaiMedValue } from '@/hooks/useHerbDx'
 import { fmtNum } from '@/lib/format'
@@ -31,12 +31,15 @@ export const ThaiMedValueCard: FC<ThaiMedValueCardProps> = ({ range }) => {
         <div role="status" aria-live="polite">
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
             {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-[68px] animate-pulse rounded-xl bg-slate-100 dark:bg-white/5" style={{ animationDelay: `${i * 100}ms` }} />
+              <div key={i} className="skeleton h-[68px] rounded-xl" />
             ))}
           </div>
-          <p className="mt-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            <Loader2 className="size-3.5 animate-spin" /> กำลังดึงข้อมูลจาก HOSxP…
-          </p>
+          <div className="mt-3 space-y-2">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="skeleton h-3" style={{ width: `${90 - i * 18}%` }} />
+            ))}
+          </div>
+          <p className="sr-only">กำลังดึงข้อมูลจาก HOSxP…</p>
         </div>
       )}
       {isError && <p className="text-xs text-rose-500">ดึงข้อมูลมูลค่าบริการไม่สำเร็จ</p>}
