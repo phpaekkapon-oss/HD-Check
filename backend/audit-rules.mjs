@@ -1,26 +1,19 @@
 // Pure herbal-drug audit rule (no DB access) so it can be unit-tested: node --test
-import { MIN_QTY_EXEMPT_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U, normalizeIcdCode } from './config.mjs'
+import { MIN_QTY_APPLY_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U, normalizeIcdCode } from './config.mjs'
 
-/** แผนกแพทย์แผนไทย / แพทย์แผนไทย ต้องมีรหัส U ควบคู่กับรหัสแผนปัจจุบัน */
+/** เฉพาะแพทย์แผนไทย 5 ท่านที่กำหนด ต้องมีรหัส U ควบคู่กับรหัสแผนปัจจุบัน (ผู้สั่งอื่นมี ICD10 แผนปัจจุบันก็ผ่าน) */
 export function isThaiMedRow(row) {
-  const deptName = String(row.department_name ?? '').trim()
   const doctorName = String(row.doctor_name ?? '').trim()
-  return (
-    deptName.includes('แพทย์แผนไทย') ||
-    deptName.includes('แผนไทย') ||
-    THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name)) ||
-    doctorName.includes('พท.') ||
-    doctorName.includes('แพทย์แผนไทย')
-  )
+  return THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
 }
 
 export function evaluate(row, dxMap, minQtyMap) {
   const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
   const qty = Number(row.drug_qty ?? 0)
 
-  // 1. ตรวจสอบสิทธิที่ได้รับการยกเว้นเกณฑ์การจ่ายขั้นต่ำ
-  const pttype = String(row.pttype_name ?? '').trim()
-  const isPttypeExempt = MIN_QTY_EXEMPT_PTTYPES.some((kw) => pttype.includes(kw))
+  // 1. เกณฑ์จำนวนจ่ายขั้นต่ำใช้เฉพาะสิทธิ UC (สิทธิอื่นไม่ตรวจ)
+  const pttype = String(row.pttype_name ?? '').trim().toUpperCase()
+  const isPttypeExempt = !MIN_QTY_APPLY_PTTYPES.some((kw) => pttype.includes(kw.toUpperCase()))
   const isQtyFail = !isPttypeExempt && minQty > 0 && qty < minQty
   const units = row.drug_units ? ` ${row.drug_units}` : ''
 
@@ -169,7 +162,7 @@ export function evaluate(row, dxMap, minQtyMap) {
 
   if (isDxPass) {
     const exemptNotice = isPttypeExempt && minQty > 0 && qty < minQty
-      ? ` [ยกเว้นเกณฑ์ขั้นต่ำสำหรับสิทธิ: ${pttype}]`
+      ? ` [เกณฑ์ขั้นต่ำใช้เฉพาะสิทธิ UC ไม่ตรวจสิทธิ: ${row.pttype_name}]`
       : ''
     const reasonText = isThaiMed
       ? `ผ่านเกณฑ์แพทย์แผนไทย: พบรหัสแผนปัจจุบัน (${matchedModern.join(', ')}) ควบคู่กับรหัสแพทย์แผนไทย (${matchedU.join(', ')})${exemptNotice}`

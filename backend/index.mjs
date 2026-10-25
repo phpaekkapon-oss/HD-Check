@@ -1088,7 +1088,7 @@ app.post('/api/audit/advice', requireSession, async (req, res) => {
 - ยา: ${record.drug_name} (${record.drug_icode}) จำนวน ${record.drug_qty ?? '-'} ${record.drug_units ?? ''}
 - รหัสวินิจฉัยในเคส: ${analysis.dx.join(', ') || 'ไม่มี'}
 - เกณฑ์ ICD ของยา: แผนปัจจุบัน ${analysis.criteria.modern.join(', ') || '-'} | แผนไทย ${analysis.criteria.u.join(', ') || '-'} | ข้อบ่งใช้ ${indication || '-'}
-- ${analysis.isThaiMed ? 'แผนกแพทย์แผนไทย: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ + รหัส U ตัวใดก็ได้' : 'แพทย์แผนปัจจุบัน: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์'}
+- ${analysis.isThaiMed ? 'แพทย์แผนไทย 5 ท่านที่กำหนด: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ + รหัส U ตัวใดก็ได้' : 'แพทย์/ผู้สั่งอื่นๆ: ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ (ไม่ต้องมีรหัส U)'}
 - ผลตรวจ: ${record.audit_result} — ${record.audit_reason ?? ''}
 ผลวิเคราะห์เบื้องต้นจากระบบ:
 สิ่งที่ขาด:

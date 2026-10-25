@@ -83,24 +83,24 @@ test('target Thai-medicine doctor needs a U-code diagnosis', () => {
   assert.equal(run({ pdx: 'K30', doctor_name: 'แพทย์ทั่วไป' }).audit_result, 'PASS')
 })
 
-test('Department Thai-medicine requires both modern ICD (K30) and Thai med U-code (U6680)', () => {
-  // แผนกแพทย์แผนไทย คีย์ K30 แต่ไม่คีย์ U6680 -> ไม่ผ่าน (FAIL)
-  const failThaiMed = run({ pdx: 'K30', department_name: 'แพทย์แผนไทย' })
+test('Listed Thai-medicine doctor requires both modern ICD (K30) and Thai med U-code (U6680)', () => {
+  // แพทย์แผนไทยที่กำหนด คีย์ K30 แต่ไม่คีย์ U6680 -> ไม่ผ่าน (FAIL)
+  const failThaiMed = run({ pdx: 'K30', doctor_name: 'นางสาวแคทริยา แสนหูม' })
   assert.equal(failThaiMed.audit_result, 'FAIL')
   assert.match(failThaiMed.audit_reason, /รหัสแพทย์แผนไทย/)
 
   // แผนกแพทย์แผนไทย คีย์ K30 และคีย์ U6680 -> ผ่าน (PASS)
-  const passThaiMed = run({ pdx: 'K30', dx0: 'U6680', department_name: 'แพทย์แผนไทย' })
+  const passThaiMed = run({ pdx: 'K30', dx0: 'U6680', doctor_name: 'นางสาวแคทริยา แสนหูม' })
   assert.equal(passThaiMed.audit_result, 'PASS')
   assert.deepEqual(passThaiMed.matched_dx, ['K30', 'U6680'])
 
   // แผนกแพทย์แผนไทย คีย์เฉพาะ U6680 แต่ไม่คีย์ K30 -> ไม่ผ่าน (FAIL)
-  const missingModernThaiMed = run({ pdx: 'U6680', department_name: 'แพทย์แผนไทย' })
+  const missingModernThaiMed = run({ pdx: 'U6680', doctor_name: 'นางสาวแคทริยา แสนหูม' })
   assert.equal(missingModernThaiMed.audit_result, 'FAIL')
   assert.match(missingModernThaiMed.audit_reason, /รหัสแผนปัจจุบัน/)
 
   // แผนกแพทย์แผนไทย คีย์ K30 และรหัส U อื่น (เช่น U5753 ของโรคเข่า) -> ผ่าน (PASS) ยอมรับรหัส U ทุกรหัส
-  const otherUThaiMed = run({ pdx: 'M179', dx0: 'K30', dx1: 'U5753', department_name: 'แพทย์แผนไทย' })
+  const otherUThaiMed = run({ pdx: 'M179', dx0: 'K30', dx1: 'U5753', doctor_name: 'นางสาวแคทริยา แสนหูม' })
   assert.equal(otherUThaiMed.audit_result, 'PASS')
   assert.deepEqual(otherUThaiMed.matched_dx, ['K30', 'U5753'])
 
@@ -108,6 +108,24 @@ test('Department Thai-medicine requires both modern ICD (K30) and Thai med U-cod
   const passModernDoctor = run({ pdx: 'K30', department_name: 'ผู้ป่วยนอก (OPD)' })
   assert.equal(passModernDoctor.audit_result, 'PASS')
   assert.deepEqual(passModernDoctor.matched_dx, ['K30'])
+})
+
+test('Thai-medicine department/doctor outside the 5 named doctors does not need a U-code', () => {
+  assert.equal(run({ pdx: 'K30', department_name: 'แพทย์แผนไทย' }).audit_result, 'PASS')
+  assert.equal(run({ pdx: 'K30', doctor_name: 'พท.ปภาวี ใจดี' }).audit_result, 'PASS')
+})
+
+test('Minimum quantity applies only to UC rights', () => {
+  for (const pt of ['UC30บาท(UCS) 12-59 ปีในเขต', 'UC Walk In ในจังหวัด มี ท', 'ODS_UC  มี ท.', 'บัตรทองฉุกเฉิน ต่างจังหวัด มี ท.']) {
+    const r = run({ pdx: 'K30', drug_qty: 5, pttype_name: pt })
+    assert.equal(r.audit_result, 'FAIL', pt)
+    assert.equal(r.is_qty_fail, true, pt)
+  }
+  for (const pt of ['ผู้พิการ รพ.พังโคน', 'สิทธิเบิกกรมบัญชีกลาง', 'ชำระเงินเอง', 'ประกันสังคมในเครือข่าย รพ.สกลนคร', 'สิทธิว่าง / มาตรา 8']) {
+    const r = run({ pdx: 'K30', drug_qty: 5, pttype_name: pt })
+    assert.equal(r.audit_result, 'PASS', pt)
+    assert.equal(r.is_qty_fail, false, pt)
+  }
 })
 
 const { evaluateHealthMedAudit } = await import('./healthmed.mjs')

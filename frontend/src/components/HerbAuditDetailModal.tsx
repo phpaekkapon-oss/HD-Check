@@ -252,7 +252,7 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
             <div>
               <span className="font-semibold">รหัสแผนไทยของยา:</span>{' '}
               <span className="font-mono">{analysis?.criteria.u.join(', ') || '—'}</span>
-              {analysis?.isThaiMed && <span className="text-slate-400"> (แผนกแพทย์แผนไทยใช้รหัส U ตัวใดก็ได้)</span>}
+              {analysis?.isThaiMed && <span className="text-slate-400"> (แพทย์แผนไทย 5 ท่านที่กำหนดใช้รหัส U ตัวใดก็ได้)</span>}
             </div>
             {analysis?.indication && (
               <div>
