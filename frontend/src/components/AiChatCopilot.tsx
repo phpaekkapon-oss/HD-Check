@@ -242,7 +242,7 @@ export const AiChatCopilot: FC = () => {
   return (
     <>
       {/* Floating Action Button (Launcher): 3D Living & Floating Design */}
-      <div className="fixed right-3.5 sm:right-5 lg:right-6 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-14 z-40 select-none">
+      <div className="fixed right-3.5 sm:right-5 lg:right-6 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:bottom-14 z-[35] lg:z-40 select-none">
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}

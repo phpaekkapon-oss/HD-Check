@@ -257,6 +257,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
 
       {/* Floating toast notification for new release */}
       <VersionUpdateNotice
+        suppressed={moreOpen || mobileMenuOpen}
         serverVersion={status?.appVersion}
         onOpenChangelog={() => setChangelogOpen(true)}
       />

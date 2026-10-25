@@ -13,14 +13,19 @@ interface VersionUpdateNoticeProps {
   readonly currentVersion?: string
   readonly serverVersion?: string
   readonly onOpenChangelog: () => void
+  /** ซ่อนชั่วคราวเมื่อมีแผง/เมนูมือถือเปิดอยู่ (ไม่ให้ป้ายลอยทับปุ่มในแผงนั้น) */
+  readonly suppressed?: boolean
 }
 
 export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   currentVersion = __APP_VERSION__,
   serverVersion,
   onOpenChangelog,
+  suppressed = false,
 }) => {
   const [showNotice, setShowNotice] = useState(false)
+  // เวอร์ชันบนเซิร์ฟเวอร์ที่ผู้ใช้กดปิดแล้ว: ระบบเช็กซ้ำทุก 15 วินาที ต้องไม่เด้งป้ายเดิมกลับมา
+  const dismissedRemoteRef = useRef<string | null>(null)
   const [remoteVersion, setRemoteVersion] = useState<string | null>(null)
   const [isReloading, setIsReloading] = useState(false)
   const latestRelease = changelogData[0]
@@ -53,7 +58,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
         const data = await res.json()
         if (data?.version && data.version !== currentVersion && isMounted) {
           setRemoteVersion(data.version)
-          setShowNotice(true)
+          if (dismissedRemoteRef.current !== data.version) setShowNotice(true)
         }
       } catch {
         // network silent ignore
@@ -75,7 +80,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   useEffect(() => {
     if (serverVersion && serverVersion !== currentVersion) {
       setRemoteVersion(serverVersion)
-      setShowNotice(true)
+      if (dismissedRemoteRef.current !== serverVersion) setShowNotice(true)
     }
   }, [serverVersion, currentVersion])
 
@@ -96,7 +101,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
     }
   }, [currentVersion, remoteVersion])
 
-  if (!showNotice) return <NoticeOffset height={0} />
+  if (!showNotice || suppressed) return <NoticeOffset height={0} />
   const autoCloseMs = remoteVersion && remoteVersion !== currentVersion ? 0 : 10_000
 
   const isServerUpgradePending = Boolean(remoteVersion && remoteVersion !== currentVersion)
@@ -104,6 +109,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
 
   const handleDismiss = () => {
     setShowNotice(false)
+    if (remoteVersion && remoteVersion !== currentVersion) dismissedRemoteRef.current = remoteVersion
     try {
       localStorage.setItem('hd_check_last_seen_version', activeVersion)
     } catch {
@@ -302,7 +308,7 @@ const ToastShell: FC<{ children: React.ReactNode; autoCloseMs: number; onAutoClo
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}
       onBlur={() => setPaused(false)}
-      className="fixed z-40 inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:inset-x-auto lg:bottom-auto lg:top-20 lg:right-5 lg:w-full lg:max-w-sm animate-in slide-in-from-bottom-5 lg:slide-in-from-top-5 fade-in duration-300"
+      className="fixed z-[35] inset-x-3 bottom-[calc(4.75rem+env(safe-area-inset-bottom,0px))] lg:inset-x-auto lg:bottom-auto lg:top-20 lg:right-5 lg:w-full lg:max-w-sm animate-in slide-in-from-bottom-5 lg:slide-in-from-top-5 fade-in duration-300"
     >
       <NoticeOffset height={height} />
       {children}
