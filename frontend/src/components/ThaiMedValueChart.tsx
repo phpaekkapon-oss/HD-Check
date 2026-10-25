@@ -16,8 +16,8 @@ interface Point {
   readonly visits: number
 }
 
-const W = 960
-const H = 320
+const W = 1200
+const H = 300
 const PAD = { left: 58, right: 74, top: 30, bottom: 36 }
 const PLOT_W = W - PAD.left - PAD.right
 const PLOT_H = H - PAD.top - PAD.bottom
@@ -72,13 +72,13 @@ function aggregate(daily: readonly ThaiMedValueDaily[], bucket: Bucket): Point[]
     }))
 }
 
-/** แกนสวยๆ: เพดานเป็น 1/2/5 × 10^n และแบ่ง 4 ช่อง */
+/** แกนสวยๆ: แบ่ง 4 ช่อง ขั้นละ 1/2/2.5/3/4/5/6/8 × 10^n เลือกขั้นเล็กสุดที่ครอบค่าสูงสุด (ไม่ปล่อยที่ว่างเหนือแท่งมากเกินไป) */
 function niceMax(max: number): number {
   if (max <= 0) return 1
-  const exp = Math.pow(10, Math.floor(Math.log10(max)))
-  const f = max / exp
-  const nice = f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10
-  return nice * exp
+  const raw = max / 4
+  const exp = Math.pow(10, Math.floor(Math.log10(raw)))
+  const step = ([1, 2, 2.5, 3, 4, 5, 6, 8, 10].find((m) => m * exp >= raw) ?? 10) * exp
+  return step * 4
 }
 
 const compact = (n: number): string => {
@@ -116,7 +116,7 @@ export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate
 
   const max = niceMax(Math.max(0, ...points.map((p) => p.value)))
   const slot = points.length > 0 ? PLOT_W / points.length : PLOT_W
-  const barW = Math.min(34, Math.max(6, slot * 0.62))
+  const barW = Math.min(40, Math.max(6, slot * 0.6))
   const dx = is3D ? Math.min(8, barW * 0.3) : 0
   const dy = is3D ? -dx * 0.8 : 0
   const y0 = PAD.top + PLOT_H
