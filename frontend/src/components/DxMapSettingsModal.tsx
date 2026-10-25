@@ -50,13 +50,103 @@ function PreviewStat({ label, value, tone }: { readonly label: string; readonly 
 // ค่าว่างต้องเป็นอาร์เรย์ตัวเดิมเสมอ: ถ้าสร้าง [] ใหม่ทุก render ตาราง (TanStack) จะ reset แล้ว render วนไม่จบจนหน้าเว็บค้าง
 const NO_DX_MAP: DxMapRecord[] = []
 
+export type SettingsTabId = 'dxmap' | 'interval' | 'healthmed'
+
+const SETTINGS_TABS: readonly {
+  readonly id: SettingsTabId
+  readonly label: string
+  readonly hint: string
+  readonly badge: string
+  readonly icon: typeof Info
+  readonly activeGradient: string
+  readonly hoverBorder: string
+  readonly iconTint: string
+  readonly badgeTint: string
+}[] = [
+  {
+    id: 'dxmap',
+    label: 'เกณฑ์จับคู่รหัส ICD-10',
+    hint: 'ยา ↔ ICD-10 & จ่ายขั้นต่ำ',
+    badge: '',
+    icon: Info,
+    activeGradient: 'from-emerald-600 to-teal-500',
+    hoverBorder: 'hover:border-emerald-400',
+    iconTint: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-300',
+    badgeTint: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-500/20 dark:text-emerald-200',
+  },
+  {
+    id: 'interval',
+    label: 'เงื่อนไขรอบการจ่าย',
+    hint: 'ตามสิทธิการรักษา',
+    badge: 'UC 7 วัน',
+    icon: Clock,
+    activeGradient: 'from-amber-500 to-orange-500',
+    hoverBorder: 'hover:border-amber-400',
+    iconTint: 'bg-amber-100 text-amber-700 dark:bg-amber-500/20 dark:text-amber-300',
+    badgeTint: 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-200',
+  },
+  {
+    id: 'healthmed',
+    label: 'เกณฑ์ค่าบริการแพทย์แผนไทย',
+    hint: 'ตรวจคิดค่าบริการซ้ำ',
+    badge: 'คิดซ้ำ',
+    icon: Layers,
+    activeGradient: 'from-violet-600 to-fuchsia-500',
+    hoverBorder: 'hover:border-violet-400',
+    iconTint: 'bg-violet-100 text-violet-700 dark:bg-violet-500/20 dark:text-violet-300',
+    badgeTint: 'bg-violet-100 text-violet-800 dark:bg-violet-500/20 dark:text-violet-200',
+  },
+]
+
+/** แท็บหลักของหน้าตั้งค่าเกณฑ์: แต่ละแท็บมีสีประจำตัว แท็บที่เลือกเป็นพื้นไล่สีเข้มตัวอักษรขาว */
+export const SettingsTabBar: FC<{
+  readonly active: SettingsTabId
+  readonly onChange: (id: SettingsTabId) => void
+  readonly dxMapCount: number
+}> = ({ active, onChange, dxMapCount }) => (
+    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2" role="tablist" aria-label="หมวดตั้งค่าเกณฑ์">
+      {SETTINGS_TABS.map((t) => {
+        const selected = active === t.id
+        const Icon = t.icon
+        return (
+          <button
+            key={t.id}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(t.id)}
+            className={cn(
+              'flex items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition-all cursor-pointer select-none active:scale-[0.98] touch-manipulation',
+              selected
+                ? cn('bg-gradient-to-r text-white shadow-md border-transparent', t.activeGradient)
+                : cn('bg-white dark:bg-[#161a30] border-slate-200 dark:border-white/10 text-slate-700 dark:text-slate-100 hover:-translate-y-0.5 hover:shadow-sm', t.hoverBorder)
+            )}
+          >
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span className={cn('grid size-9 shrink-0 place-items-center rounded-xl', selected ? 'bg-white/20 text-white' : t.iconTint)}>
+                <Icon className="size-[18px]" />
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-bold leading-tight">{t.label}</span>
+                <span className={cn('mt-0.5 block truncate text-[11px] leading-tight', selected ? 'text-white/85' : 'text-slate-500 dark:text-slate-400')}>{t.hint}</span>
+              </span>
+            </span>
+            <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-xs font-bold tabular-nums', selected ? 'bg-white/25 text-white' : t.badgeTint)}>
+              {t.id === 'dxmap' ? dxMapCount : t.badge}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+)
+
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
   const { user } = useAuth()
   const canEdit = canManageHerbDx(user)
   const { data: dxMap = NO_DX_MAP, isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
 
-  const [activeTab, setActiveTab] = useState<'dxmap' | 'interval' | 'healthmed'>('dxmap')
+  const [activeTab, setActiveTab] = useState<SettingsTabId>('dxmap')
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
   const [prefixes, setPrefixes] = useState('')
   const [minQty, setMinQty] = useState<number>(0)
@@ -622,70 +712,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
 
   return (
     <div className="space-y-4 pb-20 sm:pb-6">
-      {/* Tab Navigation: Segmented Control on mobile, flex row on desktop */}
-      <div className="grid grid-cols-3 gap-1 sm:gap-2 p-1 sm:p-0 rounded-2xl sm:rounded-none bg-slate-100/90 sm:bg-transparent dark:bg-[#121526] sm:dark:bg-transparent border sm:border-0 sm:border-b border-slate-200/90 dark:border-white/10 sm:border-slate-200 sm:dark:border-[#292440] sm:pb-2 shadow-xs sm:shadow-none">
-        <button
-          type="button"
-          onClick={() => setActiveTab('dxmap')}
-          className={cn(
-            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
-            activeTab === 'dxmap'
-              ? 'bg-white dark:bg-[#1b1f36] text-emerald-800 dark:text-emerald-300 shadow-sm border border-emerald-500/40 ring-1 ring-emerald-500/20 sm:bg-emerald-500/15 sm:dark:bg-emerald-950/40 sm:border-emerald-500/30 sm:ring-0'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
-          )}
-        >
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <Info className="size-3.5 sm:size-4 text-emerald-500 shrink-0" />
-            <span className="hidden sm:inline font-bold">เกณฑ์จับคู่รหัส ICD-10 & จ่ายขั้นต่ำ</span>
-            <span className="sm:hidden font-bold text-xs leading-tight text-center">เกณฑ์ ICD-10</span>
-          </div>
-          <span className="text-xs px-1.5 py-0.2 rounded-full bg-slate-200/80 dark:bg-white/10 font-mono font-bold shrink-0">
-            {dxMap.length}
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('interval')}
-          className={cn(
-            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
-            activeTab === 'interval'
-              ? 'bg-white dark:bg-[#1b1f36] text-amber-800 dark:text-amber-300 shadow-sm border border-amber-500/40 ring-1 ring-amber-500/20 sm:bg-amber-500/15 sm:dark:bg-amber-950/40 sm:border-amber-500/30 sm:ring-0'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
-          )}
-        >
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <Clock className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
-            <span className="hidden sm:inline font-bold">เงื่อนไขรอบการจ่าย & สิทธิการรักษา</span>
-            <span className="sm:hidden font-bold text-xs leading-tight text-center">รอบจ่าย & สิทธิ</span>
-          </div>
-          <span className="text-xs sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
-            <span className="hidden sm:inline">สปสช. / สิทธิ UC 7 วัน</span>
-            <span className="sm:hidden">UC 7 วัน</span>
-          </span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveTab('healthmed')}
-          className={cn(
-            'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-2.5 px-1 sm:px-3.5 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-95 touch-manipulation',
-            activeTab === 'healthmed'
-              ? 'bg-white dark:bg-[#1b1f36] text-amber-800 dark:text-amber-300 shadow-sm border border-amber-500/40 ring-1 ring-amber-500/20 sm:bg-amber-500/15 sm:dark:bg-amber-950/40 sm:border-amber-500/30 sm:ring-0'
-              : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white/40 dark:hover:bg-white/5'
-          )}
-        >
-          <div className="flex items-center gap-1 sm:gap-1.5 shrink-0">
-            <Layers className="size-3.5 sm:size-4 text-amber-500 shrink-0" />
-            <span className="hidden sm:inline font-bold">เกณฑ์ตรวจค่าบริการแพทย์แผนไทย</span>
-            <span className="sm:hidden font-bold text-xs leading-tight text-center">ค่าบริการซ้ำ</span>
-          </div>
-          <span className="text-xs sm:text-xs px-1.5 sm:px-2 py-0.2 rounded-full bg-amber-500/20 text-amber-800 dark:text-amber-300 font-semibold border border-amber-500/30 shrink-0">
-            <span className="hidden sm:inline">คิดค่าบริการซ้ำ</span>
-            <span className="sm:hidden">ตรวจซ้ำ</span>
-          </span>
-        </button>
-      </div>
+      <SettingsTabBar active={activeTab} onChange={setActiveTab} dxMapCount={dxMap.length} />
 
       {activeTab === 'interval' ? (
         <DispensingRulesTab dxMap={dxMap} canEdit={canEdit} />

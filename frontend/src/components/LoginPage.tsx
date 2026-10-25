@@ -36,6 +36,36 @@ const SSO_META: Record<SsoKey, { icon: typeof Fingerprint; tone: string; iconCol
 }
 
 const VERIFY_TTL_MS = 5 * 60 * 1000
+const REMEMBER_KEY = 'hdcheck.rememberedUser'
+
+/** ชื่อผู้ใช้ที่เคยติ๊ก "จดจำฉัน" (เก็บเฉพาะชื่อผู้ใช้ ไม่เก็บรหัสผ่าน) */
+function readRememberedUser(): string {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? ''
+  } catch {
+    return ''
+  }
+}
+
+type PasswordCredentialCtor = new (data: { id: string; password: string; name?: string }) => Credential
+
+/**
+ * ติ๊กจดจำ: จำชื่อผู้ใช้ และฝากรหัสผ่านให้ตัวจัดการรหัสผ่านของเบราว์เซอร์ (Credential Management API) เก็บแบบเข้ารหัส
+ * ไม่ติ๊ก: ล้างชื่อผู้ใช้ที่จำไว้ รหัสผ่านไม่เคยถูกเก็บใน localStorage ของระบบ
+ */
+function saveRememberedLogin(loginname: string, password: string, remember: boolean): void {
+  try {
+    if (remember) localStorage.setItem(REMEMBER_KEY, loginname)
+    else localStorage.removeItem(REMEMBER_KEY)
+  } catch {
+    // เก็บไม่ได้ (เช่น private window) ก็ล็อกอินต่อได้ตามปกติ
+  }
+  if (!remember) return
+  const Ctor = (window as unknown as { PasswordCredential?: PasswordCredentialCtor }).PasswordCredential
+  if (!Ctor || !navigator.credentials?.store) return
+  navigator.credentials.store(new Ctor({ id: loginname, password, name: loginname })).catch(() => undefined)
+}
+
 const LOGIN_INPUT_CLASS =
   'w-full h-12 pl-10 pr-4 rounded-xl border border-white/12 bg-white/[0.04] text-[15px] text-white placeholder-slate-500 transition focus:border-violet-400 focus:bg-white/[0.07] focus:outline-hidden focus:ring-4 focus:ring-violet-500/20'
 
@@ -44,7 +74,9 @@ export const LoginPage: FC = () => {
   const { accent } = useTheme()
 
   const [step, setStep] = useState<'login' | 'verify_2fa' | 'setup_2fa' | 'backup_codes'>('login')
-  const [loginname, setLoginname] = useState('')
+  const [rememberedUser] = useState(readRememberedUser)
+  const [loginname, setLoginname] = useState(rememberedUser)
+  const [remember, setRemember] = useState(Boolean(rememberedUser))
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [capsLock, setCapsLock] = useState(false)
@@ -164,6 +196,8 @@ export const LoginPage: FC = () => {
         setError(res.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')
         return
       }
+
+      saveRememberedLogin(loginname.trim(), password, remember)
 
       if (res.require2fa) {
         setTempToken(res.tempToken || '')
@@ -355,7 +389,7 @@ export const LoginPage: FC = () => {
                     value={loginname}
                     onChange={(e) => setLoginname(e.target.value)}
                     placeholder="ชื่อผู้ใช้ HOSxP"
-                    autoFocus
+                    autoFocus={!rememberedUser}
                     className={LOGIN_INPUT_CLASS}
                   />
                 </div>
@@ -378,6 +412,7 @@ export const LoginPage: FC = () => {
                     onKeyUp={(e) => setCapsLock(e.getModifierState('CapsLock'))}
                     onBlur={() => setCapsLock(false)}
                     placeholder="รหัสผ่าน"
+                    autoFocus={Boolean(rememberedUser)}
                     className={`${LOGIN_INPUT_CLASS} pr-12`}
                   />
                   <button
@@ -396,6 +431,21 @@ export const LoginPage: FC = () => {
                   </p>
                 )}
               </div>
+
+              <label className="flex cursor-pointer items-start gap-2.5 select-none">
+                <input
+                  type="checkbox"
+                  checked={remember}
+                  onChange={(e) => setRemember(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 cursor-pointer rounded border-white/30 bg-white/10 accent-violet-500"
+                />
+                <span className="text-sm text-slate-200">
+                  จดจำฉันไว้ในเครื่องนี้
+                  <span className="mt-0.5 block text-[11px] leading-snug text-slate-400">
+                    จำชื่อผู้ใช้ไว้ และให้เบราว์เซอร์ช่วยจำรหัสผ่าน (ระบบไม่เก็บรหัสผ่านของคุณ)
+                  </span>
+                </span>
+              </label>
 
               <button
                 type="submit"
