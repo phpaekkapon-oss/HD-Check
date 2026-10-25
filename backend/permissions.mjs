@@ -65,6 +65,12 @@ export function resolveRole(user, isAdmin) {
   return 'general'
 }
 
+/** เห็นการ์ดมูลค่าบริการแผนไทย: IT/ผู้ดูแลระบบ หรือผู้ดูแลแผนไทยที่ IT เปิดสวิตช์ให้รายคน (ไม่ผูกกับกลุ่มงาน) */
+export function canViewThaiMedValue(user, isAdmin) {
+  if (!user) return false
+  return Boolean(isAdmin) || user.thaimed_admin_enabled === true || Number(user.thaimed_admin_enabled) === 1
+}
+
 /** รายการเมนูที่กลุ่มนี้เข้าได้ */
 export function allowedMenus(perms, role) {
   if (role === 'it') return [...ALWAYS_ALLOWED, ...MENU_IDS]

@@ -452,6 +452,16 @@ test('Copilot offline - topic questions are not hijacked by drug names', () => {
 
 const perm = await import('./permissions.mjs')
 
+test('Thai-med value card - only IT or a user the IT switched on can view it', () => {
+  const thaiMedStaff = { loginname: 'staff', groupname: 'แพทย์แผนไทย', position: 'นักการแพทย์แผนไทย' }
+  assert.equal(perm.canViewThaiMedValue(null, false), false)
+  assert.equal(perm.canViewThaiMedValue(thaiMedStaff, false), false, 'Thai-med group alone is not enough')
+  assert.equal(perm.canViewThaiMedValue({ ...thaiMedStaff, thaimed_admin_enabled: false }, false), false)
+  assert.equal(perm.canViewThaiMedValue({ ...thaiMedStaff, thaimed_admin_enabled: true }, false), true)
+  assert.equal(perm.canViewThaiMedValue({ ...thaiMedStaff, thaimed_admin_enabled: 1 }, false), true)
+  assert.equal(perm.canViewThaiMedValue({ loginname: 'it' }, true), true, 'IT always can')
+})
+
 test('Menu permissions - roles resolve IT > Thai-med > pharmacist > general', () => {
   assert.equal(perm.resolveRole({ position: 'นักวิชาการคอมพิวเตอร์' }, true), 'it')
   assert.equal(perm.resolveRole({ groupname: 'doctor', position: 'แพทย์แผนไทยปฏิบัติการ' }, false), 'thaimed')

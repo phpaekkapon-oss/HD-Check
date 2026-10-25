@@ -14,7 +14,7 @@ import {
 import { evaluate } from './audit-rules.mjs'
 import { analyzeHerbRecord } from './herb-advice.mjs'
 import { checkVisitIcd, claimState, loadIcdReference, fetchClaimVisits, fdhLastChecked } from './claims.mjs'
-import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
+import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, canViewThaiMedValue as canViewThaiMedValueRule, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
 import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
 import {
   initDispensingRulesTable,
@@ -277,6 +277,16 @@ function requireSession(req, res, next) {
 function requireAdmin(req, res, next) {
   return requireSession(req, res, () => {
     if (!isAdminUser(req.authUser)) return res.status(403).json({ success: false, error: 'บัญชีนี้ไม่มีสิทธิ์ผู้ดูแลระบบ' })
+    next()
+  })
+}
+
+/** เห็นการ์ดมูลค่าบริการแผนไทย: IT/ผู้ดูแลระบบ หรือผู้ดูแลแผนไทยที่ IT เปิดสวิตช์ให้รายคน */
+const canViewThaiMedValue = (user) => canViewThaiMedValueRule(user, isAdminUser(user))
+
+function requireThaiMedValue(req, res, next) {
+  return requireSession(req, res, () => {
+    if (!canViewThaiMedValue(req.authUser)) return res.status(403).json({ success: false, error: 'บัญชีนี้ไม่มีสิทธิ์ดูมูลค่าบริการแผนไทย' })
     next()
   })
 }
@@ -677,10 +687,10 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
 })
 
 /**
- * มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการจาก opitemrece.sum_price) — เฉพาะ IT/ผู้ดูแลระบบ
+ * มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการจาก opitemrece.sum_price) — เฉพาะ IT/ผู้ดูแลระบบ/ผู้ดูแลแผนไทย
  * ส่งเฉพาะยอดรวมระดับกลุ่มงาน ไม่มีข้อมูลรายแพทย์
  */
-app.get('/api/thaimed-value', requireAdmin, async (req, res) => {
+app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
     const [byGroup] = await hosPool.query(
@@ -2580,6 +2590,31 @@ app.post('/api/admin/users/:loginname/admin-role', requireAdmin, async (req, res
       [target.loginname, target.name || target.loginname, target.groupname || null, enabled ? 1 : 0]
     )
     res.json({ success: true, loginname: target.loginname, admin_enabled: enabled })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/admin/users/:loginname/thaimed-admin', requireAdmin, async (req, res) => {
+  try {
+    const loginname = String(req.params.loginname ?? '').trim()
+    const enabled = req.body?.enabled
+    if (!loginname || typeof enabled !== 'boolean') {
+      return res.status(400).json({ success: false, error: 'ระบุผู้ใช้และสถานะผู้ดูแลแผนไทยให้ถูกต้อง' })
+    }
+    const [users] = await hosPool.query(
+      'SELECT loginname, name, groupname FROM opduser WHERE loginname = ? LIMIT 1',
+      [loginname]
+    )
+    if (!users.length) return res.status(404).json({ success: false, error: 'ไม่พบบัญชีนี้ใน HOSxP' })
+    const target = users[0]
+    await dwPool.query(
+      `INSERT INTO dw_hd_check_user_2fa (loginname, name, user_type, groupname, thaimed_admin_enabled)
+       VALUES (?, ?, 'opduser', ?, ?)
+       ON DUPLICATE KEY UPDATE thaimed_admin_enabled = VALUES(thaimed_admin_enabled), name = VALUES(name), groupname = VALUES(groupname)`,
+      [target.loginname, target.name || target.loginname, target.groupname || null, enabled ? 1 : 0]
+    )
+    res.json({ success: true, loginname: target.loginname, thaimed_admin_enabled: enabled })
   } catch (err) {
     fail(res, err)
   }

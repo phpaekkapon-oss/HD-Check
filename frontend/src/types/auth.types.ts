@@ -8,6 +8,7 @@ export interface User {
   readonly user_type: 'opduser' | 'doctor'
   readonly two_factor_enabled: boolean
   readonly admin_enabled?: boolean
+  readonly thaimed_admin_enabled?: boolean
   readonly has_pin?: boolean
   readonly pin_enabled?: boolean
   readonly pin_length?: number
@@ -44,6 +45,7 @@ export interface User2FAAdminItem {
   readonly user_type: string
   readonly account_disable: boolean
   readonly admin_enabled: boolean
+  readonly thaimed_admin_enabled?: boolean
   readonly role_override?: string | null
   readonly effective_role?: 'it' | 'thaimed' | 'doctor' | 'pharmacist' | 'general'
   readonly two_factor_enabled: boolean
@@ -74,6 +76,12 @@ export function isAdminUser(user?: Partial<User> | null): boolean {
   if (pos.includes('คอมพิวเตอร์') || pos.includes('สารสนเทศ') || pos.includes('โปรแกรมเมอร์')) return true
 
   return false
+}
+
+/** เห็นการ์ดมูลค่าบริการแผนไทย: IT/ผู้ดูแลระบบ หรือผู้ดูแลแผนไทยที่ IT เปิดสวิตช์ให้ (ต้องตรงกับ canViewThaiMedValue ใน backend) */
+export function canViewThaiMedValue(user?: Partial<User> | null): boolean {
+  if (!user) return false
+  return isAdminUser(user) || user.thaimed_admin_enabled === true || Number(user.thaimed_admin_enabled) === 1
 }
 
 /** Check if user has permission to manage herbal drug ICD-10 criteria (Admin/IT, Thai Traditional Medicine, Pharmacist) */

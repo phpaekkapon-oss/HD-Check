@@ -791,6 +791,48 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     })
   }
 
+  const handleToggleThaiMedAdmin = (targetLogin: string, enabled: boolean) => {
+    const action = enabled ? 'กำหนด' : 'ถอด'
+    const targetUserItem = usersList.find((u) => u.loginname.toLowerCase() === targetLogin.toLowerCase())
+    promptConfirm({
+      title: `ยืนยัน${action}สิทธิ์ผู้ดูแลแผนไทย`,
+      description: `ยืนยัน${action}สิทธิ์ผู้ดูแลแผนไทยของบัญชี "${targetLogin}" หรือไม่?`,
+      detail: enabled
+        ? 'ผู้ใช้นี้จะเห็นการ์ดมูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการ) บนหน้าแรก โดยไม่ได้สิทธิ์ผู้ดูแลระบบอื่น'
+        : 'ผู้ใช้นี้จะไม่เห็นการ์ดมูลค่าบริการบนหน้าแรกอีก',
+      targetUser: {
+        loginname: targetLogin,
+        name: targetUserItem?.name,
+        role: targetUserItem?.position || targetUserItem?.groupname,
+      },
+      confirmText: enabled ? 'กำหนดสิทธิ์' : 'ถอดสิทธิ์',
+      variant: enabled ? 'primary' : 'danger',
+      icon: enabled ? 'shield-check' : 'shield-alert',
+      onConfirm: async () => {
+        setUpdatingAdminUser(targetLogin)
+        try {
+          const res = await fetch(`/api/admin/users/${encodeURIComponent(targetLogin)}/thaimed-admin`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled }),
+          })
+          const data = await res.json()
+          if (data.success) {
+            setAdminNotice(`${action}สิทธิ์ผู้ดูแลแผนไทยให้ ${targetLogin} เรียบร้อยแล้ว ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่`)
+            await fetchUsers()
+            setTimeout(() => setAdminNotice(null), 6000)
+          } else {
+            setAdminNotice(`ข้อผิดพลาด: ${data.error || 'เปลี่ยนสิทธิ์ผู้ดูแลแผนไทยไม่สำเร็จ'}`)
+          }
+        } catch (err) {
+          setAdminNotice(`ข้อผิดพลาด: ${(err as Error).message}`)
+        } finally {
+          setUpdatingAdminUser(null)
+        }
+      },
+    })
+  }
+
   // Role categorization helpers
   const isUserAdmin = (u: User2FAAdminItem) => {
     return Boolean(u.admin_enabled || u.effective_role === 'it' || isAdminUser(u as any))
@@ -2228,6 +2270,33 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                                     </button>
                                     {updatingAdminUser === u.loginname && (
                                       <Loader2 className="size-3 animate-spin text-violet-400" />
+                                    )}
+                                    {/* ผู้ดูแลแผนไทย: เห็นการ์ดมูลค่าบริการ (Admin เห็นอยู่แล้ว จึงไม่แสดงสวิตช์) */}
+                                    {!uIsAdmin && (
+                                      <label
+                                        className="inline-flex items-center gap-1 text-[10.5px] text-slate-400 cursor-pointer select-none"
+                                        title="ผู้ดูแลแผนไทย: เห็นการ์ดมูลค่าบริการบนหน้าแรก (ไม่ได้สิทธิ์ผู้ดูแลระบบ)"
+                                      >
+                                        <span>หน.แผนไทย</span>
+                                        <button
+                                          type="button"
+                                          role="switch"
+                                          aria-checked={Boolean(u.thaimed_admin_enabled)}
+                                          disabled={updatingAdminUser === u.loginname}
+                                          onClick={() => handleToggleThaiMedAdmin(u.loginname, !u.thaimed_admin_enabled)}
+                                          className={cn(
+                                            'relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed',
+                                            u.thaimed_admin_enabled ? 'bg-emerald-600' : 'bg-slate-800 border-slate-700 hover:bg-slate-700'
+                                          )}
+                                        >
+                                          <span
+                                            className={cn(
+                                              'pointer-events-none inline-block size-4 rounded-full bg-white shadow-sm transition-transform duration-200',
+                                              u.thaimed_admin_enabled ? 'translate-x-4' : 'translate-x-0'
+                                            )}
+                                          />
+                                        </button>
+                                      </label>
                                     )}
                                   </div>
                                 </td>

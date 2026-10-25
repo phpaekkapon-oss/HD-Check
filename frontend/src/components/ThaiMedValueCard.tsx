@@ -10,7 +10,7 @@ interface ThaiMedValueCardProps {
 
 const baht = (n: number) => fmtNum(n, 2)
 
-/** มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการ) — แสดงเฉพาะ IT/ผู้ดูแลระบบ และไม่แสดงข้อมูลรายแพทย์ */
+/** มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการ) — แสดงเฉพาะ IT/ผู้ดูแลระบบ/ผู้ดูแลแผนไทย และไม่แสดงข้อมูลรายแพทย์ */
 export const ThaiMedValueCard: FC<ThaiMedValueCardProps> = ({ range }) => {
   const { data, isLoading, isError } = useThaiMedValue(range, true)
 
@@ -24,7 +24,7 @@ export const ThaiMedValueCard: FC<ThaiMedValueCardProps> = ({ range }) => {
             ประมาณการ
           </span>
         </div>
-        <span className="text-[11px] text-slate-400">เห็นเฉพาะ IT / ผู้ดูแลระบบ</span>
+        <span className="text-[11px] text-slate-400">เห็นเฉพาะ IT / ผู้ดูแลแผนไทย</span>
       </div>
 
       {isLoading && <p className="text-xs text-slate-400">กำลังดึงข้อมูลจาก HOSxP…</p>}
