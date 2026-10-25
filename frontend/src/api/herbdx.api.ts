@@ -57,7 +57,30 @@ const qs = (params: Record<string, string | undefined>) => {
   return new URLSearchParams(clean).toString()
 }
 
+export interface ThaiMedValueGroup {
+  readonly income_group: string
+  readonly items: number
+  readonly value: number
+  readonly cost: number
+}
+
+export interface ThaiMedValueResponse {
+  readonly success: true
+  readonly startDate: string
+  readonly endDate: string
+  readonly estimated: true
+  readonly visits: number
+  readonly totalValue: number
+  readonly totalCost: number
+  readonly atRiskValue: number
+  readonly atRiskItems: number
+  readonly groups: readonly ThaiMedValueGroup[]
+}
+
 export const herbDxApi = {
+  thaiMedValue: (r: DateRange) =>
+    request<ThaiMedValueResponse>(`/api/thaimed-value?${qs({ startDate: r.startDate, endDate: r.endDate })}`),
+
   status: () => request<DbStatus>('/api/status'),
 
   prescriptions: (f: AuditFilterParams) =>

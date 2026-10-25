@@ -12,6 +12,7 @@ export const herbDxKeys = {
   healthMedSettings: () => [...herbDxKeys.all, 'healthmed-settings'] as const,
   pttypes: () => [...herbDxKeys.all, 'pttypes'] as const,
   menuPermissions: () => [...herbDxKeys.all, 'menu-permissions'] as const,
+  thaiMedValue: (r: DateRange) => [...herbDxKeys.all, 'thaimed-value', r] as const,
   claims: (r: DateRange) => [...herbDxKeys.all, 'claims', r] as const,
 }
 
@@ -210,3 +211,14 @@ export function usePttypes() {
 }
 
 
+
+/** มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการ) — เปิดเฉพาะผู้ดูแลระบบ */
+export function useThaiMedValue(range: DateRange, enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: herbDxKeys.thaiMedValue(range),
+    queryFn: () => herbDxApi.thaiMedValue(range),
+    staleTime: 60_000,
+    retry: false,
+  })
+}

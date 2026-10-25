@@ -3,7 +3,7 @@ import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
 import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
 import {
   HEALTH_MED_AUDIT_SQL,
@@ -671,6 +671,90 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
           : evaluated.filter((r) => r.audit_result === result)
 
     res.json({ success: true, data: filtered, kpi, kpiByType, meta: { total: filtered.length, startDate, endDate } })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+/**
+ * มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการจาก opitemrece.sum_price) — เฉพาะ IT/ผู้ดูแลระบบ
+ * ส่งเฉพาะยอดรวมระดับกลุ่มงาน ไม่มีข้อมูลรายแพทย์
+ */
+app.get('/api/thaimed-value', requireAdmin, async (req, res) => {
+  try {
+    const { startDate, endDate } = readRange(req.query)
+    const [byGroup] = await hosPool.query(
+      `SELECT COALESCE(i.name, 'ไม่ระบุหมวด') AS income_group,
+              COUNT(*) AS items,
+              ROUND(SUM(op.sum_price), 2) AS value,
+              ROUND(SUM(op.qty * COALESCE(op.cost, 0)), 2) AS cost
+       FROM opitemrece op
+       JOIN ovst o ON o.vn = op.vn
+       JOIN spclty sp ON sp.spclty = o.spclty
+       LEFT JOIN income i ON i.income = op.income
+       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+       GROUP BY i.name
+       ORDER BY value DESC`,
+      [startDate, endDate]
+    )
+    const [[visitRow]] = await hosPool.query(
+      `SELECT COUNT(DISTINCT o.vn) AS visits
+       FROM ovst o JOIN spclty sp ON sp.spclty = o.spclty
+       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+         AND EXISTS (SELECT 1 FROM opitemrece op WHERE op.vn = o.vn)`,
+      [startDate, endDate]
+    )
+
+    // มูลค่ายาสมุนไพร (OPD) ที่ตรวจแล้วไม่ผ่านเกณฑ์ DX/จำนวนขั้นต่ำ — ไม่รวมกฎรอบการจ่ายซ้ำ
+    let atRiskValue = 0
+    let atRiskItems = 0
+    const activeHerbs = await getActiveHerbalDrugs()
+    if (activeHerbs.length > 0) {
+      const [rxRows] = await dwPool.query(
+        `SELECT vn, drug_icode, drug_qty, pttype_name, department_name, doctor_name, pdx, dx0, dx1, dx2, dx3, dx4, dx5
+         FROM dw_hd_check_prescriptions
+         WHERE visit_date BETWEEN ? AND ? AND drug_qty > 0 AND vn NOT LIKE 'AN:%' AND drug_icode IN (?)`,
+        [startDate, endDate, activeHerbs.map((d) => d.icode)]
+      )
+      const { dxMap, minQtyMap } = await loadDxMap()
+      const failKeys = new Set(
+        rxRows.filter((r) => evaluate(r, dxMap, minQtyMap).audit_result === 'FAIL').map((r) => `${r.vn}|${r.drug_icode}`)
+      )
+      if (failKeys.size > 0) {
+        const vns = [...new Set([...failKeys].map((k) => k.split('|')[0]))]
+        for (let i = 0; i < vns.length; i += 2000) {
+          const [priced] = await hosPool.query(
+            'SELECT vn, icode, SUM(sum_price) AS value FROM opitemrece WHERE vn IN (?) GROUP BY vn, icode',
+            [vns.slice(i, i + 2000)]
+          )
+          for (const p of priced) {
+            if (failKeys.has(`${p.vn}|${p.icode}`)) {
+              atRiskValue += Number(p.value ?? 0)
+              atRiskItems += 1
+            }
+          }
+        }
+      }
+    }
+
+    const groups = byGroup.map((g) => ({
+      income_group: g.income_group,
+      items: Number(g.items),
+      value: Number(g.value ?? 0),
+      cost: Number(g.cost ?? 0),
+    }))
+    res.json({
+      success: true,
+      startDate,
+      endDate,
+      estimated: true,
+      visits: Number(visitRow?.visits ?? 0),
+      totalValue: Math.round(groups.reduce((s, g) => s + g.value, 0) * 100) / 100,
+      totalCost: Math.round(groups.reduce((s, g) => s + g.cost, 0) * 100) / 100,
+      atRiskValue: Math.round(atRiskValue * 100) / 100,
+      atRiskItems,
+      groups,
+    })
   } catch (err) {
     fail(res, err)
   }

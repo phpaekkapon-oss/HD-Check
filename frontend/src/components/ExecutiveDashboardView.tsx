@@ -37,6 +37,8 @@ import type {
 import { fmtNum, toThaiDate, downloadExcel, AUDIT_RESULT_META, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { ThaiMedValueCard } from '@/components/ThaiMedValueCard'
+import { isAdminUser } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 
 interface ExecutiveDashboardViewProps {
@@ -1428,6 +1430,9 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </div>
         </div>
       </div>
+
+      {/* มูลค่าบริการแพทย์แผนไทย (ประมาณการ) — เฉพาะ IT/ผู้ดูแลระบบ ไม่แสดงรายแพทย์ */}
+      {isAdminUser(user) && <ThaiMedValueCard range={range} />}
 
       {/* ========================================================================= */}
       {/* 4. COMPACT QUICK LAUNCHPAD TOOLBAR                                        */}
