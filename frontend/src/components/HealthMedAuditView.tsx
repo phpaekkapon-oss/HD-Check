@@ -40,6 +40,7 @@ import { herbDxApi } from '@/api/herbdx.api'
 import type { DateRange, HealthMedRecord } from '@/types/herbdx.types'
 import { DataTableColumnHeader } from '@/components/DataTableColumnHeader'
 import { DataTablePagination } from '@/components/DataTablePagination'
+import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CopyButton } from '@/components/CopyButton'
 import {
@@ -170,7 +171,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     setTimeout(() => setCopiedAdvice(false), 2000)
   }
 
-  const { data, isLoading } = useHealthMedAudit({
+  const { data, isLoading, isFetching, isPlaceholderData } = useHealthMedAudit({
     startDate: range.startDate,
     endDate: range.endDate,
     result: 'ALL',
@@ -762,6 +763,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
 
   return (
     <div className="space-y-4">
+      {isFetching && isPlaceholderData && <RangeLoadingNotice range={range} />}
       {/* Header Banner - Enterprise Space-Saving Style */}
       <div className="rounded-2xl bg-themed-card p-3 sm:p-4 border border-themed shadow-xs">
         <div className="flex flex-wrap items-center justify-between gap-3">

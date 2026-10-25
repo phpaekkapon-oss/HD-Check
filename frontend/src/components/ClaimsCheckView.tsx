@@ -19,6 +19,7 @@ import { fmtNum, toThaiDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { PaginationBar } from '@/components/PaginationBar'
 import { usePagination } from '@/hooks/usePagination'
+import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { PhiName, PhiHn } from '@/components/Phi'
 
 interface ClaimsCheckViewProps {
@@ -42,7 +43,7 @@ const dxList = (v: ClaimVisit): [string, string][] =>
   ).flatMap(([slot, code]) => (code ? [[slot, code] as [string, string]] : []))
 
 export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
-  const { data, isLoading, error, isFetching } = useClaimCheck(range)
+  const { data, isLoading, error, isFetching, isPlaceholderData } = useClaimCheck(range)
   const [filter, setFilter] = useState<Filter>('ALL')
   const [search, setSearch] = useState('')
   const [openVn, setOpenVn] = useState<string | null>(null)
@@ -106,6 +107,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
 
   return (
     <div className="space-y-4">
+      {isFetching && isPlaceholderData && <RangeLoadingNotice range={range} />}
       {/* หัวหน้า */}
       <section className="rounded-2xl border border-themed bg-themed-card p-5">
         <div className="flex flex-wrap items-start justify-between gap-3">

@@ -52,6 +52,8 @@ interface ExecutiveDashboardViewProps {
   readonly onSync: () => void
   readonly isSyncing: boolean
   readonly onConfigureDrug?: (record: AuditRecord) => void
+  /** กำลังโหลดช่วงวันที่ใหม่ (ข้อมูลที่เห็นยังเป็นของช่วงก่อนหน้า) */
+  readonly loading?: boolean
 }
 
 interface DailyTrendItem {
@@ -76,6 +78,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   onNavigate,
   onSync,
   isSyncing,
+  loading = false,
 }) => {
   const { user } = useAuth()
   // Chart filter mode
@@ -530,17 +533,39 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const plotHeight = chartHeight - padTop - padBottom
 
   return (
-    <div className="space-y-4 animate-fade-in pb-8 text-slate-800 dark:text-slate-100">
+    <div
+      aria-busy={loading}
+      className={cn(
+        'space-y-4 animate-fade-in pb-8 text-slate-800 dark:text-slate-100',
+        // ระหว่างโหลดช่วงใหม่ ตัวเลขและกราฟด้านล่างยังเป็นของช่วงก่อนหน้า จึงจางลงและกดไม่ได้จนกว่าจะโหลดเสร็จ
+        loading &&
+          '[&>*:not([data-keep])]:opacity-40 [&>*:not([data-keep])]:pointer-events-none [&>*:not([data-keep])]:transition-opacity'
+      )}
+    >
+      {loading && (
+        <div
+          data-keep
+          role="status"
+          aria-live="polite"
+          className="flex items-center gap-2 rounded-xl border border-violet-500/30 bg-violet-500/10 px-3.5 py-2.5 text-xs font-medium text-violet-800 dark:text-violet-200"
+        >
+          <RefreshCw className="size-3.5 animate-spin shrink-0" />
+          <span>
+            กำลังโหลดข้อมูล {toThaiDate(range.startDate)} – {toThaiDate(range.endDate)} จาก HOSxP… ช่วงยาวอาจใช้เวลาสักครู่ ตัวเลขด้านล่างจะอัปเดตเมื่อโหลดเสร็จ
+          </span>
+        </div>
+      )}
+
       {/* ========================================================================= */}
       {/* 1. SLIM & PROFESSIONAL EXECUTIVE HEADER BAR                               */}
       {/* ========================================================================= */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-themed-card border border-themed shadow-xs">
-        <div className="flex items-center gap-3">
+      <div data-keep className="flex flex-col xl:flex-row xl:items-center justify-between gap-3 p-3.5 rounded-2xl bg-themed-card border border-themed shadow-xs">
+        <div className="flex min-w-0 flex-1 items-center gap-3">
           <div className="size-10 rounded-xl bg-accent-soft border border-accent-soft text-accent grid place-items-center shrink-0">
             <Activity className="size-5" />
           </div>
-          <div>
-            <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+          <div className="min-w-0">
+            <h1 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex flex-wrap items-center gap-x-2 gap-y-1">
               <span>ภาพรวมการสั่งใช้ยาสมุนไพร</span>
               <span className="text-xs px-2 py-0.5 rounded-md bg-accent-soft text-accent border border-accent-soft font-normal">
                 รพ.พังโคน
@@ -563,7 +588,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         </div>
 
         {/* Date presets & Subtle Refresh */}
-        <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+        <div className="flex w-full max-w-full items-center gap-2 xl:w-auto xl:shrink-0">
           <div className="flex items-center gap-1.5 p-1 rounded-xl bg-slate-100 dark:bg-white/5 border border-slate-200/80 dark:border-white/5 text-xs flex-wrap">
             {/* กลุ่ม 1: ปีงบประมาณ 3 ปี (เรียงตามลำดับเวลา: ปีงบ 68 -> ปีงบ 69 -> ปีงบ 70) */}
             <div className="flex items-center gap-1 pr-1.5 border-r border-slate-300 dark:border-white/10">

@@ -20,6 +20,7 @@ import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate
 import { useAuth } from '@/context/AuthContext'
 import { canManageHerbDx, canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
 import { ThaiMedValueView } from '@/components/ThaiMedValueView'
+import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { ShieldAlert } from 'lucide-react'
 
 const NoAccessNotice: FC<{ readonly onBack: () => void }> = ({ onBack }) => (
@@ -196,7 +197,11 @@ const DashboardView: FC = () => {
 
   // หน้าภาพรวมใช้ข้อมูลทั้งหมด (ทุกผลตรวจ, OPD + IPD) ไม่ขึ้นกับตัวกรองที่ค้างไว้ในหน้าตรวจสอบการจ่ายยา
   const dashboardParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'ALL' }
-  const { data: dashboardResponse } = useAuditRecords(dashboardParams, activePage === 'dashboard')
+  const {
+    data: dashboardResponse,
+    isFetching: isDashboardFetching,
+    isPlaceholderData: isDashboardPlaceholder,
+  } = useAuditRecords(dashboardParams, activePage === 'dashboard')
 
   // หน้าที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (IT ตั้งค่าใน จัดการระบบ > สิทธิ์เมนู) แสดงข้อความแทน แม้พิมพ์ URL ตรง
   const { data: menuPerms } = useMenuPermissions()
@@ -206,11 +211,18 @@ const DashboardView: FC = () => {
   const shownPage: ActivePage | 'blocked' = isBlocked ? 'blocked' : activePage
 
   const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'PROBLEM' }
-  const { data: mismatchResponse, isLoading: isMismatchLoading } = useAuditRecords(
-    mismatchParams,
-    activePage === 'mapping' || activePage === 'dxwriteback'
-  )
-  const { data: drugSummaries = NO_DRUGS, isLoading: isDrugsLoading } = useDrugSummaries(
+  const {
+    data: mismatchResponse,
+    isLoading: isMismatchLoading,
+    isFetching: isMismatchFetching,
+    isPlaceholderData: isMismatchPlaceholder,
+  } = useAuditRecords(mismatchParams, activePage === 'mapping' || activePage === 'dxwriteback')
+  const {
+    data: drugSummaries = NO_DRUGS,
+    isLoading: isDrugsLoading,
+    isFetching: isDrugsFetching,
+    isPlaceholderData: isDrugsPlaceholder,
+  } = useDrugSummaries(
     range,
     activePage === 'dashboard' || activePage === 'drugs' || activePage === 'mapping' || activePage === 'audit'
   )
@@ -319,6 +331,7 @@ const DashboardView: FC = () => {
           onSync={handleManualSync}
           isSyncing={isSyncing}
           onConfigureDrug={handleConfigureDrug}
+          loading={isDashboardFetching && (isDashboardPlaceholder || !dashboardResponse)}
         />
       )}
 
@@ -438,17 +451,23 @@ const DashboardView: FC = () => {
           {isDrugsLoading ? (
             <AuditTableSkeleton />
           ) : (
+            <div className="space-y-4">
+              {isDrugsFetching && isDrugsPlaceholder && <RangeLoadingNotice range={range} />}
             <DrugSummaryView
               drugs={drugSummaries}
               range={range}
               onRangeChange={handleRangeChange}
               latestVisitDate={status?.latestVisitDate ?? null}
             />
+            </div>
           )}
         </>
       )}
 
       {/* Page 3: Read-only queue for missing drug codes and ICD rules */}
+      {shownPage === 'mapping' && isMismatchFetching && isMismatchPlaceholder && (
+        <div className="mb-4"><RangeLoadingNotice range={range} /></div>
+      )}
       {shownPage === 'mapping' && (
         <CodeReviewQueue
           drugs={drugSummaries}
@@ -460,6 +479,9 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page: Review a single service encounter before any HOSxP write-back */}
+      {shownPage === 'dxwriteback' && isMismatchFetching && isMismatchPlaceholder && (
+        <div className="mb-4"><RangeLoadingNotice range={range} /></div>
+      )}
       {shownPage === 'dxwriteback' && (
         <DxWritebackView
           records={mismatchResponse?.data ?? NO_RECORDS}

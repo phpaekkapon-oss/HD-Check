@@ -8,7 +8,7 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers, CircleHelp } from 'lucide-react'
 import { DispensingRulesTab } from '@/components/DispensingRulesTab'
 import { ThaiMedRulesTab } from '@/components/ThaiMedRulesTab'
 import { herbDxApi } from '@/api/herbdx.api'
@@ -139,6 +139,17 @@ export const SettingsTabBar: FC<{
       })}
     </div>
 )
+
+type QuickFilter = 'all' | 'no-icd' | 'interval' | 'min-qty'
+
+const HELP_KEY = 'hdcheck.dxmapHelpOpen'
+
+const QUICK_FILTERS: readonly { readonly id: QuickFilter; readonly label: string; readonly test: (d: DxMapRecord) => boolean }[] = [
+  { id: 'all', label: 'ทั้งหมด', test: () => true },
+  { id: 'no-icd', label: 'ยังไม่กำหนด ICD', test: (d) => !d.dx_prefixes.trim() },
+  { id: 'interval', label: 'มีรอบจ่าย', test: (d) => (d.dispensing_interval_days ?? 0) > 0 },
+  { id: 'min-qty', label: 'มีจ่ายขั้นต่ำ', test: (d) => (d.min_qty ?? 0) > 0 },
+]
 
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
   const { user } = useAuth()
@@ -305,17 +316,46 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     )
   }
 
+  const [quick, setQuick] = useState<QuickFilter>('all')
+  const [showHelp, setShowHelp] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem(HELP_KEY) === '1'
+    } catch {
+      return false
+    }
+  })
+  const toggleHelp = () =>
+    setShowHelp((v) => {
+      try {
+        localStorage.setItem(HELP_KEY, v ? '0' : '1')
+      } catch {
+        // เก็บค่าไม่ได้ก็ยังเปิด/ปิดได้ในรอบนี้
+      }
+      return !v
+    })
+
+  const quickCounts = useMemo(
+    () => ({
+      all: dxMap.length,
+      'no-icd': dxMap.filter((d) => !d.dx_prefixes.trim()).length,
+      interval: dxMap.filter((d) => (d.dispensing_interval_days ?? 0) > 0).length,
+      'min-qty': dxMap.filter((d) => (d.min_qty ?? 0) > 0).length,
+    }),
+    [dxMap]
+  )
+
   const filtered = useMemo(() => {
-    if (!search.trim()) return dxMap
+    const base = dxMap.filter((d) => QUICK_FILTERS.find((f) => f.id === quick)?.test(d) ?? true)
+    if (!search.trim()) return base
     const q = search.trim().normalize('NFC').toLocaleLowerCase()
-    return dxMap.filter(
+    return base.filter(
       (item) =>
         item.icode.normalize('NFC').toLocaleLowerCase().includes(q) ||
         item.drug_name.normalize('NFC').toLocaleLowerCase().includes(q) ||
         item.dx_prefixes.normalize('NFC').toLocaleLowerCase().includes(q) ||
         item.indication.normalize('NFC').toLocaleLowerCase().includes(q)
     )
-  }, [dxMap, search])
+  }, [dxMap, search, quick])
 
   const [expandedDxRows, setExpandedDxRows] = useState<Set<string>>(new Set())
   const toggleExpandDx = (icode: string) => {
@@ -539,7 +579,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           return (
             <div className="flex items-center justify-center font-mono">
               {item.min_qty && item.min_qty > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-700/50">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/50">
                   ≥ {item.min_qty}
                 </span>
               ) : (
@@ -720,31 +760,6 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         <ThaiMedRulesTab canEdit={canEdit} />
       ) : (
         <>
-          {/* Informational Banner with Hospital Gradient */}
-          <div className="rounded-2xl bg-themed-card border border-themed p-4 text-xs text-slate-600 dark:text-slate-200 flex items-start gap-3 shadow-xs">
-        <div className="grid place-items-center size-8 rounded-xl bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300 shrink-0 mt-0.5">
-          <Info className="size-4.5" />
-        </div>
-        <div className="space-y-1 flex-1">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <strong className="text-sm font-bold block text-slate-900 dark:text-white tracking-tight">
-              เกณฑ์การจับคู่ยาสมุนไพรกับรหัสการวินิจฉัยโรค (ICD-10 / ICD-10-TM)
-            </strong>
-            {canEdit && (
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-xs font-semibold border border-emerald-500/20">
-                <BadgeCheck className="size-3.5" /> บัญชีมีสิทธิ์จัดการเกณฑ์ (แพทย์แผนไทย / Admin)
-              </span>
-            )}
-          </div>
-          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            ระบบจะตรวจสอบว่าการสั่งจ่ายยานั้น มีรหัส PDX หรือ DX0-DX5 ที่ขึ้นต้นด้วยคำนำหน้าที่กำหนดไว้หรือไม่ (เช่น ระบุ <code className="font-mono bg-teal-950 text-teal-300 px-1.5 py-0.5 rounded font-bold border border-teal-500/30">M</code> จะครอบคลุมทุกรหัสโรคกล้ามเนื้อ M00-M99) แพทย์ พยาบาล และผู้สั่งอื่นๆ ผ่านเมื่อมีรหัสแผนปัจจุบัน (ICD10) ตรงเกณฑ์ ไม่ต้องมีรหัส U ส่วน<strong className="text-slate-800 dark:text-slate-100 font-bold">แพทย์แผนไทย 5 ท่านที่กำหนด</strong>ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ <strong className="text-emerald-700 dark:text-emerald-300 font-bold">ควบคู่กับ</strong>รหัสแพทย์แผนไทยที่ขึ้นต้นด้วย <code className="font-mono bg-emerald-950 text-emerald-300 px-1.5 py-0.5 rounded font-bold border border-emerald-500/30">U</code> ตัวใดก็ได้ (มีแต่รหัส U อย่างเดียวไม่ผ่าน)
-          </p>
-          <p className="text-slate-500 dark:text-slate-400 leading-relaxed">
-            สีในตารางผลตรวจ: <strong className="text-emerald-700 dark:text-emerald-300">เขียว = รหัสตรงเกณฑ์</strong>, <strong className="text-rose-700 dark:text-rose-300">แดง = รหัสไม่ตรง</strong>, <strong className="text-amber-700 dark:text-amber-300">เหลือง = ยังไม่มีเกณฑ์ให้ตรวจ</strong> ส่วนรหัส ICD สีเขียวในหน้านี้คือรหัสที่อนุญาต
-          </p>
-        </div>
-      </div>
-
       {!canEdit && (
         <div className="flex items-start gap-2 rounded-xl border border-amber-300/60 bg-amber-50 px-3 py-2.5 text-xs text-amber-900 dark:border-amber-500/25 dark:bg-amber-950/20 dark:text-amber-200">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" />
@@ -757,64 +772,124 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
         </div>
       )}
 
-      {/* Search & Action Header */}
-      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-xs dark:shadow-sm">
-        <div className="relative w-full sm:flex-1 sm:max-w-md">
-          <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="ค้นหารหัสยา, ชื่อยาสมุนไพร, ข้อบ่งใช้…"
-            className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
-          />
-        </div>
-        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
-          <div className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
-            ทั้งหมด <strong className="font-bold text-slate-800 dark:text-slate-200">{dxMap.length}</strong> รายการ
+      {/* แถบเครื่องมือ: ค้นหา + ปุ่มคำอธิบาย + ปุ่มเพิ่ม และชิปกรองด่วน */}
+      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 space-y-2.5 shadow-xs dark:shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2.5">
+          <div className="relative w-full sm:flex-1">
+            <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหารหัสยา, ชื่อยาสมุนไพร, ข้อบ่งใช้…"
+              className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
+            />
           </div>
-          {canEdit && (
+          <div className="flex items-center justify-end gap-2">
             <button
               type="button"
-              onClick={() => {
-                setSelectedDrug(null)
-                setAddSearchQuery('')
-                setSearchResults([])
-                setNewPrefixes('')
-                setNewIndication('')
-                setAddError(null)
-                setIsAddModalOpen(true)
-              }}
-              className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3 py-2 sm:py-1.5 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
+              onClick={toggleHelp}
+              aria-pressed={showHelp}
+              className={cn(
+                'inline-flex items-center gap-1.5 rounded-xl border px-3 py-2 text-xs font-semibold transition cursor-pointer',
+                showHelp
+                  ? 'border-violet-500/40 bg-violet-500/10 text-violet-700 dark:text-violet-300'
+                  : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+              )}
+              title="อธิบายเกณฑ์และความหมายของสี"
             >
-              <Plus className="size-3.5" />
-              <span className="sm:hidden">+ เพิ่มรายการยา</span>
-              <span className="hidden sm:inline">ตั้งค่าเพิ่มรายการยา</span>
+              <CircleHelp className="size-4" />
+              <span className="hidden sm:inline">คำอธิบายเกณฑ์</span>
             </button>
-          )}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedDrug(null)
+                  setAddSearchQuery('')
+                  setSearchResults([])
+                  setNewPrefixes('')
+                  setNewIndication('')
+                  setAddError(null)
+                  setIsAddModalOpen(true)
+                }}
+                className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
+              >
+                <Plus className="size-3.5" />
+                <span className="sm:hidden">เพิ่มยา</span>
+                <span className="hidden sm:inline">ตั้งค่าเพิ่มรายการยา</span>
+              </button>
+            )}
+          </div>
         </div>
+
+        <div className="flex flex-wrap items-center gap-1.5" role="group" aria-label="กรองด่วน">
+          {QUICK_FILTERS.map((q) => {
+            const selected = quick === q.id
+            return (
+              <button
+                key={q.id}
+                type="button"
+                aria-pressed={selected}
+                onClick={() => setQuick(q.id)}
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition cursor-pointer',
+                  selected
+                    ? 'border-transparent bg-slate-900 text-white dark:bg-white dark:text-slate-900'
+                    : 'border-slate-200 dark:border-white/10 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-white/5'
+                )}
+              >
+                {q.label}
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 text-[11px] font-bold tabular-nums',
+                    selected
+                      ? 'bg-white/20 dark:bg-slate-900/15'
+                      : q.id === 'no-icd' && quickCounts['no-icd'] > 0
+                        ? 'bg-rose-100 text-rose-700 dark:bg-rose-500/20 dark:text-rose-300'
+                        : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300'
+                  )}
+                >
+                  {quickCounts[q.id]}
+                </span>
+              </button>
+            )
+          })}
+        </div>
+
+        {showHelp && (
+          <div className="grid gap-2.5 border-t border-slate-200/80 pt-3 text-xs text-slate-600 dark:border-white/10 dark:text-slate-300 md:grid-cols-3">
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+              <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">ตรวจอย่างไร</div>
+              ระบบเทียบรหัส PDX และ DX0–DX5 กับคำนำหน้าที่กำหนดไว้ เช่น <code className="rounded border border-teal-500/30 bg-teal-50 px-1 font-mono font-bold text-teal-700 dark:bg-teal-950 dark:text-teal-300">M</code> ครอบคลุม M00–M99
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+              <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">แพทย์ พยาบาล และผู้สั่งอื่นๆ</div>
+              ผ่านเมื่อมีรหัสแผนปัจจุบัน (ICD10) ตรงเกณฑ์ ไม่ต้องมีรหัส U
+            </div>
+            <div className="rounded-xl bg-slate-50 p-3 dark:bg-white/5">
+              <div className="mb-1 font-bold text-slate-800 dark:text-slate-100">แพทย์แผนไทย 5 ท่านที่กำหนด</div>
+              ต้องมีรหัสแผนปัจจุบันตรงเกณฑ์ <strong className="text-emerald-700 dark:text-emerald-300">ควบคู่กับ</strong> รหัส <code className="rounded border border-emerald-500/30 bg-emerald-50 px-1 font-mono font-bold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">U</code> ตัวใดก็ได้ (มีแต่ U อย่างเดียวไม่ผ่าน)
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 md:col-span-3">
+              <span className="font-bold text-slate-800 dark:text-slate-100">สีในตารางผลตรวจ:</span>
+              <span><strong className="text-emerald-700 dark:text-emerald-300">เขียว</strong> = รหัสตรงเกณฑ์</span>
+              <span><strong className="text-rose-700 dark:text-rose-300">แดง</strong> = รหัสไม่ตรง</span>
+              <span><strong className="text-amber-700 dark:text-amber-300">เหลือง</strong> = ยังไม่มีเกณฑ์ให้ตรวจ</span>
+              <span className="text-slate-500 dark:text-slate-400">รหัส ICD สีเขียวในหน้านี้ = รหัสที่อนุญาต</span>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Settings Grid with Shadcn Data Table */}
       <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden space-y-0 transition-colors">
-        {/* Table Toolbar Header with Shadcn title */}
-        <div className="flex items-center justify-between px-4 py-2.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]">
-          <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
-            <span className="font-semibold text-slate-900 dark:text-white">ตารางข้อมูล</span>
-            <span className="text-slate-400 dark:text-slate-400">•</span>
-            <span>คลิกหัวคอลัมน์เพื่อเรียงลำดับ</span>
-          </div>
-          <div className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-            ค้นพบ {filtered.length} จาก {dxMap.length} รายการ
-          </div>
-        </div>
-
         {/* Scrollable table container */}
         <Table containerClassName="max-h-[68dvh] sm:min-h-[420px] overflow-auto">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-100 dark:bg-[#1d2035]">
                 {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="text-slate-700 dark:text-slate-300 font-bold">
+                  <TableHead key={header.id} title={header.column.getCanSort() ? 'คลิกเพื่อเรียงลำดับ' : undefined} className="text-slate-700 dark:text-slate-300 font-bold">
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
