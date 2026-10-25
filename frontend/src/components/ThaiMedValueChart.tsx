@@ -1,5 +1,5 @@
 import { useMemo, useState, type FC } from 'react'
-import { Box, Square } from 'lucide-react'
+import { Box, Loader2, Square } from 'lucide-react'
 import type { ThaiMedValueDaily } from '@/api/herbdx.api'
 import { fmtNum, toThaiDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -97,10 +97,27 @@ interface ThaiMedValueChartProps {
   readonly daily: readonly ThaiMedValueDaily[]
   readonly startDate: string
   readonly endDate: string
+  /** กำลังดึงข้อมูลช่วงที่เลือก (แสดงโครงกราฟแทนข้อความ "ไม่มีข้อมูล") */
+  readonly loading?: boolean
+  readonly error?: boolean
 }
 
+/** โครงกราฟระหว่างโหลด: แท่งกะพริบเบาๆ พร้อมข้อความ ไม่ให้เข้าใจผิดว่าไม่มีข้อมูล */
+const ChartSkeleton: FC = () => (
+  <div role="status" aria-live="polite" className="rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[#070b14]/50 p-4">
+    <div className="flex h-44 items-end gap-3 px-6">
+      {[45, 70, 55, 85, 60, 75, 50, 90, 65, 80, 55, 70].map((h, i) => (
+        <div key={i} className="flex-1 animate-pulse rounded-t bg-slate-200 dark:bg-white/10" style={{ height: `${h}%`, animationDelay: `${i * 80}ms` }} />
+      ))}
+    </div>
+    <p className="mt-3 flex items-center justify-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+      <Loader2 className="size-3.5 animate-spin" /> กำลังดึงข้อมูลจาก HOSxP… ช่วงยาวอาจใช้เวลาสักครู่
+    </p>
+  </div>
+)
+
 /** กราฟแท่งซ้อน ยา / บริการ-หัตถการ (ประมาณการ) สไตล์เดียวกับกราฟ 3 มิติหน้าแรก */
-export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate, endDate }) => {
+export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate, endDate, loading = false, error = false }) => {
   const [is3D, setIs3D] = useState(true)
   const [hovered, setHovered] = useState<number | null>(null)
 
@@ -116,7 +133,8 @@ export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate
 
   const max = niceMax(Math.max(0, ...points.map((p) => p.value)))
   const slot = points.length > 0 ? PLOT_W / points.length : PLOT_W
-  const barW = Math.min(40, Math.max(6, slot * 0.6))
+  // แท่งกว้างราว 45% ของช่อง (ช่องว่างมากกว่าแท่ง) และไม่เกิน 28 หน่วย: ไม่อ้วนเมื่อมีแท่งน้อย เช่น 12 เดือน
+  const barW = Math.min(28, Math.max(6, slot * 0.45))
   const dx = is3D ? Math.min(8, barW * 0.3) : 0
   const dy = is3D ? -dx * 0.8 : 0
   const y0 = PAD.top + PLOT_H
@@ -182,7 +200,11 @@ export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate
         </div>
       )}
 
-      {points.length === 0 ? (
+      {loading ? (
+        <ChartSkeleton />
+      ) : error ? (
+        <p className="py-10 text-center text-xs text-rose-500">ดึงข้อมูลกราฟไม่สำเร็จ ลองเลือกช่วงวันที่ใหม่อีกครั้ง</p>
+      ) : points.length === 0 ? (
         <p className="py-10 text-center text-xs text-slate-500 dark:text-slate-400">ไม่มีข้อมูลในช่วงวันที่เลือก</p>
       ) : (
         <div className="relative rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[#070b14]/50 p-2">

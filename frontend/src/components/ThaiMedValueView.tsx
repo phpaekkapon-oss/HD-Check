@@ -13,7 +13,7 @@ interface ThaiMedValueViewProps {
 
 /** หน้ารายได้แผนไทย: มูลค่าบริการ (ประมาณการ) แยกหมวดและรายวัน เฉพาะ IT / ผู้ดูแลแผนไทย ไม่มีข้อมูลรายแพทย์ */
 export const ThaiMedValueView: FC<ThaiMedValueViewProps> = ({ range, onRangeChange }) => {
-  const { data } = useThaiMedValue(range, true)
+  const { data, isFetching, isError } = useThaiMedValue(range, true)
   const daily = data?.daily ?? []
 
   return (
@@ -30,7 +30,7 @@ export const ThaiMedValueView: FC<ThaiMedValueViewProps> = ({ range, onRangeChan
 
       <ThaiMedValueCard range={range} />
 
-      <ThaiMedValueChart daily={daily} startDate={range.startDate} endDate={range.endDate} />
+      <ThaiMedValueChart daily={daily} startDate={range.startDate} endDate={range.endDate} loading={isFetching && !data} error={isError} />
     </div>
   )
 }
