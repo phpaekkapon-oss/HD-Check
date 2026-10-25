@@ -54,7 +54,7 @@ export const MenuPermissionsPanel: FC = () => {
             <h3 className="text-lg font-bold text-white">สิทธิ์การเข้าถึงเมนู</h3>
             <p className="mt-1 text-sm leading-relaxed text-slate-300">
               ติ๊กเพื่อให้กลุ่มผู้ใช้เห็นเมนูนั้น เมนูที่ไม่ได้ติ๊กจะถูกซ่อน และเปิดผ่าน URL ไม่ได้
-              ผู้ดูแลระบบ (IT) เห็นทุกเมนูเสมอ และเป็นกลุ่มเดียวที่แก้หน้านี้ได้
+              ผู้ดูแลระบบ (IT) เห็นทุกเมนูเสมอ และเป็นกลุ่มเดียวที่แก้หน้านี้ได้ ส่วนเมนู "รายได้แผนไทย" เปิดให้เป็นรายคนเท่านั้น
             </p>
           </div>
         </div>
@@ -133,6 +133,24 @@ export const MenuPermissionsPanel: FC = () => {
                 })}
               </tr>
             ))}
+            <tr className="hover:bg-white/[0.02]">
+              <td className="px-4 py-3 text-slate-200">
+                <div className="whitespace-nowrap">รายได้แผนไทย</div>
+                <div className="text-xs text-slate-500">เปิดรายคน ไม่ผูกกับกลุ่ม · ตั้งที่สวิตช์ "หน.แผนไทย" ในหน้า ผู้ใช้ &amp; นโยบาย</div>
+              </td>
+              <td className="px-2 py-3 text-center">
+                <span className="inline-grid size-6 place-items-center rounded-md bg-accent text-white" title="IT เห็นเสมอ">
+                  <Check className="size-4 stroke-[3]" />
+                </span>
+              </td>
+              {roles.map((r) => (
+                <td key={r.id} className="px-2 py-3 text-center">
+                  <span className="inline-block rounded-md bg-white/[0.06] px-1.5 py-0.5 text-[11px] text-slate-400 whitespace-nowrap" title="เปิดให้เป็นรายคนเท่านั้น">
+                    รายคน
+                  </span>
+                </td>
+              ))}
+            </tr>
           </tbody>
         </table>
       </div>

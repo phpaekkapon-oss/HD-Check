@@ -698,7 +698,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       {/* Add / Edit Rule Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-4xl rounded-2xl border border-slate-200 dark:border-[#292440] bg-white dark:bg-[#121629] p-6 shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+          <div className="w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#292440] bg-white dark:bg-[#121629] p-6 shadow-2xl space-y-4 max-h-[94vh] overflow-y-auto">
             <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#292440] pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="grid place-items-center size-9 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
@@ -814,7 +814,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                   </div>
 
                   {/* Drug Checkbox List with Synced ICD-10 Badges */}
-                  <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-[#34304a] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[#101326] flex-1">
+                  <div className="max-h-[55vh] min-h-[20rem] overflow-y-auto rounded-xl border border-slate-200 dark:border-[#34304a] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[#101326] flex-1">
                     {filteredDrugs.length === 0 ? (
                       <div className="p-4 text-center text-xs text-slate-400">
                         ไม่พบยาสมุนไพรที่ตรงกับคำค้นหา
@@ -842,9 +842,9 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                                   <span className="truncate">{d.drug_name}</span>
                                   <span className="font-mono text-xs text-slate-400 shrink-0">({d.icode})</span>
                                 </div>
-                                <div className="flex items-center gap-1.5 mt-0.5">
+                                <div className="flex flex-wrap items-center gap-1.5 mt-0.5">
                                   {d.dx_prefixes ? (
-                                    <span className="font-mono text-xs px-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30">
+                                    <span className="font-mono text-xs px-1 rounded bg-teal-50 dark:bg-teal-950/40 text-teal-700 dark:text-teal-300 border border-teal-200 dark:border-teal-500/30 whitespace-normal break-all">
                                       ICD: {d.dx_prefixes}
                                     </span>
                                   ) : (
@@ -939,7 +939,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       </div>
 
                       {/* Scrollable list of pttypes */}
-                      <div className="max-h-36 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
+                      <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
                         {isLoadingPttypes ? (
                           <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
                             <Loader2 className="size-4 animate-spin text-emerald-500" />
