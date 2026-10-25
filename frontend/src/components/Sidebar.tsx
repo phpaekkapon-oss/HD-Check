@@ -1,4 +1,4 @@
-import { useEffect, useState, type FC } from 'react'
+import { useEffect, useRef, useState, type FC } from 'react'
 import {
   LayoutDashboard,
   ClipboardCheck,
@@ -18,6 +18,7 @@ import {
   Banknote,
   BadgeCheck,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react'
 import type { ActivePage, DbStatus } from '@/types/herbdx.types'
 import { useTheme } from '@/context/ThemeContext'
@@ -94,6 +95,21 @@ export const Sidebar: FC<SidebarProps> = ({
   const { user } = useAuth()
   const isAdmin = isAdminUser(user)
   const { data: menuPerms } = useMenuPermissions(Boolean(user))
+  // รายการเมนูยาวกว่าความสูงจอ (เช่นมือถือ): บอกใบ้ว่าเลื่อนได้ด้วยแถบเลื่อนบางๆ และแถบจางพร้อมข้อความที่ท้ายรายการ
+  const navRef = useRef<HTMLElement>(null)
+  const [navHasMore, setNavHasMore] = useState(false)
+  const updateNavHasMore = () => {
+    const el = navRef.current
+    if (el) setNavHasMore(el.scrollHeight - el.scrollTop - el.clientHeight > 8)
+  }
+  useEffect(() => {
+    const el = navRef.current
+    if (!el) return
+    updateNavHasMore()
+    const ro = new ResizeObserver(updateNavHasMore)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [mobileOpen, collapsed, menuPerms, isAdmin])
   const [securityModalOpen, setSecurityModalOpen] = useState(() => {
     try {
       return sessionStorage.getItem('hd_check_security_modal_open') === 'true'
@@ -217,7 +233,8 @@ export const Sidebar: FC<SidebarProps> = ({
       </div>
 
       {/* Navigation List */}
-      <nav className="flex-1 p-2.5 space-y-1.5 overflow-y-auto scrollbar-none">
+      <div className="relative flex min-h-0 flex-1 flex-col">
+      <nav ref={navRef} onScroll={updateNavHasMore} className="flex-1 min-h-0 p-2.5 space-y-1.5 overflow-y-auto overscroll-contain">
         {!isCollapsedView && (
           <div className="px-2.5 pt-2 pb-1 text-xs font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
             <span
@@ -303,6 +320,14 @@ export const Sidebar: FC<SidebarProps> = ({
           )
         })}
       </nav>
+      {navHasMore && !isCollapsedView && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex h-14 items-end justify-center bg-gradient-to-t from-[var(--sidebar-bg)] via-[var(--sidebar-bg)]/85 to-transparent pb-1.5">
+          <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white/90 px-2.5 py-0.5 text-[11px] font-medium text-slate-500 shadow-xs dark:border-white/10 dark:bg-white/10 dark:text-slate-300">
+            เลื่อนดูเมนูเพิ่ม <ChevronDown className="size-3" />
+          </span>
+        </div>
+      )}
+      </div>
 
       {/* System actions */}
       <div className="p-2.5 border-t border-slate-200 dark:border-white/10 space-y-1">
