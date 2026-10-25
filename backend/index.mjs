@@ -707,6 +707,16 @@ app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
        ORDER BY value DESC`,
       [startDate, endDate]
     )
+    const [daily] = await hosPool.query(
+      `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.vn) AS visits, ROUND(SUM(op.sum_price), 2) AS value
+       FROM opitemrece op
+       JOIN ovst o ON o.vn = op.vn
+       JOIN spclty sp ON sp.spclty = o.spclty
+       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+       GROUP BY o.vstdate
+       ORDER BY o.vstdate`,
+      [startDate, endDate]
+    )
     const [[visitRow]] = await hosPool.query(
       `SELECT COUNT(DISTINCT o.vn) AS visits
        FROM ovst o JOIN spclty sp ON sp.spclty = o.spclty
@@ -764,6 +774,7 @@ app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
       atRiskValue: Math.round(atRiskValue * 100) / 100,
       atRiskItems,
       groups,
+      daily: daily.map((d) => ({ date: d.date, visits: Number(d.visits), value: Number(d.value ?? 0) })),
     })
   } catch (err) {
     fail(res, err)

@@ -75,6 +75,7 @@ export interface ThaiMedValueResponse {
   readonly atRiskValue: number
   readonly atRiskItems: number
   readonly groups: readonly ThaiMedValueGroup[]
+  readonly daily: readonly { readonly date: string; readonly visits: number; readonly value: number }[]
 }
 
 export const herbDxApi = {

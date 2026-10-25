@@ -18,7 +18,8 @@ import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useMenuPermis
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange, DrugSummaryRecord, DxMapRecord } from '@/types/herbdx.types'
 import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
-import { canManageHerbDx, isAdminUser } from '@/types/auth.types'
+import { canManageHerbDx, canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
+import { ThaiMedValueView } from '@/components/ThaiMedValueView'
 import { ShieldAlert } from 'lucide-react'
 
 const NoAccessNotice: FC<{ readonly onBack: () => void }> = ({ onBack }) => (
@@ -56,6 +57,7 @@ const VALID_PAGES: readonly ActivePage[] = [
   'mapping',
   'dxwriteback',
   'dxmap',
+  'thaimedvalue',
   'sql',
 ]
 
@@ -198,7 +200,9 @@ const DashboardView: FC = () => {
 
   // หน้าที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (IT ตั้งค่าใน จัดการระบบ > สิทธิ์เมนู) แสดงข้อความแทน แม้พิมพ์ URL ตรง
   const { data: menuPerms } = useMenuPermissions()
-  const isBlocked = activePage !== 'dashboard' && (menuPerms ? !menuPerms.myMenus.includes(activePage) : activePage === 'sql' && !isAdminUser(user))
+  const isBlocked = activePage === 'thaimedvalue'
+    ? !canViewThaiMedValue(user)
+    : activePage !== 'dashboard' && (menuPerms ? !menuPerms.myMenus.includes(activePage) : activePage === 'sql' && !isAdminUser(user))
   const shownPage: ActivePage | 'blocked' = isBlocked ? 'blocked' : activePage
 
   const mismatchParams: AuditFilterParams = { ...range, hn: '', search: '', result: 'PROBLEM' }
@@ -470,6 +474,9 @@ const DashboardView: FC = () => {
       {/* Page: ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย */}
       {shownPage === 'healthmed' && <HealthMedAuditView range={range} />}
       {shownPage === 'claims' && <ClaimsCheckView range={range} />}
+
+      {/* Page: รายได้แผนไทย (เฉพาะ IT / ผู้ดูแลแผนไทย) */}
+      {shownPage === 'thaimedvalue' && <ThaiMedValueView range={range} onRangeChange={handleRangeChange} />}
 
       {/* Page 4: ตั้งค่ายาสมุนไพร ↔ ICD-10 */}
       {shownPage === 'dxmap' && (

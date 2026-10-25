@@ -2,7 +2,7 @@ import { useEffect, useState, type FC, type ReactNode } from 'react'
 import { ArrowUp, MoreHorizontal } from 'lucide-react'
 import { Sidebar, visibleNavItems } from '@/components/Sidebar'
 import { useAuth } from '@/context/AuthContext'
-import { isAdminUser } from '@/types/auth.types'
+import { canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
 import { useMenuPermissions } from '@/hooks/useHerbDx'
 import { AuditHeader } from '@/components/AuditHeader'
 import { VersionChangelogModal } from '@/components/VersionChangelogModal'
@@ -40,7 +40,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
 }) => {
   const { user } = useAuth()
   const { data: menuPerms } = useMenuPermissions(Boolean(user))
-  const navItems = visibleNavItems(isAdminUser(user), menuPerms?.myMenus)
+  const navItems = visibleNavItems(isAdminUser(user), menuPerms?.myMenus, canViewThaiMedValue(user))
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
   const [moreOpen, setMoreOpen] = useState(false)

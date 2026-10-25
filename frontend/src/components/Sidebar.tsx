@@ -15,6 +15,7 @@ import {
   Cpu,
   ExternalLink,
   Activity,
+  Banknote,
   BadgeCheck,
   ChevronRight,
 } from 'lucide-react'
@@ -24,7 +25,7 @@ import { useAuth } from '@/context/AuthContext'
 import { Security2FASettingsModal } from '@/components/Security2FASettingsModal'
 import { SystemOverview } from '@/components/SystemOverview'
 import { useMenuPermissions } from '@/hooks/useHerbDx'
-import { isAdminUser } from '@/types/auth.types'
+import { canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 
 export interface NavItem {
@@ -35,6 +36,8 @@ export interface NavItem {
   readonly icon: typeof Pill
   /** เมนูเฉพาะผู้ดูแลระบบ (เช่น SQL ที่เปิดเผยชื่อตารางฐานข้อมูล) */
   readonly adminOnly?: boolean
+  /** เมนูที่เปิดรายคน (IT หรือผู้ดูแลแผนไทย) ไม่ผูกกับตารางสิทธิ์เมนูตามกลุ่ม */
+  readonly perUser?: boolean
 }
 
 export const NAV_ITEMS: readonly NavItem[] = [
@@ -46,6 +49,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'mapping', label: 'ตรวจรหัสยาและ ICD-10', shortLabel: 'ตรวจรหัส', hint: 'รหัสว่าง / เกณฑ์ไม่ครบ', icon: ScanSearch },
   { id: 'dxwriteback', label: 'ทบทวนรหัสโรค (DX)', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },
   { id: 'dxmap', label: 'ตั้งค่ายา ↔ ICD-10', shortLabel: 'เกณฑ์ ICD-10', hint: 'เกณฑ์การตรวจสอบ', icon: Settings2 },
+  { id: 'thaimedvalue', label: 'รายได้แผนไทย', shortLabel: 'รายได้แผนไทย', hint: 'มูลค่าบริการ (ประมาณการ)', icon: Banknote, perUser: true },
   { id: 'sql', label: 'SQL Query', shortLabel: 'SQL Query', hint: 'คำสั่งต้นฉบับ (เฉพาะผู้ดูแลระบบ)', icon: TerminalSquare, adminOnly: true },
 ]
 
@@ -53,8 +57,11 @@ export const NAV_ITEMS: readonly NavItem[] = [
  * เมนูที่ผู้ใช้คนนี้เห็นได้: ตามสิทธิ์ที่ IT ตั้งไว้ (allowed จาก /api/permissions/menus)
  * ระหว่างโหลดสิทธิ์ใช้กฎเดิม (ซ่อนเมนู adminOnly จากผู้ที่ไม่ใช่ IT)
  */
-export const visibleNavItems = (isAdmin: boolean, allowed?: readonly string[]): readonly NavItem[] =>
-  NAV_ITEMS.filter((n) => (allowed ? allowed.includes(n.id) : !n.adminOnly || isAdmin))
+export const visibleNavItems = (isAdmin: boolean, allowed?: readonly string[], canViewValue = false): readonly NavItem[] =>
+  NAV_ITEMS.filter((n) => {
+    if (n.perUser) return canViewValue
+    return allowed ? allowed.includes(n.id) : !n.adminOnly || isAdmin
+  })
 
 interface SidebarProps {
   readonly active: ActivePage
@@ -221,7 +228,7 @@ export const Sidebar: FC<SidebarProps> = ({
           </div>
         )}
 
-        {visibleNavItems(isAdmin, menuPerms?.myMenus).map(({ id, label, hint, icon: Icon }) => {
+        {visibleNavItems(isAdmin, menuPerms?.myMenus, canViewThaiMedValue(user)).map(({ id, label, hint, icon: Icon }) => {
           const isActive = active === id
           return (
             <button
