@@ -64,6 +64,16 @@ export interface ThaiMedValueGroup {
   readonly cost: number
 }
 
+export interface ThaiMedValueDaily {
+  readonly date: string
+  readonly visits: number
+  readonly value: number
+  /** มูลค่าหมวดค่ายา */
+  readonly drugValue: number
+  /** มูลค่าบริการ/หัตถการ/อื่นๆ (ไม่ใช่ยา) */
+  readonly serviceValue: number
+}
+
 export interface ThaiMedValueResponse {
   readonly success: true
   readonly startDate: string
@@ -75,7 +85,7 @@ export interface ThaiMedValueResponse {
   readonly atRiskValue: number
   readonly atRiskItems: number
   readonly groups: readonly ThaiMedValueGroup[]
-  readonly daily: readonly { readonly date: string; readonly visits: number; readonly value: number }[]
+  readonly daily: readonly ThaiMedValueDaily[]
 }
 
 export const herbDxApi = {

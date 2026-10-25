@@ -708,10 +708,12 @@ app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
       [startDate, endDate]
     )
     const [daily] = await hosPool.query(
-      `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.vn) AS visits, ROUND(SUM(op.sum_price), 2) AS value
+      `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.vn) AS visits, ROUND(SUM(op.sum_price), 2) AS value,
+              ROUND(SUM(CASE WHEN i.name LIKE 'ค่ายา%' THEN op.sum_price ELSE 0 END), 2) AS drug_value
        FROM opitemrece op
        JOIN ovst o ON o.vn = op.vn
        JOIN spclty sp ON sp.spclty = o.spclty
+       LEFT JOIN income i ON i.income = op.income
        WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
        GROUP BY o.vstdate
        ORDER BY o.vstdate`,
@@ -774,7 +776,11 @@ app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
       atRiskValue: Math.round(atRiskValue * 100) / 100,
       atRiskItems,
       groups,
-      daily: daily.map((d) => ({ date: d.date, visits: Number(d.visits), value: Number(d.value ?? 0) })),
+      daily: daily.map((d) => {
+        const value = Number(d.value ?? 0)
+        const drugValue = Number(d.drug_value ?? 0)
+        return { date: d.date, visits: Number(d.visits), value, drugValue, serviceValue: Math.round((value - drugValue) * 100) / 100 }
+      }),
     })
   } catch (err) {
     fail(res, err)
