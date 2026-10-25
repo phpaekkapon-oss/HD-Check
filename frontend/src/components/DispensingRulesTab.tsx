@@ -25,6 +25,8 @@ import {
 import type { DispensingRule, DxMapRecord, PttypeItem } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
+import { PaginationBar } from '@/components/PaginationBar'
+import { usePagination } from '@/hooks/usePagination'
 
 interface DispensingRulesTabProps {
   readonly dxMap: readonly DxMapRecord[]
@@ -387,6 +389,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
         (r.rule_description && r.rule_description.toLowerCase().includes(q))
     )
   }, [rules, search])
+  const { pageRows, barProps } = usePagination(filteredRules, 15)
 
   // Drugs available for autocomplete/multiselect
   const filteredDrugs = useMemo(() => {
@@ -494,7 +497,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                   </td>
                 </tr>
               ) : (
-                filteredRules.map((rule, idx) => {
+                pageRows.map((rule, idx) => {
                   const isUC = rule.pttype_filter.includes('UC') || rule.pttype_filter.includes('บัตรทอง')
                   const isSSS = rule.pttype_filter.includes('SSS') || rule.pttype_filter.includes('ประกันสังคม')
                   const isOFC = rule.pttype_filter.includes('OFC') || rule.pttype_filter.includes('ข้าราชการ')
@@ -519,7 +522,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       )}
                     >
                       <td className="py-3 px-3 text-center font-mono font-medium text-slate-400">
-                        {idx + 1}
+                        {barProps.pageIndex * barProps.pageSize + idx + 1}
                       </td>
                       <td className="py-3 px-3 text-center">
                         <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
@@ -689,6 +692,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             </tbody>
           </table>
         </div>
+        <PaginationBar {...barProps} pageSizeOptions={[10, 15, 25, 50]} />
       </div>
 
       {/* Add / Edit Rule Modal */}

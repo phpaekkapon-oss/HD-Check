@@ -37,6 +37,8 @@ import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
 import { isAdminUser, type TotpSetupData, type User2FAAdminItem, type PinPolicy } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
+import { PaginationBar } from '@/components/PaginationBar'
+import { usePagination } from '@/hooks/usePagination'
 import { ProfileAvatarModal } from './ProfileAvatarModal'
 import { SsoSettingsPanel } from './SsoSettingsPanel'
 import { MenuPermissionsPanel } from './MenuPermissionsPanel'
@@ -929,6 +931,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
       )
     })
   }, [usersList, searchQuery, roleFilter])
+  const { pageRows: pagedUsers, barProps: usersBarProps } = usePagination(filteredUsers, 25)
 
   // Toggle select all visible
   const allVisibleSelected = filteredUsers.length > 0 && filteredUsers.every((u) => selectedLogins.has(u.loginname))
@@ -1998,7 +2001,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       {searchQuery ? `ไม่พบรายชื่อที่ตรงกับ "${searchQuery}"` : 'ไม่พบข้อมูลบุคลากรในหมวดนี้'}
                     </div>
                   ) : (
-                    filteredUsers.map((u) => {
+                    pagedUsers.map((u) => {
                       const uIsAdmin = isUserAdmin(u)
                       const uIsThaiMed = isUserThaiMed(u)
                       const uIsPharm = isUserPharmacist(u)
@@ -2131,6 +2134,11 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   )}
                 </div>
 
+                {/* แถบแบ่งหน้า (มือถือ) */}
+                <div className="dark md:hidden rounded-xl overflow-hidden">
+                  <PaginationBar {...usersBarProps} pageSizeOptions={[25, 50, 100, 200]} />
+                </div>
+
                 {/* Desktop Table Container (>= md) */}
                 <div className="hidden md:block rounded-2xl border border-slate-800 overflow-hidden bg-slate-950/60 shadow-sm">
                   <div className="overflow-x-auto overflow-y-auto max-h-[500px] scrollbar-thin scrollbar-thumb-slate-700/80 scrollbar-track-slate-900/40">
@@ -2168,7 +2176,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                             </td>
                           </tr>
                         ) : (
-                          filteredUsers.map((u) => {
+                          pagedUsers.map((u) => {
                             const uIsAdmin = isUserAdmin(u)
                             const uIsThaiMed = isUserThaiMed(u)
                             const uIsPharm = isUserPharmacist(u)
@@ -2377,15 +2385,9 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                     </table>
                   </div>
 
-                  {/* Table Footer Status */}
-                  <div className="flex items-center justify-between px-4 py-2 bg-slate-900/90 border-t border-slate-800 text-[11px] text-slate-400">
-                    <div>
-                      แสดงทั้งหมด <span className="font-semibold text-emerald-400">{filteredUsers.length.toLocaleString()}</span> คน
-                      {roleFilter !== 'all' && <span className="text-slate-400"> (ตามหมวดหมู่ที่เลือก)</span>}
-                    </div>
-                    <div className="text-[11px] text-slate-400">
-                      หมุนลูกกลิ้งเมาส์ (Scroll) เพื่อเลื่อนดูรายชื่อทั้งหมด
-                    </div>
+                  {/* แถบแบ่งหน้า */}
+                  <div className="dark">
+                    <PaginationBar {...usersBarProps} pageSizeOptions={[25, 50, 100, 200]} />
                   </div>
                 </div>
               </div>

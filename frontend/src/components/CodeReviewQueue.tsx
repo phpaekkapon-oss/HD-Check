@@ -2,6 +2,8 @@ import { useMemo, useState, type FC } from 'react'
 import { AlertTriangle, BadgeCheck, CircleHelp, ClipboardList, Clock3, Database, ListFilter, ScanLine, ShieldAlert, Stethoscope } from 'lucide-react'
 import type { AuditRecord, DrugSummaryRecord, DxMapRecord } from '@/types/herbdx.types'
 import { fmtNum } from '@/lib/format'
+import { PaginationBar } from '@/components/PaginationBar'
+import { usePagination } from '@/hooks/usePagination'
 import { DxMismatchReview } from '@/components/DxMismatchReview'
 
 interface CodeReviewQueueProps {
@@ -39,11 +41,12 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
     }).filter((row) => row.missingDrugCode || row.missingIcdRule)
   }, [drugs, dxMap])
 
-  const filteredRows = rows.filter((row) => {
+  const filteredRows = useMemo(() => rows.filter((row) => {
     const matchesFilter = filter === 'all' || (filter === 'drug-code' ? row.missingDrugCode : row.missingIcdRule)
     const q = query.trim().toLocaleLowerCase()
     return matchesFilter && (!q || row.name.toLocaleLowerCase().includes(q) || row.icode.toLocaleLowerCase().includes(q))
-  })
+  }), [rows, filter, query])
+  const { pageRows, barProps } = usePagination(filteredRows, 15)
   const noDrugCode = rows.filter((row) => row.missingDrugCode).length
   const noIcd = rows.filter((row) => row.missingIcdRule).length
 
@@ -207,13 +210,14 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
                   <tr><th className="px-5 py-3 font-semibold">รายการยา</th><th className="px-4 py-3 font-semibold">รหัส HOSxP</th><th className="px-4 py-3 font-semibold">รหัสที่อ่านได้</th><th className="px-4 py-3 font-semibold">สิ่งที่พบ</th><th className="px-4 py-3 text-right font-semibold">จำนวนจ่าย</th></tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                  {filteredRows.map((row) => <tr key={row.icode} className="align-top hover:bg-slate-50/70 dark:hover:bg-white/[0.025]"><td className="max-w-xs px-5 py-4 font-semibold text-slate-800 dark:text-slate-100">{row.name}</td><td className="px-4 py-4 font-mono text-xs text-slate-500">{row.icode}</td><td className="px-4 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{row.nhso_adp_code || '—'}</td><td className="px-4 py-4"><FlagList flags={row.flags} /></td><td className="px-4 py-4 text-right font-mono text-xs text-slate-600 dark:text-slate-300">{fmtNum(row.total_qty)}</td></tr>)}
+                  {pageRows.map((row) => <tr key={row.icode} className="align-top hover:bg-slate-50/70 dark:hover:bg-white/[0.025]"><td className="max-w-xs px-5 py-4 font-semibold text-slate-800 dark:text-slate-100">{row.name}</td><td className="px-4 py-4 font-mono text-xs text-slate-500">{row.icode}</td><td className="px-4 py-4 font-mono text-xs text-slate-600 dark:text-slate-300">{row.nhso_adp_code || '—'}</td><td className="px-4 py-4"><FlagList flags={row.flags} /></td><td className="px-4 py-4 text-right font-mono text-xs text-slate-600 dark:text-slate-300">{fmtNum(row.total_qty)}</td></tr>)}
                 </tbody>
               </table>
             </div>
             <div className="space-y-3 p-3 md:hidden">
-              {filteredRows.map((row) => <article key={row.icode} className="rounded-xl border border-themed bg-themed-app p-4"><div className="flex items-start justify-between gap-3"><h3 className="text-sm font-bold leading-5 text-slate-900 dark:text-white">{row.name}</h3><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">{row.icode}</span></div><div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs"><span className="text-slate-500">รหัสที่อ่านได้</span><span className="break-all font-mono text-slate-700 dark:text-slate-300">{row.nhso_adp_code || '—'}</span><span className="text-slate-500">จำนวนจ่าย</span><span className="font-mono text-slate-700 dark:text-slate-300">{fmtNum(row.total_qty)}</span></div><div className="mt-3 border-t border-themed pt-3"><FlagList flags={row.flags} /></div></article>)}
+              {pageRows.map((row) => <article key={row.icode} className="rounded-xl border border-themed bg-themed-app p-4"><div className="flex items-start justify-between gap-3"><h3 className="text-sm font-bold leading-5 text-slate-900 dark:text-white">{row.name}</h3><span className="shrink-0 rounded-md bg-slate-100 px-2 py-1 font-mono text-xs text-slate-600 dark:bg-white/5 dark:text-slate-300">{row.icode}</span></div><div className="mt-3 grid grid-cols-[auto_1fr] gap-x-3 gap-y-2 text-xs"><span className="text-slate-500">รหัสที่อ่านได้</span><span className="break-all font-mono text-slate-700 dark:text-slate-300">{row.nhso_adp_code || '—'}</span><span className="text-slate-500">จำนวนจ่าย</span><span className="font-mono text-slate-700 dark:text-slate-300">{fmtNum(row.total_qty)}</span></div><div className="mt-3 border-t border-themed pt-3"><FlagList flags={row.flags} /></div></article>)}
             </div>
+            <PaginationBar {...barProps} pageSizeOptions={[15, 25, 50, 100]} />
           </>
         )}
       </div>}

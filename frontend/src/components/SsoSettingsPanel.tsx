@@ -14,6 +14,8 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { ConfirmModal } from './ConfirmModal'
+import { PaginationBar } from '@/components/PaginationBar'
+import { usePagination } from '@/hooks/usePagination'
 
 type P = 'thaid' | 'providerid'
 type Mode = 'off' | 'demo' | 'live'
@@ -406,6 +408,7 @@ const fmt = (v: string | null) => (v ? new Date(v).toLocaleString('th-TH', { dat
 const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
   const m = META[p]
   const [rows, setRows] = useState<readonly Identity[]>([])
+  const { pageRows, barProps } = usePagination(rows, 10)
   const [f, setF] = useState({ loginname: '', cid: '', note: '' })
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<Msg>(null)
@@ -488,7 +491,7 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
       {/* Mobile cards */}
       <div className="md:hidden divide-y divide-slate-800 max-h-80 overflow-y-auto">
         {!rows.length && <p className="text-center py-8 text-xs text-slate-400">ยังไม่มีบัญชีที่ผูก</p>}
-        {rows.map((r) => (
+        {pageRows.map((r) => (
           <div key={r.id} className="px-4 py-3 space-y-1.5">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0">
@@ -527,7 +530,7 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
                 </td>
               </tr>
             )}
-            {rows.map((r) => (
+            {pageRows.map((r) => (
               <tr key={r.id}>
                 <td>
                   <p className="font-medium">{r.name || r.loginname}</p>
@@ -548,6 +551,7 @@ const IdentitiesPanel: FC<{ p: P }> = ({ p }) => {
           </tbody>
         </table>
       </div>
+      {rows.length > 0 && <PaginationBar {...barProps} pageSizeOptions={[10, 25, 50, 100]} />}
 
       {unlinkTarget && (
         <ConfirmModal

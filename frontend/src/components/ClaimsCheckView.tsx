@@ -17,6 +17,8 @@ import type { ClaimState, ClaimVisit, DateRange } from '@/types/herbdx.types'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { fmtNum, toThaiDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { PaginationBar } from '@/components/PaginationBar'
+import { usePagination } from '@/hooks/usePagination'
 import { PhiName, PhiHn } from '@/components/Phi'
 
 interface ClaimsCheckViewProps {
@@ -33,7 +35,6 @@ const STATE_META: Record<ClaimState, { label: string; className: string; icon: t
   not_nhso: { label: 'ไม่ใช่สิทธิ UC', className: 'bg-slate-500/10 text-slate-500 dark:text-slate-400', icon: Info },
 }
 
-const PAGE = 50
 
 const dxList = (v: ClaimVisit): [string, string][] =>
   (
@@ -44,7 +45,6 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
   const { data, isLoading, error, isFetching } = useClaimCheck(range)
   const [filter, setFilter] = useState<Filter>('ALL')
   const [search, setSearch] = useState('')
-  const [shown, setShown] = useState(PAGE)
   const [openVn, setOpenVn] = useState<string | null>(null)
 
   const rows = data?.data
@@ -67,6 +67,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
     }
     return list
   }, [rows, filter, search])
+  const { pageRows, barProps, reset: resetPage } = usePagination(filtered, 25)
 
   // HOSxP ยังไม่ได้ดึงผลจาก FDH ของช่วงนี้ → แจ้งให้ชัด ไม่ให้เข้าใจผิดว่ายังไม่ได้ส่งเบิก
   const noFdhForPeriod = Boolean(kpi && kpi.ucVisits > 0 && kpi.noResult / kpi.ucVisits > 0.8)
@@ -135,7 +136,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
             type="button"
             onClick={() => {
               setFilter(c.filter)
-              setShown(PAGE)
+              resetPage()
             }}
             className={cn(
               'rounded-2xl border bg-themed-card p-4 text-left transition hover:-translate-y-0.5 cursor-pointer',
@@ -164,7 +165,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
                 type="button"
                 onClick={() => {
                   setFilter(c.id)
-                  setShown(PAGE)
+                  resetPage()
                 }}
                 className={cn(
                   'rounded-lg px-3 py-1.5 text-xs font-medium transition cursor-pointer',
@@ -181,7 +182,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value)
-                setShown(PAGE)
+                resetPage()
               }}
               placeholder="ค้นหา HN, VN, ชื่อ, รหัสโรค…"
               className="h-9 w-full rounded-lg border border-themed bg-transparent pl-9 pr-3 text-sm text-slate-800 placeholder:text-slate-400 focus:border-accent focus:outline-hidden dark:text-slate-100"
@@ -210,7 +211,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
                   </td>
                 </tr>
               )}
-              {filtered.slice(0, shown).map((v) => {
+              {pageRows.map((v) => {
                 const st = STATE_META[v.claim_state]
                 const bad = new Set(v.icd_issues.map((i) => i.dx).filter(Boolean))
                 const open = openVn === v.vn
@@ -313,16 +314,7 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
           </table>
         </div>
 
-        <div className="flex items-center justify-between gap-3 border-t border-themed px-4 py-3 text-xs text-slate-500 dark:text-slate-400">
-          <span>
-            แสดง {fmtNum(Math.min(shown, filtered.length))} จาก {fmtNum(filtered.length)} visit
-          </span>
-          {shown < filtered.length && (
-            <button type="button" onClick={() => setShown((n) => n + PAGE)} className="rounded-lg px-3 py-1.5 font-medium text-accent hover:bg-accent-soft cursor-pointer">
-              แสดงเพิ่ม
-            </button>
-          )}
-        </div>
+        <PaginationBar {...barProps} pageSizeOptions={[25, 50, 100, 200]} />
       </section>
     </div>
   )

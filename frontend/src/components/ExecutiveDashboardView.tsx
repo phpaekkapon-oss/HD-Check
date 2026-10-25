@@ -14,8 +14,6 @@ import {
   Box,
   Search,
   X,
-  ChevronLeft,
-  ChevronRight,
   Eye,
   ExternalLink,
   FileSpreadsheet,
@@ -38,6 +36,7 @@ import { fmtNum, toThaiDate, downloadExcel, AUDIT_RESULT_META, type ExcelColumn,
 import { useAuth } from '@/context/AuthContext'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { ThaiMedValueCard } from '@/components/ThaiMedValueCard'
+import { PaginationBar } from '@/components/PaginationBar'
 import { canViewThaiMedValue } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 import { PhiName, PhiHn } from '@/components/Phi'
@@ -161,7 +160,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
   const [activeDrillDown, setActiveDrillDown] = useState<DrillDownType>(null)
   const [drillDownSearch, setDrillDownSearch] = useState('')
   const [drillDownPage, setDrillDownPage] = useState(0)
-  const drillDownPageSize = 15
+  const [drillDownPageSize, setDrillDownPageSize] = useState(15)
   const [drillDownScope, setDrillDownScope] = useState<'ALL' | 'OPD' | 'IPD'>('ALL')
   const [selectedPatientRecord, setSelectedPatientRecord] = useState<AuditRecord | null>(null)
 
@@ -1862,34 +1861,22 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
               )}
             </div>
 
-            {/* Modal Footer: Pagination & Direct Actions */}
-            <div className="p-3 sm:px-5 border-t border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-white/[0.02]">
-              {/* Pagination */}
-              <div className="flex items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
-                <span>
-                  หน้า <strong className="tabular-nums text-slate-900 dark:text-white">{drillDownPage + 1}</strong> จาก{' '}
-                  <strong className="tabular-nums text-slate-900 dark:text-white">{totalDrillDownPages}</strong>
-                </span>
-                <div className="flex items-center gap-1 ml-2">
-                  <button
-                    type="button"
-                    disabled={drillDownPage === 0}
-                    onClick={() => setDrillDownPage((p) => Math.max(0, p - 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 disabled:opacity-40 transition cursor-pointer"
-                  >
-                    <ChevronLeft className="size-4" />
-                  </button>
-                  <button
-                    type="button"
-                    disabled={drillDownPage >= totalDrillDownPages - 1}
-                    onClick={() => setDrillDownPage((p) => Math.min(totalDrillDownPages - 1, p + 1))}
-                    className="p-1.5 rounded-lg border border-slate-200 dark:border-white/10 hover:bg-white dark:hover:bg-white/10 disabled:opacity-40 transition cursor-pointer"
-                  >
-                    <ChevronRight className="size-4" />
-                  </button>
-                </div>
-              </div>
+            {/* แถบแบ่งหน้ามาตรฐาน */}
+            <PaginationBar
+              pageIndex={Math.min(drillDownPage, totalDrillDownPages - 1)}
+              pageSize={drillDownPageSize}
+              pageCount={totalDrillDownItems === 0 ? 0 : totalDrillDownPages}
+              totalRows={totalDrillDownItems}
+              onPageChange={(i) => setDrillDownPage(Math.max(0, Math.min(i, totalDrillDownPages - 1)))}
+              onPageSizeChange={(n) => {
+                setDrillDownPageSize(n)
+                setDrillDownPage(0)
+              }}
+              pageSizeOptions={[15, 25, 50, 100]}
+            />
 
+            {/* Modal Footer: Direct Actions */}
+            <div className="p-3 sm:px-5 border-t border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-white/[0.02]">
               {/* Direct Jump Buttons */}
               <div className="flex items-center gap-2">
                 {activeDrillDown === 'PROBLEMS' && (
