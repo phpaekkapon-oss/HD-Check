@@ -5,6 +5,7 @@ import { cleanDrugUnit } from '@/types/herbdx.types'
 import { cn } from '@/lib/utils'
 import { toThaiDate, fmtNum } from '@/lib/format'
 import { CopyButton } from '@/components/CopyButton'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface AuditCardListProps {
   readonly records: readonly AuditRecord[]
@@ -67,9 +68,9 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100 dark:border-[#292440]">
               <div className="flex items-center gap-1.5">
                 <span className="font-mono text-xs font-bold px-2 py-0.5 rounded bg-slate-100 dark:bg-[#101326] text-slate-800 dark:text-slate-200">
-                  HN {rec.hn}
+                  HN <PhiHn value={rec.hn} />
                 </span>
-                <CopyButton text={rec.hn} title="คัดลอก HN" iconSize="size-3" />
+                <CopyButton text={rec.hn} sensitive title="คัดลอก HN" iconSize="size-3" />
                 <span className="text-xs text-slate-500 dark:text-slate-400 font-mono flex items-center gap-1">
                   <Clock className="size-3 text-slate-400" />
                   {toThaiDate(rec.visit_date)} {rec.visit_time.slice(0, 5)}
@@ -114,8 +115,8 @@ export const AuditCardList: FC<AuditCardListProps> = ({ records, onConfigureDrug
             <div className="space-y-0.5">
               <div className="font-bold text-slate-900 dark:text-white text-sm flex items-center gap-1.5">
                 <User className="size-3.5 text-indigo-600 dark:text-indigo-400" />
-                <span>{rec.patient_name}</span>
-                <CopyButton text={rec.patient_name} title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3" />
+                <span><PhiName value={rec.patient_name} /></span>
+                <CopyButton text={rec.patient_name} sensitive title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3" />
               </div>
               <p className="text-xs text-slate-500 dark:text-slate-400 pl-5">{rec.pttype_name}</p>
             </div>

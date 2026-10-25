@@ -17,6 +17,7 @@ import type { ClaimState, ClaimVisit, DateRange } from '@/types/herbdx.types'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { fmtNum, toThaiDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface ClaimsCheckViewProps {
   readonly range: DateRange
@@ -225,8 +226,8 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
                         <div className="text-xs text-slate-400">{v.visit_time ?? ''}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900 dark:text-white whitespace-nowrap">{v.patient_name}</div>
-                        <div className="font-mono text-xs text-slate-500">HN {v.hn} · VN {v.vn}</div>
+                        <div className="font-medium text-slate-900 dark:text-white whitespace-nowrap"><PhiName value={v.patient_name} /></div>
+                        <div className="font-mono text-xs text-slate-500">HN <PhiHn value={v.hn} /> · VN {v.vn}</div>
                       </td>
                       <td className="px-4 py-3 text-xs text-slate-600 dark:text-slate-300">
                         <span className={cn('rounded px-1.5 py-0.5 font-medium', v.hip === 'UCS' ? 'bg-accent-soft text-accent' : 'bg-slate-500/10 text-slate-500')}>{v.hip ?? '—'}</span>

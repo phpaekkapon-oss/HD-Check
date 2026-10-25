@@ -4,6 +4,7 @@ import type { AuditRecord, DateRange } from '@/types/herbdx.types'
 import { DateRangeFields } from '@/components/AuditFilterBar'
 import { fmtNum, toThaiDateShort } from '@/lib/format'
 import { CopyButton } from '@/components/CopyButton'
+import { PhiHn } from '@/components/Phi'
 
 interface DxWritebackViewProps {
   readonly records: readonly AuditRecord[]
@@ -98,8 +99,8 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
                       {visit.patientName ? <CopyButton text={visit.patientName} title="คัดลอกชื่อผู้ป่วย" iconSize="size-3" /> : null}
                     </span>
                     <span className="mt-1 flex items-center gap-1 font-mono text-xs text-slate-500">
-                      <span>HN {visit.hn}</span>
-                      <CopyButton text={visit.hn} title="คัดลอก HN" iconSize="size-3" />
+                      <span>HN <PhiHn value={visit.hn} /></span>
+                      <CopyButton text={visit.hn} sensitive title="คัดลอก HN" iconSize="size-3" />
                       <span>· VN {visit.vn}</span>
                       <CopyButton text={visit.vn} title="คัดลอก VN" iconSize="size-3" />
                     </span>
@@ -122,8 +123,8 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
                   <CopyButton text={selected.patientName} title="คัดลอกชื่อผู้ป่วย" />
                 </div>
                 <div className="mt-1 flex items-center gap-1.5 font-mono text-xs text-slate-500">
-                  <span>HN {selected.hn}</span>
-                  <CopyButton text={selected.hn} title="คัดลอก HN" iconSize="size-3" />
+                  <span>HN <PhiHn value={selected.hn} /></span>
+                  <CopyButton text={selected.hn} sensitive title="คัดลอก HN" iconSize="size-3" />
                   <span>· VN {selected.vn}</span>
                   <CopyButton text={selected.vn} title="คัดลอก VN" iconSize="size-3" />
                 </div>
@@ -181,7 +182,7 @@ export const DxWritebackView: FC<DxWritebackViewProps> = ({ records, range, onRa
                 วิธีแก้ไขให้เคสนี้ผ่านเกณฑ์ใน HOSxP:
               </h4>
               <ol className="mt-2 list-decimal list-inside space-y-1.5 text-xs leading-5">
-                <li>เปิดโปรแกรม <strong>HOSxP</strong> ➔ ระบบผู้ป่วยใน (IPD) ค้นหาด้วย <strong>AN: {selected.vn}</strong> (หรือ HN: {selected.hn})</li>
+                <li>เปิดโปรแกรม <strong>HOSxP</strong> ➔ ระบบผู้ป่วยใน (IPD) ค้นหาด้วย <strong>AN: {selected.vn}</strong> (หรือ HN: <PhiHn value={selected.hn} />)</li>
                 <li>ไปที่หน้าจอ <strong>สรุปชาร์จการรักษา (Discharge Summary)</strong> / บันทึกการวินิจฉัยโรค (iptdiag)</li>
                 <li>นำรหัส ICD-10 ตามข้อบ่งใช้ของยาด้านบน (เช่น {selected.records[0]?.allowed_dx.slice(0, 4).join(', ') || 'รหัสข้อบ่งใช้'}) ไปบันทึกในช่อง <strong>PDX</strong> หรือ <strong>Secondary DX</strong></li>
                 <li>บันทึกใน HOSxP แล้วกลับมากดปุ่มสีม่วง <strong>&quot;ดึงข้อมูล HOSxP&quot;</strong> ที่มุมขวาบนของ HD-Check รายการนี้จะเปลี่ยนเป็น <strong>ผ่านเกณฑ์</strong> ทันทีครับ</li>

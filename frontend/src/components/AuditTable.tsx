@@ -27,6 +27,7 @@ import { DataTableViewOptions } from '@/components/DataTableViewOptions'
 import { cn } from '@/lib/utils'
 import { toThaiDate } from '@/lib/format'
 import { CopyButton } from '@/components/CopyButton'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface AuditTableProps {
   readonly records: readonly AuditRecord[]
@@ -218,9 +219,9 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="font-mono font-bold text-slate-900 dark:text-white">
-              {row.original.hn}
+              <PhiHn value={row.original.hn} />
             </span>
-            <CopyButton text={row.original.hn} title="คัดลอก HN" />
+            <CopyButton text={row.original.hn} sensitive title="คัดลอก HN" />
           </div>
         ),
       },
@@ -232,9 +233,9 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
         cell: ({ row }) => (
           <div className="flex items-center gap-1.5 whitespace-nowrap">
             <span className="font-medium text-slate-900 dark:text-white">
-              {row.original.patient_name}
+              <PhiName value={row.original.patient_name} />
             </span>
-            <CopyButton text={row.original.patient_name} title="คัดลอกชื่อผู้รับบริการ" />
+            <CopyButton text={row.original.patient_name} sensitive title="คัดลอกชื่อผู้รับบริการ" />
           </div>
         ),
       },

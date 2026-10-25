@@ -1,6 +1,7 @@
 import { useState, type FC, type MouseEvent } from 'react'
 import { Check, Copy } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { usePrivacy } from '@/context/PrivacyContext'
 
 interface CopyButtonProps {
   readonly text: string
@@ -8,6 +9,8 @@ interface CopyButtonProps {
   readonly className?: string
   readonly iconSize?: string
   readonly showTooltip?: boolean
+  /** ข้อมูลระบุตัวผู้ป่วย: ซ่อนปุ่มคัดลอกเมื่อเปิดโหมดปกปิดข้อมูล */
+  readonly sensitive?: boolean
 }
 
 export const CopyButton: FC<CopyButtonProps> = ({
@@ -16,8 +19,10 @@ export const CopyButton: FC<CopyButtonProps> = ({
   className,
   iconSize = 'size-3.5',
   showTooltip = true,
+  sensitive = false,
 }) => {
   const [copied, setCopied] = useState(false)
+  const { hidden } = usePrivacy()
 
   const handleCopy = async (e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation()
@@ -43,6 +48,8 @@ export const CopyButton: FC<CopyButtonProps> = ({
       console.error('Failed to copy text:', err)
     }
   }
+
+  if (sensitive && hidden) return null
 
   return (
     <div className="relative inline-flex items-center">

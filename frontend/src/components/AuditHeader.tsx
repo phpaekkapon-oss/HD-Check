@@ -9,6 +9,8 @@ import {
   User,
   Clock,
   Maximize2,
+  Eye,
+  EyeOff,
   Minimize2,
   X,
   Palette,
@@ -27,6 +29,7 @@ import { ThemeCustomizerPopover } from '@/components/ThemeCustomizerModal'
 import { Security2FASettingsModal } from '@/components/Security2FASettingsModal'
 import { ProfileAvatarModal } from '@/components/ProfileAvatarModal'
 import { useTheme } from '@/context/ThemeContext'
+import { usePrivacy } from '@/context/PrivacyContext'
 import { useAuth } from '@/context/AuthContext'
 import { usePinLock } from '@/context/PinLockContext'
 import { cn } from '@/lib/utils'
@@ -174,6 +177,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
   // Theme controls
   const { mode, toggleMode, accent } = useTheme()
+  const { hidden: privacyHidden, toggle: togglePrivacy } = usePrivacy()
   const [themeCustomizerOpen, setThemeCustomizerOpen] = useState(false)
   const [mobileThemeOpen, setMobileThemeOpen] = useState(false)
 
@@ -295,6 +299,21 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
               title={isFullscreen ? 'ออกจากเต็มจอ' : 'เปิดเต็มจอ'}
             >
               {isFullscreen ? <Minimize2 className="size-4" /> : <Maximize2 className="size-4" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={togglePrivacy}
+              aria-pressed={privacyHidden}
+              className={cn(
+                'p-1.5 rounded-lg active:scale-95 transition cursor-pointer',
+                privacyHidden
+                  ? 'bg-rose-500/15 text-rose-500 dark:text-rose-300 ring-1 ring-rose-500/40'
+                  : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-white dark:hover:bg-white/10'
+              )}
+              title={privacyHidden ? 'กำลังปกปิดชื่อ/HN ผู้ป่วย (คลิกเพื่อแสดง)' : 'ปกปิดชื่อ/HN ผู้ป่วย (สำหรับแคปหน้าจอ)'}
+            >
+              {privacyHidden ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
             </button>
 
             <button

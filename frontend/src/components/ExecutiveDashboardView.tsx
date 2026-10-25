@@ -40,6 +40,7 @@ import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { ThaiMedValueCard } from '@/components/ThaiMedValueCard'
 import { canViewThaiMedValue } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface ExecutiveDashboardViewProps {
   readonly kpi: AuditKpiMetrics | undefined
@@ -1697,7 +1698,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                               {p.patientName}
                             </div>
                             <div className="text-xs font-mono text-slate-500 dark:text-slate-400 mt-0.5">
-                              HN {p.hn}
+                              HN <PhiHn value={p.hn} />
                             </div>
                           </td>
                           <td className="py-3 px-3 text-center tabular-nums text-sm text-slate-700 dark:text-slate-200">
@@ -1792,11 +1793,11 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                             </td>
                             <td className="py-2.5 px-3">
                               <div className="font-bold text-slate-900 dark:text-white truncate max-w-[170px]">
-                                {r.patient_name}
+                                <PhiName value={r.patient_name} />
                               </div>
                               <div className="flex items-center gap-1 mt-0.5 text-xs font-mono">
                                 <span className="px-1.5 py-0.2 rounded bg-teal-500/10 text-teal-700 dark:text-teal-300 font-semibold">
-                                  HN {r.hn}
+                                  HN <PhiHn value={r.hn} />
                                 </span>
                                 <span className="text-slate-400">VN {r.vn}</span>
                               </div>
@@ -1934,10 +1935,10 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
                 </div>
                 <div>
                   <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                    {selectedPatientRecord.patient_name}
+                    <PhiName value={selectedPatientRecord.patient_name} />
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-slate-400 mt-0.5 font-mono">
-                    <span>HN: {selectedPatientRecord.hn}</span>
+                    <span>HN: <PhiHn value={selectedPatientRecord.hn} /></span>
                     <span>•</span>
                     <span>VN: {selectedPatientRecord.vn}</span>
                   </div>

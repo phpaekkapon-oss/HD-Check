@@ -23,6 +23,7 @@ import { cleanDrugUnit } from '@/types/herbdx.types'
 import { CopyButton } from '@/components/CopyButton'
 import { toThaiDate } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface HerbAuditDetailModalProps {
   readonly record: AuditRecord
@@ -145,13 +146,13 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-1.5">
-                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate">{record.patient_name}</h3>
-                <CopyButton text={record.patient_name} title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3.5" />
+                <h3 className="text-base font-bold text-slate-900 dark:text-white truncate"><PhiName value={record.patient_name} /></h3>
+                <CopyButton text={record.patient_name} sensitive title="คัดลอกชื่อผู้รับบริการ" iconSize="size-3.5" />
               </div>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400">
                 <span className="text-teal-600 dark:text-teal-400 font-bold inline-flex items-center gap-1">
-                  HN: {record.hn}
-                  <CopyButton text={record.hn} title="คัดลอก HN" iconSize="size-3" />
+                  HN: <PhiHn value={record.hn} />
+                  <CopyButton text={record.hn} sensitive title="คัดลอก HN" iconSize="size-3" />
                 </span>
                 <span>•</span>
                 <span className="inline-flex items-center gap-1">

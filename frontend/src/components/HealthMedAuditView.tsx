@@ -51,6 +51,7 @@ import {
   TableRow,
 } from '@/components/ui/table'
 import { cn } from '@/lib/utils'
+import { PhiName, PhiHn } from '@/components/Phi'
 
 interface HealthMedAuditViewProps {
   readonly range: DateRange
@@ -252,11 +253,11 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 truncate text-xs sm:text-[13.5px]"
                 title="คลิกเพื่อดูรายละเอียดเวชระเบียน"
               >
-                <span className="truncate">{row.original.patient_name}</span>
+                <span className="truncate"><PhiName value={row.original.patient_name} /></span>
                 <Eye className="size-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
               </button>
               <CopyButton
-                text={row.original.patient_name}
+                text={row.original.patient_name} sensitive
                 title="คัดลอกชื่อผู้รับบริการ"
                 iconSize="size-3.5"
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
@@ -264,9 +265,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
             </div>
             <div className="flex items-center gap-1.5 mt-1 text-xs">
               <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
-                <span>HN: {row.original.hn}</span>
+                <span>HN: <PhiHn value={row.original.hn} /></span>
                 <CopyButton
-                  text={row.original.hn}
+                  text={row.original.hn} sensitive
                   title="คัดลอก HN"
                   iconSize="size-2.5"
                   className="p-0.5 hover:bg-teal-500/25 text-teal-600 dark:text-teal-300 rounded cursor-pointer transition"
@@ -1041,19 +1042,19 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 <div>
                   <div className="flex items-center gap-1.5">
                     <h3 className="text-base font-bold text-slate-900 dark:text-white">
-                      {selectedRecord.patient_name}
+                      <PhiName value={selectedRecord.patient_name} />
                     </h3>
                     <CopyButton
-                      text={selectedRecord.patient_name}
+                      text={selectedRecord.patient_name} sensitive
                       title="คัดลอกชื่อผู้รับบริการ"
                       iconSize="size-3.5"
                     />
                   </div>
                   <div className="flex items-center gap-2 mt-0.5 text-xs font-mono text-slate-500 dark:text-slate-400">
                     <span className="text-teal-600 dark:text-teal-400 font-bold inline-flex items-center gap-1">
-                      <span>HN: {selectedRecord.hn}</span>
+                      <span>HN: <PhiHn value={selectedRecord.hn} /></span>
                       <CopyButton
-                        text={selectedRecord.hn}
+                        text={selectedRecord.hn} sensitive
                         title="คัดลอก HN"
                         iconSize="size-3"
                       />

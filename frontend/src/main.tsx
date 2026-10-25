@@ -6,6 +6,7 @@ import './index.css'
 import { App } from './App'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
+import { PrivacyProvider } from '@/context/PrivacyContext'
 
 // Configure TanStack Query Client for HerbDx
 const queryClient = new QueryClient({
@@ -30,7 +31,9 @@ createRoot(rootElement).render(
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <AuthProvider>
-          <App />
+          <PrivacyProvider>
+            <App />
+          </PrivacyProvider>
         </AuthProvider>
       </ThemeProvider>
     </QueryClientProvider>
