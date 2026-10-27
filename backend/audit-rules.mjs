@@ -1,8 +1,14 @@
 // Pure herbal-drug audit rule (no DB access) so it can be unit-tested: node --test
 import { MIN_QTY_APPLY_PTTYPES, THAI_MED_DOCTORS_REQUIRE_U, normalizeIcdCode } from './config.mjs'
 
-/** เฉพาะแพทย์แผนไทย 5 ท่านที่กำหนด ต้องมีรหัส U ควบคู่กับรหัสแผนปัจจุบัน (ผู้สั่งอื่นมี ICD10 แผนปัจจุบันก็ผ่าน) */
+/** เฉพาะแพทย์แผนไทย 5 ท่านที่กำหนด และในแผนกแพทย์แผนไทย ต้องมีรหัส U ควบคู่กับรหัสแผนปัจจุบัน (แผนกอื่นๆ ไม่ต้องจับกับรหัส U) */
 export function isThaiMedRow(row) {
+  const dept = String(row.department_name ?? '').trim()
+  // แผนกอื่นๆ (เช่น ห้อง ER, คลินิก Warfarin, จุดซักประวัติ OPD ฯลฯ) ไม่ต้องจับกับรหัส U
+  if (dept && !dept.includes('แพทย์แผนไทย') && !dept.includes('แผนไทย')) {
+    return false
+  }
+
   const doctorName = String(row.doctor_name ?? '').trim()
   return THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
 }

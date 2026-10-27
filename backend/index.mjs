@@ -1629,7 +1629,7 @@ app.get('/api/dx-map/search-drugs', requireHerbDxManager, async (req, res) => {
     const q = String(req.query.q ?? '').trim()
     if (!q) return res.json({ success: true, data: [] })
     const [rows] = await hosPool.query(
-      `SELECT d.icode, d.name, d.units
+      `SELECT d.icode, d.name, d.units, COALESCE(d.default_qty, 0) AS default_qty
        FROM drugitems d
        WHERE d.istatus = 'Y'
          AND (d.name LIKE ? OR d.icode LIKE ?)
@@ -1639,7 +1639,12 @@ app.get('/api/dx-map/search-drugs', requireHerbDxManager, async (req, res) => {
     )
     res.json({
       success: true,
-      data: rows.map((r) => ({ icode: String(r.icode), name: r.name ?? String(r.icode), units: r.units ?? '' })),
+      data: rows.map((r) => ({
+        icode: String(r.icode),
+        name: r.name ?? String(r.icode),
+        units: r.units ?? '',
+        default_qty: Number(r.default_qty || 0),
+      })),
     })
   } catch (err) {
     fail(res, err)
@@ -1840,6 +1845,31 @@ app.put('/api/dx-map/:icode', requireHerbDxManager, async (req, res) => {
       indication,
       dispensing_rule: updatedDispensingRule,
     })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/dx-map/sync-hosxp-min-qty', requireHerbDxManager, async (_req, res) => {
+  try {
+    const [hosDrugs] = await hosPool.query(
+      `SELECT icode, name, default_qty FROM drugitems WHERE default_qty IS NOT NULL AND default_qty > 0`
+    )
+    const hosQtyMap = new Map(hosDrugs.map((d) => [String(d.icode), Number(d.default_qty)]))
+
+    const [dwDrugs] = await dwPool.query('SELECT icode, drug_name FROM dw_hd_check_drug_dx_map')
+    let updatedCount = 0
+
+    for (const d of dwDrugs) {
+      const defaultQty = hosQtyMap.get(String(d.icode))
+      if (defaultQty !== undefined && defaultQty > 0) {
+        await dwPool.query('UPDATE dw_hd_check_drug_dx_map SET min_qty = ? WHERE icode = ?', [defaultQty, d.icode])
+        updatedCount++
+      }
+    }
+
+    activeHerbCacheAt = 0
+    res.json({ success: true, updatedCount, totalHerbs: dwDrugs.length })
   } catch (err) {
     fail(res, err)
   }

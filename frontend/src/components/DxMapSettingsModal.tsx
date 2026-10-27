@@ -8,12 +8,12 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers, CircleHelp } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers, CircleHelp, RefreshCw } from 'lucide-react'
 import { DispensingRulesTab } from '@/components/DispensingRulesTab'
 import { ThaiMedRulesTab } from '@/components/ThaiMedRulesTab'
 import { herbDxApi } from '@/api/herbdx.api'
 import { useAuth } from '@/context/AuthContext'
-import { useDxMap, useUpdateDxMap } from '@/hooks/useHerbDx'
+import { useDxMap, useUpdateDxMap, useSyncHosxpMinQty } from '@/hooks/useHerbDx'
 import type { DxMapPreview, DxMapRecord } from '@/types/herbdx.types'
 import { canManageHerbDx } from '@/types/auth.types'
 import {
@@ -149,7 +149,7 @@ const QUICK_FILTERS: readonly { readonly id: QuickFilter; readonly label: string
   { id: 'all', label: 'ทั้งหมด', test: () => true },
   { id: 'no-icd', label: 'ยังไม่กำหนด ICD', test: (d) => !d.dx_prefixes.trim() },
   { id: 'interval', label: 'มีรอบจ่าย', test: (d) => (d.dispensing_interval_days ?? 0) > 0 },
-  { id: 'min-qty', label: 'มีจ่ายขั้นต่ำ', test: (d) => (d.min_qty ?? 0) > 0 },
+  { id: 'min-qty', label: 'มีจ่ายขั้นต่ำ (UC)', test: (d) => (d.min_qty ?? 0) > 0 },
 ]
 
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
@@ -157,6 +157,8 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const canEdit = canManageHerbDx(user)
   const { data: dxMap = NO_DX_MAP, isLoading } = useDxMap()
   const { mutate: updateMap, isPending } = useUpdateDxMap()
+  const { mutate: syncHosxpMinQty, isPending: isSyncingMinQty } = useSyncHosxpMinQty()
+  const [syncStatusMsg, setSyncStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
 
   const [activeTab, setActiveTab] = useState<SettingsTabId>('dxmap')
   const [editingIcode, setEditingIcode] = useState<string | null>(null)
@@ -178,14 +180,33 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   // State for adding a new herbal drug from HOSxP
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [addSearchQuery, setAddSearchQuery] = useState('')
-  const [searchResults, setSearchResults] = useState<readonly { icode: string; name: string; units?: string }[]>([])
+  const [searchResults, setSearchResults] = useState<readonly { icode: string; name: string; units?: string; default_qty?: number }[]>([])
   const [isSearchingDrugs, setIsSearchingDrugs] = useState(false)
-  const [selectedDrug, setSelectedDrug] = useState<{ icode: string; name: string; units?: string } | null>(null)
+  const [selectedDrug, setSelectedDrug] = useState<{ icode: string; name: string; units?: string; default_qty?: number } | null>(null)
   const [newPrefixes, setNewPrefixes] = useState('')
   const [newMinQty, setNewMinQty] = useState<number>(0)
   const [newIndication, setNewIndication] = useState('')
   const [newIntervalDays, setNewIntervalDays] = useState<number>(0)
   const [addError, setAddError] = useState<string | null>(null)
+
+  const handleSyncHosxpMinQty = () => {
+    setSyncStatusMsg(null)
+    syncHosxpMinQty(undefined, {
+      onSuccess: (res) => {
+        setSyncStatusMsg({
+          type: 'success',
+          text: `ดึงจำนวนสั่งจ่ายเริ่มต้นจาก HOSxP (เฉพาะ UC) สำเร็จ ${res.updatedCount} รายการ (จากทั้งหมด ${res.totalHerbs} รายการ)`,
+        })
+        setTimeout(() => setSyncStatusMsg(null), 6000)
+      },
+      onError: (err) => {
+        setSyncStatusMsg({
+          type: 'error',
+          text: err instanceof Error ? `ดึงข้อมูลไม่สำเร็จ: ${err.message}` : 'ดึงข้อมูลไม่สำเร็จ',
+        })
+      },
+    })
+  }
 
   useEffect(() => {
     if (!isAddModalOpen || !addSearchQuery.trim()) {
@@ -208,17 +229,17 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
     return () => clearTimeout(timer)
   }, [addSearchQuery, isAddModalOpen])
 
-  const handleSelectDrugToAdd = (drug: { icode: string; name: string; units?: string }) => {
+  const handleSelectDrugToAdd = (drug: { icode: string; name: string; units?: string; default_qty?: number }) => {
     setSelectedDrug(drug)
     const existing = dxMap.find((item) => item.icode === drug.icode)
     if (existing) {
       setNewPrefixes(existing.dx_prefixes)
-      setNewMinQty(existing.min_qty ?? 0)
+      setNewMinQty(existing.min_qty && existing.min_qty > 0 ? existing.min_qty : (drug.default_qty ?? 0))
       setNewIndication(existing.indication)
       setNewIntervalDays(existing.dispensing_interval_days ?? 0)
     } else {
       setNewPrefixes('')
-      setNewMinQty(0)
+      setNewMinQty(drug.default_qty ?? 0)
       setNewIndication('')
       setNewIntervalDays(0)
     }
@@ -558,7 +579,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
       {
         accessorKey: 'min_qty',
         header: ({ column }) => (
-          <DataTableColumnHeader column={column} title="จ่ายขั้นต่ำ" className="justify-center" />
+          <DataTableColumnHeader column={column} title="จ่ายขั้นต่ำ (เฉพาะ UC)" className="justify-center" />
         ),
         cell: ({ row }) => {
           const item = row.original
@@ -580,7 +601,10 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           return (
             <div className="flex items-center justify-center font-mono">
               {item.min_qty && item.min_qty > 0 ? (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/50">
+                <span
+                  title="เกณฑ์จ่ายขั้นต่ำเฉพาะสิทธิ UC (จับคู่จากจำนวนสั่งจ่ายเริ่มต้น HOSxP)"
+                  className="px-2 py-0.5 rounded-full text-xs font-bold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/50"
+                >
                   ≥ {item.min_qty}
                 </span>
               ) : (
@@ -772,6 +796,24 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           บันทึกไม่สำเร็จ: {saveError}
         </div>
       )}
+      {syncStatusMsg && (
+        <div
+          role="status"
+          className={cn(
+            'flex items-center gap-2 rounded-xl border px-3 py-2.5 text-xs transition-all',
+            syncStatusMsg.type === 'success'
+              ? 'border-emerald-300/60 bg-emerald-50 text-emerald-800 dark:border-emerald-500/25 dark:bg-emerald-950/20 dark:text-emerald-200'
+              : 'border-rose-300/60 bg-rose-50 text-rose-800 dark:border-rose-500/25 dark:bg-rose-950/20 dark:text-rose-200'
+          )}
+        >
+          {syncStatusMsg.type === 'success' ? (
+            <BadgeCheck className="size-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+          ) : (
+            <ShieldAlert className="size-4 shrink-0 text-rose-600 dark:text-rose-400" />
+          )}
+          <p>{syncStatusMsg.text}</p>
+        </div>
+      )}
 
       {/* แถบเครื่องมือ: ค้นหา + ปุ่มคำอธิบาย + ปุ่มเพิ่ม และชิปกรองด่วน */}
       <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 space-y-2.5 shadow-xs dark:shadow-sm">
@@ -785,7 +827,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-2 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
             />
           </div>
-          <div className="flex items-center justify-end gap-2">
+          <div className="flex items-center justify-end gap-2 flex-wrap">
             <button
               type="button"
               onClick={toggleHelp}
@@ -802,23 +844,36 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               <span className="hidden sm:inline">คำอธิบายเกณฑ์</span>
             </button>
             {canEdit && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSelectedDrug(null)
-                  setAddSearchQuery('')
-                  setSearchResults([])
-                  setNewPrefixes('')
-                  setNewIndication('')
-                  setAddError(null)
-                  setIsAddModalOpen(true)
-                }}
-                className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
-              >
-                <Plus className="size-3.5" />
-                <span className="sm:hidden">เพิ่มยา</span>
-                <span className="hidden sm:inline">ตั้งค่าเพิ่มรายการยา</span>
-              </button>
+              <>
+                <button
+                  type="button"
+                  onClick={handleSyncHosxpMinQty}
+                  disabled={isSyncingMinQty}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-sky-300 dark:border-sky-500/30 bg-sky-50 dark:bg-sky-950/30 px-3 py-2 text-xs font-semibold text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 transition cursor-pointer disabled:opacity-50"
+                  title="ดึงจำนวนสั่งจ่ายเริ่มต้นจาก HOSxP (drugitems.default_qty) มาใส่ในจำนวนจ่ายขั้นต่ำ (เฉพาะ UC) ทุกรายการ"
+                >
+                  <RefreshCw className={cn('size-3.5', isSyncingMinQty && 'animate-spin')} />
+                  <span className="hidden sm:inline">จับคู่จ่ายขั้นต่ำ HOSxP (UC)</span>
+                  <span className="sm:hidden">ดึงขั้นต่ำ UC</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedDrug(null)
+                    setAddSearchQuery('')
+                    setSearchResults([])
+                    setNewPrefixes('')
+                    setNewIndication('')
+                    setAddError(null)
+                    setIsAddModalOpen(true)
+                  }}
+                  className="btn-pill-action shrink-0 inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold text-white shadow-xs cursor-pointer hover:brightness-105 active:scale-95 transition-all touch-manipulation"
+                >
+                  <Plus className="size-3.5" />
+                  <span className="sm:hidden">เพิ่มยา</span>
+                  <span className="hidden sm:inline">ตั้งค่าเพิ่มรายการยา</span>
+                </button>
+              </>
             )}
           </div>
         </div>
@@ -1371,9 +1426,16 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                 </div>
 
                 <label className="block space-y-1">
-                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                    เกณฑ์จ่ายขั้นต่ำ (หน่วยตามยา เช่น 3 ขวด หรือ 42 แคปซูล)
-                  </span>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                      เกณฑ์จ่ายขั้นต่ำ (เฉพาะ UC)
+                    </span>
+                    {selectedDrug?.default_qty ? (
+                      <span className="text-[11px] font-medium text-sky-600 dark:text-sky-400">
+                        (HOSxP เริ่มต้น: {selectedDrug.default_qty} {selectedDrug.units || ''})
+                      </span>
+                    ) : null}
+                  </div>
                   <input
                     type="number"
                     min="0"
@@ -1383,7 +1445,7 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                     className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500"
                   />
                   <span className="text-xs text-slate-400 block">
-                    หากจ่ายน้อยกว่าเกณฑ์ ระบบจะตรวจเป็นสีแดง (ไม่ผ่าน) เพราะจะเบิกเคลมไม่ผ่าน
+                    จับคู่กับจำนวนสั่งจ่ายเริ่มต้นใน HOSxP — ใช้ตรวจเฉพาะสิทธิ UC หากจ่ายต่ำกว่าเกณฑ์จะตรวจไม่ผ่าน (เบิกเคลมไม่ผ่าน)
                   </span>
                 </label>
 

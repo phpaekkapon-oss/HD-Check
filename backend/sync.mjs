@@ -15,12 +15,12 @@ export function buildHerbFilter(customIcodes = []) {
 
 export function buildDrugSummarySql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
-  const docFilter = buildThaiMedDoctorSql('doc')
   return `
   SELECT
       d.icode,
       d.name,
       d.units,
+      COALESCE(d.default_qty, 0) AS default_qty,
       SUM(CASE WHEN (op.an IS NULL OR op.an = '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS opd_qty,
       SUM(CASE WHEN (op.an IS NOT NULL AND op.an <> '') THEN IFNULL(op.qty, 0) ELSE 0 END) AS ipd_qty,
       ROUND(IFNULL(d.unitcost, 0), 2) AS unitcost,
@@ -31,18 +31,10 @@ export function buildDrugSummarySql(customIcodes = []) {
   LEFT JOIN (
     SELECT op.icode, op.qty, op.an
     FROM opitemrece op
-    LEFT JOIN ovst o ON op.vn = o.vn
-    LEFT JOIN spclty sp ON o.spclty = sp.spclty
-    LEFT JOIN doctor doc ON o.doctor = doc.code
     WHERE op.vstdate BETWEEN ? AND ?
-      AND (
-        ((op.an IS NULL OR op.an = '') AND ${docFilter})
-        OR
-        (op.an IS NOT NULL AND op.an <> '')
-      )
   ) op ON d.icode = op.icode
   WHERE ${filter}
-  GROUP BY d.icode, d.name, d.units, d.unitcost, d.did, d.nhso_adp_code
+  GROUP BY d.icode, d.name, d.units, d.unitcost, d.did, d.nhso_adp_code, d.default_qty
   ORDER BY total_qty DESC, d.name ASC
 `
 }
@@ -58,10 +50,7 @@ const opdSecDx = (n) => getCodeAt('sec.all_sec_codes', n)
 /** Placeholders: OPD lv (start, end), OPD sec o2 (start, end), OPD sec hms (start, end), OPD sec o3 (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD adx (start, end), IPD (start, end) */
 export function buildPrescriptionSql(customIcodes = []) {
   const filter = buildHerbFilter(customIcodes)
-  const docFilter = buildThaiMedDoctorSql('doc')
   const dMaxFilter = buildThaiMedDoctorSql('d_max')
-  const d2Filter = buildThaiMedDoctorSql('d2')
-  const d3Filter = buildThaiMedDoctorSql('d3')
   const dMFilter = buildThaiMedDoctorSql('d_m')
   return `
   (
@@ -102,8 +91,8 @@ export function buildPrescriptionSql(customIcodes = []) {
     INNER JOIN drugitems d ON op.icode = d.icode
     LEFT JOIN pttype ps ON o.pttype = ps.pttype
     LEFT JOIN spclty sp ON o.spclty = sp.spclty
-    INNER JOIN doctor doc ON o.doctor = doc.code AND ${docFilter}
-    -- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (เฉพาะแพทย์แผนไทย 5 ท่าน)
+    LEFT JOIN doctor doc ON o.doctor = doc.code
+    -- 1) Visit ล่าสุดของผู้ป่วยในวันเดียวกัน (หากมี visit แผนไทย)
     LEFT JOIN (
       SELECT o_max.hn, o_max.vstdate, MAX(o_max.vn) AS latest_vn
       FROM ovst o_max
@@ -122,7 +111,6 @@ export function buildPrescriptionSql(customIcodes = []) {
         SELECT o2.hn, o2.vstdate, od.icd10, 1 AS priority
         FROM ovstdiag od
         INNER JOIN ovst o2 ON od.vn = o2.vn
-        INNER JOIN doctor d2 ON o2.doctor = d2.code AND ${d2Filter}
         WHERE od.diagtype <> '1' AND od.icd10 IS NOT NULL AND od.icd10 <> '' AND od.icd10 NOT LIKE 'U%'
           AND o2.vstdate BETWEEN ? AND ?
 
@@ -139,13 +127,12 @@ export function buildPrescriptionSql(customIcodes = []) {
         SELECT o3.hn, o3.vstdate, od3.icd10, 3 AS priority
         FROM ovstdiag od3
         INNER JOIN ovst o3 ON od3.vn = o3.vn
-        INNER JOIN doctor d3 ON o3.doctor = d3.code AND ${d3Filter}
         WHERE od3.icd10 IS NOT NULL AND od3.icd10 <> '' AND od3.icd10 LIKE 'U%'
           AND o3.vstdate BETWEEN ? AND ?
       ) t
       GROUP BY t.hn, t.vstdate
     ) sec ON o.hn = sec.hn AND o.vstdate = sec.vstdate
-    -- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (เฉพาะแพทย์แผนไทย 5 ท่าน)
+    -- 4) Visit ล่าสุดของผู้ป่วยในช่วงเวลา (หากมี visit แผนไทย)
     LEFT JOIN (
       SELECT o_m.hn, MAX(o_m.vn) AS period_latest_vn
       FROM ovst o_m
@@ -347,11 +334,13 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
            nhso_adp_code=VALUES(nhso_adp_code), last_sync=NOW()`,
         [drugs.map((d) => [d.icode, d.name, d.units, d.opd_qty, d.ipd_qty, d.unitcost, d.total_qty, d.total_cost, d.nhso_adp_code])]
       )
-      // Register any new herbal drug in the ICD map (empty rule) + refresh names
+      // Register any new herbal drug in the ICD map (empty rule) + refresh names + set min_qty from HOSxP default_qty if min_qty is 0
       await dw.query(
-        `INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name) VALUES ?
-         ON DUPLICATE KEY UPDATE drug_name = VALUES(drug_name)`,
-        [drugs.map((d) => [d.icode, d.name])]
+        `INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name, min_qty) VALUES ?
+         ON DUPLICATE KEY UPDATE
+           drug_name = VALUES(drug_name),
+           min_qty = IF(COALESCE(min_qty, 0) = 0, VALUES(min_qty), min_qty)`,
+        [drugs.map((d) => [d.icode, d.name, Number(d.default_qty || 0)])]
       )
     }
 

@@ -105,9 +105,14 @@ export const herbDxApi = {
   dxMap: () => request<{ success: true; data: readonly DxMapRecord[] }>('/api/dx-map'),
 
   searchDrugs: (q: string) =>
-    request<{ success: true; data: readonly { icode: string; name: string; units?: string }[] }>(
+    request<{ success: true; data: readonly { icode: string; name: string; units?: string; default_qty?: number }[] }>(
       `/api/dx-map/search-drugs?q=${encodeURIComponent(q)}`
     ),
+
+  syncHosxpMinQty: () =>
+    request<{ success: true; updatedCount: number; totalHerbs: number }>('/api/dx-map/sync-hosxp-min-qty', {
+      method: 'POST',
+    }),
 
   updateDxMap: ({ icode, ...body }: DxMapUpdate) =>
     request<{ success: true } & DxMapUpdate>(`/api/dx-map/${encodeURIComponent(icode)}`, {

@@ -115,6 +115,20 @@ test('Thai-medicine department/doctor outside the 5 named doctors does not need 
   assert.equal(run({ pdx: 'K30', doctor_name: 'พท.ปภาวี ใจดี' }).audit_result, 'PASS')
 })
 
+test('Other departments (ER, Warfarin, OPD) do NOT require code U and pass with modern ICD', () => {
+  const depts = ['ห้อง ER', 'คลินิก Wafarine', 'จุดซักประวัติ OPD', 'อายุรกรรม', 'โสต ศอ นาสิก', 'ศัลยกรรม']
+  for (const dept of depts) {
+    // แพทย์ทั่วไปในแผนกอื่น สั่งจ่ายยาธาตุอบเชย (K30) โดยไม่มีรหัส U -> ต้องผ่าน (PASS)
+    const r = run({ pdx: 'K30', department_name: dept, doctor_name: 'นางยุภาพร พานทอง' })
+    assert.equal(r.audit_result, 'PASS', `${dept} should pass without U-code`)
+    assert.deepEqual(r.matched_dx, ['K30'])
+
+    // แม้แพทย์จะเป็น 1 ใน 5 แพทย์แผนไทย แต่สั่งจ่ายในแผนกอื่น -> ไม่ต้องมีรหัส U ก็ผ่าน (PASS)
+    const rDoc = run({ pdx: 'K30', department_name: dept, doctor_name: 'นางสาวแคทริยา แสนหูม' })
+    assert.equal(rDoc.audit_result, 'PASS', `${dept} with named doc should pass without U-code`)
+  }
+})
+
 test('Minimum quantity applies only to UC rights', () => {
   for (const pt of ['UC30บาท(UCS) 12-59 ปีในเขต', 'UC Walk In ในจังหวัด มี ท', 'ODS_UC  มี ท.', 'บัตรทองฉุกเฉิน ต่างจังหวัด มี ท.']) {
     const r = run({ pdx: 'K30', drug_qty: 5, pttype_name: pt })

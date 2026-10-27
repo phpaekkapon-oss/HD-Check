@@ -123,6 +123,18 @@ export function useBatchUpdateDxMap() {
   })
 }
 
+export function useSyncHosxpMinQty() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => herbDxApi.syncHosxpMinQty(),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dxMap() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'drugs'] })
+    },
+  })
+}
+
 export function useSyncHerbDx() {
   const qc = useQueryClient()
   return useMutation({
