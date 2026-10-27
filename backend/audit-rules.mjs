@@ -13,6 +13,12 @@ export function isThaiMedRow(row) {
   return THAI_MED_DOCTORS_REQUIRE_U.some((name) => doctorName.includes(name))
 }
 
+/** รหัสโรคแผนไทยคือหมวด U50-U77 (ส่วน U07 คือรหัสสากล COVID-19 ของแพทย์แผนปัจจุบัน) */
+export function isThaiMedIcdCode(code) {
+  const norm = String(code ?? '').trim().toUpperCase()
+  return norm.startsWith('U') && !norm.startsWith('U07')
+}
+
 export function evaluate(row, dxMap, minQtyMap) {
   const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
   const qty = Number(row.drug_qty ?? 0)
@@ -31,9 +37,9 @@ export function evaluate(row, dxMap, minQtyMap) {
   // 2. ตรวจสอบประเภทแผนก/แพทย์: แผนกแพทย์แผนไทย หรือ แพทย์แผนปัจจุบัน
   const isThaiMed = isThaiMedRow(row)
 
-  const uDxList = unique.filter((dx) => dx.startsWith('U'))
+  const uDxList = unique.filter(isThaiMedIcdCode)
   const hasUDx = uDxList.length > 0
-  const modernDxList = unique.filter((dx) => !dx.startsWith('U'))
+  const modernDxList = unique.filter((dx) => !isThaiMedIcdCode(dx))
 
   const allowed = dxMap ? (dxMap.get(row.drug_icode) ?? []) : []
 
@@ -63,9 +69,9 @@ export function evaluate(row, dxMap, minQtyMap) {
     }
   }
 
-  // แยกเกณฑ์ ICD ที่ตั้งไว้: รหัสแผนปัจจุบัน (ไม่ขึ้นต้นด้วย U) กับ รหัสแผนไทย (ขึ้นต้นด้วย U)
-  const modernAllowed = allowed.filter((p) => !p.toUpperCase().startsWith('U'))
-  const uAllowed = allowed.filter((p) => p.toUpperCase().startsWith('U'))
+  // แยกเกณฑ์ ICD ที่ตั้งไว้: รหัสแผนปัจจุบัน (รวม U07) กับ รหัสแผนไทย (U50-U77)
+  const modernAllowed = allowed.filter((p) => !isThaiMedIcdCode(p))
+  const uAllowed = allowed.filter(isThaiMedIcdCode)
 
   // รหัสแผนปัจจุบันที่ตรงกับเกณฑ์
   const effectiveModernAllowed = modernAllowed.length > 0 ? modernAllowed : allowed
