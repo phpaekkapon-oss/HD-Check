@@ -29,6 +29,10 @@ export function evaluate(row, dxMap, minQtyMap) {
   const isQtyFail = !isPttypeExempt && minQty > 0 && qty < minQty
   const units = row.drug_units ? ` ${row.drug_units}` : ''
 
+  // 1.1 เกณฑ์ห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (เฉพาะ ครีมไพล 30 กรัม)
+  const isPlaiCream = String(row.drug_icode) === '1650102' || (row.drug_name && row.drug_name.includes('ไพลครีม'))
+  const isMaxQtyFail = isPlaiCream && qty > 1
+
   const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
     .map(normalizeIcdCode)
     .filter(Boolean)
@@ -49,10 +53,12 @@ export function evaluate(row, dxMap, minQtyMap) {
       matched_dx: [],
       allowed_dx: allowed,
       min_qty: minQty,
-      is_qty_fail: isQtyFail,
+      is_qty_fail: isQtyFail || isMaxQtyFail,
       audit_reason: isQtyFail
         ? `ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง) และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
-        : 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)',
+        : isMaxQtyFail
+          ? `ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง) และครีมไพลห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (จ่าย ${qty}${units})`
+          : 'ไม่มีรหัสวินิจฉัย (PDX/DX ว่าง)',
     }
   }
 
@@ -62,10 +68,12 @@ export function evaluate(row, dxMap, minQtyMap) {
       matched_dx: [],
       allowed_dx: [],
       min_qty: minQty,
-      is_qty_fail: isQtyFail,
+      is_qty_fail: isQtyFail || isMaxQtyFail,
       audit_reason: isQtyFail
         ? `ยังไม่ได้กำหนด ICD และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (${qty}/${minQty}${units})`
-        : 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้',
+        : isMaxQtyFail
+          ? `ยังไม่ได้กำหนด ICD และครีมไพลห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (จ่าย ${qty}${units})`
+          : 'ยังไม่ได้กำหนด ICD ที่ใช้คู่กับยานี้',
     }
   }
 
@@ -138,6 +146,20 @@ export function evaluate(row, dxMap, minQtyMap) {
       audit_reason: isDxPass
         ? `จ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์กำหนดขั้นต่ำ ${minQty}${units}) เบิกเคลมไม่ผ่าน`
         : `${failDxReason} และจ่ายต่ำกว่าเกณฑ์ขั้นต่ำ (จ่าย ${qty}${units}, เกณฑ์ขั้นต่ำ ${minQty}${units})`,
+    }
+  }
+
+  // ห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (ครีมไพล 30 กรัม)
+  if (isMaxQtyFail) {
+    return {
+      audit_result: 'FAIL',
+      matched_dx: matchedList,
+      allowed_dx: allowed,
+      min_qty: minQty,
+      is_qty_fail: true,
+      audit_reason: isDxPass
+        ? `ครีมไพลห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (จ่าย ${qty}${units}) เบิกเคลมไม่ผ่าน`
+        : `${failDxReason} และครีมไพลห้ามจ่ายเกิน 1 หลอด ทุกสิทธิ (จ่าย ${qty}${units})`,
     }
   }
 
