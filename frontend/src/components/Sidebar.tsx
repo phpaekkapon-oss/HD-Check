@@ -94,6 +94,7 @@ export const Sidebar: FC<SidebarProps> = ({
   const { accent, mode } = useTheme()
   const { user } = useAuth()
   const isAdmin = isAdminUser(user)
+  const displayVersion = (status?.appVersion || __APP_VERSION__).replace(/^v/, '')
   const { data: menuPerms } = useMenuPermissions(Boolean(user))
   // รายการเมนูยาวกว่าความสูงจอ (เช่นมือถือ): บอกใบ้ว่าเลื่อนได้ด้วยแถบเลื่อนบางๆ และแถบจางพร้อมข้อความที่ท้ายรายการ
   const navRef = useRef<HTMLElement>(null)
@@ -418,7 +419,7 @@ export const Sidebar: FC<SidebarProps> = ({
             'group w-full flex items-center rounded-xl p-2 text-left transition hover:bg-slate-100/70 dark:hover:bg-white/[0.05] cursor-pointer',
             isCollapsedView ? 'justify-center' : 'gap-3'
           )}
-          {...tipProps(isCollapsedView, 'โรงพยาบาลพังโคน', `เกี่ยวกับระบบ · v${__APP_VERSION__}`)}
+          {...tipProps(isCollapsedView, 'โรงพยาบาลพังโคน', `เกี่ยวกับระบบ · v${displayVersion}`)}
         >
           <div className="grid size-9 shrink-0 place-items-center rounded-xl bg-accent-soft text-accent">
             <Building2 className="size-4.5" />
@@ -446,7 +447,7 @@ export const Sidebar: FC<SidebarProps> = ({
                   className="shrink-0 tabular-nums hover:text-accent hover:underline"
                   title="ดูบันทึกการอัปเดตเวอร์ชัน"
                 >
-                  v{__APP_VERSION__}
+                  v{displayVersion}
                 </span>
               </div>
             </div>
@@ -548,7 +549,7 @@ export const Sidebar: FC<SidebarProps> = ({
                     className="font-mono text-xs text-teal-600 dark:text-teal-400 font-bold bg-teal-500/10 hover:bg-teal-500/20 px-2 py-0.5 rounded-md transition cursor-pointer flex items-center gap-1"
                     title="คลิกเพื่อดูบันทึกการอัปเดตเวอร์ชัน"
                   >
-                    <span>v{__APP_VERSION__}</span>
+                    <span>v{displayVersion}</span>
                     <span className="text-xs font-sans font-normal">(ดูอัปเดต)</span>
                   </button>
                 </div>

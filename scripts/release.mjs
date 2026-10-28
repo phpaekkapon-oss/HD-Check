@@ -178,9 +178,10 @@ async function generateChangelogWithAI() {
 
   let diffSummary = ''
   try {
-    const stat = execSync('git diff --stat HEAD~1 HEAD', { cwd: rootDir, encoding: 'utf8' }).trim()
-    const log = execSync('git log -n 5 --oneline', { cwd: rootDir, encoding: 'utf8' }).trim()
-    diffSummary = `Files Changed:\n${stat}\n\nRecent Commits:\n${log}`
+    const uncommittedStat = execSync('git diff HEAD --stat', { cwd: rootDir, encoding: 'utf8' }).trim()
+    const statusShort = execSync('git status --short', { cwd: rootDir, encoding: 'utf8' }).trim()
+    const fallbackStat = uncommittedStat || execSync('git diff --stat HEAD~1 HEAD', { cwd: rootDir, encoding: 'utf8' }).trim()
+    diffSummary = `Changed Files in This Release:\n${statusShort || fallbackStat}\n\nDiff Summary:\n${fallbackStat}`
   } catch {
     diffSummary = 'General code updates and performance improvements'
   }
@@ -202,7 +203,7 @@ async function generateChangelogWithAI() {
         const controller = new AbortController()
         const timer = setTimeout(() => controller.abort(), 8000)
         const prompt = `คุณคือ AI ผู้ช่วยสารสนเทศโรงพยาบาล จงวิเคราะห์โค้ดที่เปลี่ยนแปลงและเขียน Release Notes ภาษาไทย:
-- สรุปหัวข้อสั้นๆ 1 บรรทัด (title)
+- สรุปหัวข้อสั้นๆ 1 บรรทัด (title) โดยห้ามใส่เลขเวอร์ชัน (เช่น ห้ามใส่ v1.x.x) ในหัวข้อเด็ดขาด
 - ไฮไลท์การเปลี่ยนแปลง 3-5 ข้อที่อ่านง่ายสำหรับผู้ใช้ระบบโรงพยาบาล (highlights)
 - ใช้ภาษาไทยล้วนที่ถูกต้อง สละสลวย ห้ามปนภาษาญี่ปุ่น (เช่น ห้ามใช้ตัวอักษร katakana เช่น エンド) คำศัพท์เทคนิคให้ใช้ภาษาอังกฤษมาตรฐานหรือคำแปลไทย เช่น "ระบบ Backend", "หน้าจอ Frontend"
 ตอบเป็น JSON เท่านั้น: {"title": "...", "highlights": ["...", "..."]}
@@ -374,8 +375,12 @@ async function main() {
   // Run AI / Code Analyzer
   const aiResult = await generateChangelogWithAI()
   if (!releaseTitle) releaseTitle = aiResult.title
-  // The AI sees the old version in package.json and writes "อัปเดตเวอร์ชัน x.y.z: ..."; the entry already carries the version
-  releaseTitle = String(releaseTitle).replace(/^\s*(อัปเดต|ปรับปรุง)?\s*(ระบบ)?\s*(เวอร์ชัน|version)?\s*v?\d+\.\d+\.\d+\s*[:：–-]\s*/i, '').trim() || releaseTitle
+  // The AI sometimes writes "อัปเดต... v1.x.x: ..."; strip any embedded version number from the title
+  releaseTitle = String(releaseTitle)
+    .replace(/^[^:：–-]*?\bv?\d+\.\d+\.\d+\s*[:：–-]\s*/i, '')
+    .replace(/\s*\(?(\bเวอร์ชัน\s*|\bversion\s*)?v?\d+\.\d+\.\d+\)?\s*/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim() || releaseTitle
 
   if (!newVersion) {
     if (isAuto) {

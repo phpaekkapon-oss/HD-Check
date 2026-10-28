@@ -29,7 +29,7 @@ interface VersionUpdateNoticeProps {
 }
 
 export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
-  currentVersion = __APP_VERSION__,
+  currentVersion = import.meta.env.DEV ? (changelogData[0]?.version || __APP_VERSION__) : __APP_VERSION__,
   serverVersion,
   onOpenChangelog,
   suppressed = false,

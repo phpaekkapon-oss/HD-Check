@@ -6,6 +6,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const packageJsonPath = fileURLToPath(new URL('../package.json', import.meta.url))
+const frontendPackageJsonPath = fileURLToPath(new URL('./package.json', import.meta.url))
 const { version: appVersion } = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { version: string }
 
 // https://vite.dev/config/
@@ -19,9 +20,10 @@ export default defineConfig({
       // หน้าเว็บจะยังเป็นเลขเก่า แล้วป้าย "มีเวอร์ชันใหม่" เด้งซ้ำหลังกดยืนยัน จึงให้ dev server รีสตาร์ทเองเมื่อ package.json เปลี่ยน
       name: 'restart-on-version-bump',
       configureServer(server) {
-        server.watcher.add(packageJsonPath)
+        server.watcher.add([packageJsonPath, frontendPackageJsonPath])
         server.watcher.on('change', (file) => {
-          if (resolve(file) !== resolve(packageJsonPath)) return
+          const resolved = resolve(file)
+          if (resolved !== resolve(packageJsonPath) && resolved !== resolve(frontendPackageJsonPath)) return
           try {
             const next = (JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { version?: string }).version
             if (next && next !== appVersion) void server.restart()
