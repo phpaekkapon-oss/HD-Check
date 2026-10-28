@@ -60,11 +60,25 @@ export const HEALTH_MED_AUDIT_SQL = `
       sp.name AS department_name,
       ov.pdx,
       ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
-      -- เลขปิดสิทธิ / Claim Code สปสช. ของ Visit
+      -- เลขปิดสิทธิจริงจากตารางยืนยันการปิดสิทธิ (nhso_confirm_privilege)
+      (
+        SELECT MAX(NULLIF(TRIM(ncp.nhso_authen_code), ''))
+        FROM nhso_confirm_privilege ncp
+        WHERE ncp.vn = o.vn
+          AND IFNULL(ncp.nhso_status, 'Y') != 'C'
+      ) AS ep_code,
+      -- เลข Authen / เลขปิดสิทธิใน visit_pttype
       COALESCE(
-        NULLIF(TRIM(vp.claim_code), ''),
-        NULLIF(TRIM(vp.auth_code), ''),
-        NULLIF(TRIM(rd.claim_code), ''),
+        (
+          SELECT MAX(
+            COALESCE(
+              NULLIF(TRIM(vp.auth_code), ''),
+              CASE WHEN vp.claim_code NOT LIKE 'PG%' THEN NULLIF(TRIM(vp.claim_code), '') ELSE NULL END
+            )
+          )
+          FROM visit_pttype vp
+          WHERE vp.vn = o.vn
+        ),
         NULLIF(TRIM(o.anonymous_vn), ''),
         ''
       ) AS claim_code,
@@ -97,16 +111,6 @@ export const HEALTH_MED_AUDIT_SQL = `
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
-  LEFT JOIN (
-    SELECT vn, MAX(COALESCE(NULLIF(TRIM(claim_code), ''), NULLIF(TRIM(auth_code), ''))) AS claim_code
-    FROM visit_pttype
-    GROUP BY vn
-  ) vp ON vp.vn = o.vn
-  LEFT JOIN (
-    SELECT vn, MAX(NULLIF(TRIM(claim_code), '')) AS claim_code
-    FROM rcpt_debt
-    GROUP BY vn
-  ) rd ON rd.vn = o.vn
   WHERE o.vstdate BETWEEN ? AND ?
     AND (
       hms.vn IS NOT NULL
@@ -114,7 +118,7 @@ export const HEALTH_MED_AUDIT_SQL = `
     )
   GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
            ps.name, ps.pttype, ps.hipdata_code, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
-           vp.claim_code, rd.claim_code, o.anonymous_vn
+           o.anonymous_vn
   ORDER BY o.vstdate DESC, o.vsttime DESC
 `
 
@@ -316,26 +320,47 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
 
   // -------------------------------------------------------------
   // กฎข้อที่ 7 (ตามคำขอแผนกแพทย์แผนไทย):
-  // ถ้าเปิด Visit 2 (visit_order >= 2) ตรวจสอบว่า:
-  // 1. มีเลขปิดสิทธิ์ หรือไม่ ถ้าไม่มี -> ไม่ผ่าน
-  // 2. เลขปิดสิทธิ ซ้ำกับ visit แรก ถ้าซ้ำ -> ไม่ผ่าน
+  // ตรวจสอบสถานะการปิดสิทธิ (EP) และกรณีเปิด Visit 2 (visit_order >= 2)
   // -------------------------------------------------------------
   const checkVisit2Claim = duplicateRuleConfig?.check_visit2_claim_code !== false
   const visitOrder = Number(row.visit_order ?? 1)
+  const currEp = String(row.ep_code ?? '').trim()
+  const currClaim = String(row.claim_code ?? '').trim()
+  const firstClaim = String(row.first_visit_claim_code ?? '').trim()
+  const closeStatus = row.claim_close_status || (
+    currEp.toUpperCase().startsWith('EP')
+      ? 'CLOSED'
+      : currClaim.toUpperCase().startsWith('EP')
+      ? (visitOrder >= 2 && firstClaim && currClaim.toUpperCase() === firstClaim.toUpperCase() ? 'VISIT2_DUP' : 'CLOSED')
+      : currClaim.toUpperCase().startsWith('PP')
+      ? 'OPEN_ONLY'
+      : 'NONE'
+  )
+  const isClaimClosed = closeStatus === 'CLOSED'
   let isVisit2ClaimFail = false
 
   if (checkVisit2Claim && visitOrder >= 2) {
-    const currClaim = String(row.claim_code ?? '').trim()
-    const firstClaim = String(row.first_visit_claim_code ?? '').trim()
-
-    if (!currClaim) {
+    if (closeStatus === 'VISIT2_DUP') {
+      isVisit2ClaimFail = true
+      failures.push(`Visit 2 แผนกแพทย์แผนไทย: ยังไม่ปิดสิทธิของ Visit 2 (เลข ${currClaim} ซ้ำกับ Visit แรก ต้องขอ Authen/ปิดสิทธิใหม่สำหรับ Visit 2)`)
+    } else if (closeStatus === 'OPEN_ONLY') {
+      isVisit2ClaimFail = true
+      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เปิดสิทธิแล้ว (${currClaim}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`)
+    } else if (closeStatus === 'NONE' || !currClaim) {
       isVisit2ClaimFail = true
       failures.push('Visit 2 แผนกแพทย์แผนไทย: ไม่มีเลขปิดสิทธิ (สปสช. จะปฏิเสธการจ่ายชดเชย)')
     } else if (firstClaim && currClaim.toUpperCase() === firstClaim.toUpperCase()) {
       isVisit2ClaimFail = true
       failures.push(`Visit 2 แผนกแพทย์แผนไทย: เลขปิดสิทธิ (${currClaim}) ซ้ำกับ Visit แรก (ต้องขอเลข Authen Code ใหม่สำหรับ Visit 2)`)
     } else {
-      passes.push(`Visit 2 แผนกแพทย์แผนไทย: มีเลขปิดสิทธิ (${currClaim}) ถูกต้อง และไม่ซ้ำกับ Visit แรก`)
+      passes.push(`Visit 2 แผนกแพทย์แผนไทย: ปิดสิทธิแล้ว (${currClaim}) ถูกต้อง และไม่ซ้ำกับ Visit แรก`)
+    }
+  } else if (row.claim_close_status && !isClaimClosed) {
+    // กรณี Visit 1 ที่ยังไม่ได้ปิดสิทธิ (มีเฉพาะเลข PP เปิดสิทธิ หรือไม่มีเลขเลย)
+    if (closeStatus === 'OPEN_ONLY') {
+      failures.push(`ยังไม่ปิดสิทธิ: เปิดสิทธิแล้ว (${currClaim}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`)
+    } else {
+      failures.push('ยังไม่ปิดสิทธิ: ไม่พบเลขเปิดสิทธิ (PP) และเลขปิดสิทธิ (EP) ในระบบ')
     }
   }
 
@@ -356,11 +381,14 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     operations,
     operation_codes: opCodesList,
     labor_date: row.labor_date || null,
-    is_duplicate_fail: failures.some((f) => f.includes('ซ้ำ') && !f.includes('เลขปิดสิทธิ')),
+    is_duplicate_fail: failures.some((f) => f.includes('คิดค่าบริการซ้ำ')),
     is_visit2_claim_fail: isVisit2ClaimFail,
+    is_claim_closed: isClaimClosed,
+    claim_close_status: closeStatus,
+    ep_code: currEp || null,
     visit_order: visitOrder,
     total_day_visits: Number(row.total_day_visits ?? visitOrder),
-    claim_code: row.claim_code || null,
+    claim_code: currClaim || null,
     first_visit_claim_code: row.first_visit_claim_code || null,
     first_visit_vn: row.first_visit_vn || null,
     first_visit_dept: row.first_visit_dept || null,

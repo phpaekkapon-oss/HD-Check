@@ -317,6 +317,9 @@ export interface HealthMedRecord {
   readonly count_compress?: number
   readonly is_duplicate_fail?: boolean
   readonly is_visit2_claim_fail?: boolean
+  readonly is_claim_closed?: boolean
+  readonly claim_close_status?: 'CLOSED' | 'OPEN_ONLY' | 'VISIT2_DUP' | 'NONE'
+  readonly ep_code?: string | null
   readonly claim_code?: string | null
   readonly visit_order?: number
   readonly total_day_visits?: number
@@ -334,6 +337,14 @@ export interface HealthMedKpi {
   readonly pass: number
   readonly fail: number
   readonly passRate: number
+  readonly closedCount?: number
+  readonly closedRate?: number
+  readonly unclosedCount?: number
+  readonly unclosedOpenOnlyCount?: number
+  readonly unclosedVisit2DupCount?: number
+  readonly unclosedNoneCount?: number
+  readonly visit2TotalCount?: number
+  readonly visit2ClosedCount?: number
   readonly duplicateFail: number
   readonly kneeFail: number
   readonly postpartumFail: number

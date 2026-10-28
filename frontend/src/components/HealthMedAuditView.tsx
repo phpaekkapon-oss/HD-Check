@@ -59,14 +59,20 @@ interface HealthMedAuditViewProps {
   readonly range: DateRange
 }
 
-type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'DUPLICATE' | 'VISIT2_CLAIM' | 'KNEE' | 'MUSCLE' | 'POSTPARTUM' | 'EP'
+type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'CLOSED_EP' | 'UNCLOSED_EP' | 'DUPLICATE' | 'VISIT2_CLAIM' | 'KNEE' | 'MUSCLE' | 'POSTPARTUM' | 'EP'
 
 const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber' | 'rose' | 'purple' }[] => {
   const tags: { label: string; color: 'amber' | 'rose' | 'purple' }[] = []
   const text = (record.failures?.join(' ') || record.audit_reason || '').toLowerCase()
 
-  // 1. ตรวจสอบเลขปิดสิทธิ Visit 2 (ตามเกณฑ์ สปสช. / คำขอแผนกแพทย์แผนไทย)
-  if (record.is_visit2_claim_fail || text.includes('เลขปิดสิทธิ')) {
+  // 1. ตรวจสอบสถานะการปิดสิทธิ & Visit 2
+  if (record.claim_close_status === 'VISIT2_DUP') {
+    tags.push({ label: 'Visit 2 เลข EP ซ้ำ Visit 1', color: 'rose' })
+  } else if (record.claim_close_status === 'OPEN_ONLY') {
+    tags.push({ label: `รอปิดสิทธิ (${record.claim_code || 'PP'})`, color: 'amber' })
+  } else if (record.claim_close_status === 'NONE') {
+    tags.push({ label: 'ยังไม่ปิดสิทธิ (ไม่มีเลข)', color: 'rose' })
+  } else if (record.is_visit2_claim_fail || text.includes('เลขปิดสิทธิ')) {
     if (text.includes('ไม่มีเลขปิดสิทธิ')) {
       tags.push({ label: 'ไม่มีเลขปิดสิทธิ (Visit 2)', color: 'rose' })
     } else if (text.includes('ซ้ำกับ visit แรก') || text.includes('ซ้ำ')) {
@@ -76,8 +82,8 @@ const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber
     }
   }
 
-  // 1. ตรวจค่าบริการซ้ำ
-  if (record.is_duplicate_fail || text.includes('ซ้ำ')) {
+  // 2. ตรวจค่าบริการซ้ำ
+  if (record.is_duplicate_fail || text.includes('คิดค่าบริการซ้ำ')) {
     if (text.includes('58201') || text.includes('ประคบ')) {
       tags.push({ label: 'คิดค่าประคบซ้ำ (58201)', color: 'amber' })
     } else if (text.includes('58101') || text.includes('นวดเพื่อ')) {
@@ -89,24 +95,19 @@ const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber
     }
   }
 
-  // 2. ขาดรหัส U
+  // 3. ขาดรหัส U
   if (text.includes('ขาดรหัส u') || text.includes('รหัส u...') || text.includes('แพทย์แผนไทย (รหัส u')) {
     tags.push({ label: 'ขาดรหัสแผนไทย (U..)', color: 'rose' })
   }
 
-  // 3. ขาดรหัส M
+  // 4. ขาดรหัส M
   if (text.includes('ขาดรหัส m') || text.includes('โรคกล้ามเนื้อ (รหัส m')) {
     tags.push({ label: 'ขาดรหัสกล้ามเนื้อ (M..)', color: 'rose' })
   }
 
-  // 4. ขาดหัตถการ ICD-10-TM
+  // 5. ขาดหัตถการ ICD-10-TM
   if (text.includes('ต้องมีรหัสหัตถการ') || text.includes('ขาดรหัส: 87') || text.includes('ขาดรหัสหัตถการ') || text.includes('872-78-11')) {
     tags.push({ label: 'ขาดหัตถการ ICD-10-TM', color: 'rose' })
-  }
-
-  // 5. ปิดสิทธิ EP
-  if (text.includes('ep') || text.includes('ปิดสิทธิ')) {
-    tags.push({ label: 'ติดรหัสปิดสิทธิ (EP)', color: 'rose' })
   }
 
   // 6. เกณฑ์พอกเข่า
@@ -208,19 +209,21 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       // 1. KPI Category Filter
       if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
-      if (kpiFilter === 'DUPLICATE' && !r.is_duplicate_fail && !r.failures?.some((f) => f.includes('ซ้ำ') && !f.includes('เลขปิดสิทธิ'))) return false
-      if (kpiFilter === 'VISIT2_CLAIM' && !r.is_visit2_claim_fail && !r.failures?.some((f) => f.includes('เลขปิดสิทธิ'))) return false
+      if (kpiFilter === 'CLOSED_EP' && !r.is_claim_closed) return false
+      if ((kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && r.is_claim_closed) return false
+      if (kpiFilter === 'DUPLICATE' && !r.is_duplicate_fail) return false
+      if (kpiFilter === 'VISIT2_CLAIM' && !r.is_visit2_claim_fail) return false
       if (kpiFilter === 'KNEE' && !r.failures?.some((f) => f.includes('เข่า') || f.includes('พอกเข่า'))) return false
       if (kpiFilter === 'MUSCLE' && !r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))) return false
       if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) return false
-      if (kpiFilter === 'EP' && !r.failures?.some((f) => f.includes('EP'))) return false
 
       // 2. Text Search Filter
       if (search.trim()) {
         const q = search.toLowerCase()
         const opCodesText = r.operation_codes?.join(' ') ?? ''
         const laborText = r.labor_date ?? ''
-        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText}`.toLowerCase()
+        const claimText = `${r.claim_code ?? ''} ${r.ep_code ?? ''} ${r.first_visit_claim_code ?? ''}`
+        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText} ${claimText}`.toLowerCase()
         if (!text.includes(q)) return false
       }
       return true
@@ -314,6 +317,38 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   ) : (
                     <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[10px]">✓</span>
                   )}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 mt-1 text-[11px]">
+              {row.original.is_claim_closed ? (
+                <span
+                  title={`ปิดสิทธิแล้ว (Endpoint): ${row.original.ep_code || row.original.claim_code}`}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+                >
+                  <span className="text-emerald-500 font-bold">✓ ปิดสิทธิ:</span>
+                  <span>{row.original.ep_code || row.original.claim_code}</span>
+                </span>
+              ) : row.original.claim_close_status === 'OPEN_ONLY' ? (
+                <span
+                  title={`เปิดสิทธิแล้ว (${row.original.claim_code}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                >
+                  <span>⏳ รอปิดสิทธิ ({row.original.claim_code})</span>
+                </span>
+              ) : row.original.claim_close_status === 'VISIT2_DUP' ? (
+                <span
+                  title={`Visit 2 ยังไม่ได้ปิดสิทธิใหม่ (เลข ${row.original.claim_code} ซ้ำกับ Visit 1)`}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                >
+                  <span>✕ ยังไม่ปิดสิทธิ Visit 2 (ซ้ำ V1)</span>
+                </span>
+              ) : (
+                <span
+                  title="ไม่พบเลขเปิดสิทธิ (PP) และเลขปิดสิทธิ (EP)"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                >
+                  <span>✕ ยังไม่ปิดสิทธิ (ไม่มีเลข)</span>
                 </span>
               )}
             </div>
@@ -721,6 +756,55 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       hoverBorder: 'hover:border-rose-400/60 dark:hover:border-rose-500/40',
     },
     {
+      id: 'CLOSED_EP' as const,
+      label: 'ปิดสิทธิแล้ว (EP)',
+      value: kpi?.closedCount ?? 0,
+      rate: kpi?.closedRate ?? 0,
+      sub: 'มีเลข EP ปิดสิทธิสมบูรณ์',
+      icon: Check,
+      iconBg: 'bg-teal-500/15 text-teal-600 dark:bg-teal-500/20 dark:text-teal-300 border border-teal-500/30',
+      valueColor: 'text-teal-600 dark:text-teal-400',
+      subColor: 'text-teal-700/80 dark:text-teal-400/80',
+      activeBorder: 'border-teal-500 dark:border-teal-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(20,184,166,0.3)]',
+      activeBg: 'bg-teal-500/[0.06] dark:bg-teal-950/40',
+      hoverBorder: 'hover:border-teal-400/60 dark:hover:border-teal-500/40',
+    },
+    {
+      id: 'UNCLOSED_EP' as const,
+      label: 'ยังไม่ปิดสิทธิ',
+      value: kpi?.unclosedCount ?? kpi?.epFail ?? 0,
+      sub:
+        (kpi?.unclosedCount ?? 0) > 0
+          ? `รอปิด PP ${kpi?.unclosedOpenOnlyCount ?? 0} • V2 ซ้ำ ${kpi?.unclosedVisit2DupCount ?? 0} • ขาด ${kpi?.unclosedNoneCount ?? 0}`
+          : '✓ ปิดสิทธิครบทุกราย',
+      icon: ShieldAlert,
+      iconBg: 'bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30',
+      valueColor: (kpi?.unclosedCount ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.unclosedCount ?? 0) > 0 ? 'text-red-700/80 dark:text-red-400/80' : 'text-slate-400 dark:text-slate-400',
+      activeBorder: 'border-red-500 dark:border-red-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
+      activeBg: 'bg-red-500/[0.06] dark:bg-red-950/40',
+      hoverBorder: 'hover:border-red-400/60 dark:hover:border-red-500/40',
+    },
+    {
+      id: 'VISIT2_CLAIM' as const,
+      label: 'เลขปิดสิทธิ Visit 2',
+      value: kpi?.visit2ClaimFail ?? 0,
+      sub:
+        (kpi?.visit2TotalCount ?? 0) > 0
+          ? `จาก V2 ทั้งหมด ${kpi?.visit2TotalCount} (ปิดแล้ว ${kpi?.visit2ClosedCount ?? 0})`
+          : '✓ ปกติ เลขปิดสิทธิถูกต้อง',
+      icon: FileText,
+      iconBg: 'bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300 border border-orange-500/30',
+      valueColor: (kpi?.visit2ClaimFail ?? 0) > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-600 dark:text-slate-300',
+      subColor: (kpi?.visit2ClaimFail ?? 0) > 0 ? 'text-orange-700/80 dark:text-orange-400/80' : 'text-slate-400 dark:text-slate-400',
+      activeBorder: 'border-orange-500 dark:border-orange-400',
+      activeShadow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]',
+      activeBg: 'bg-orange-500/[0.06] dark:bg-orange-950/40',
+      hoverBorder: 'hover:border-orange-400/60 dark:hover:border-orange-500/40',
+    },
+    {
       id: 'DUPLICATE' as const,
       label: 'คิดค่าบริการซ้ำ',
       value: kpi?.duplicateFail ?? 0,
@@ -733,20 +817,6 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       activeShadow: 'shadow-[0_0_20px_rgba(245,158,11,0.3)]',
       activeBg: 'bg-amber-500/[0.06] dark:bg-amber-950/40',
       hoverBorder: 'hover:border-amber-400/60 dark:hover:border-amber-500/40',
-    },
-    {
-      id: 'VISIT2_CLAIM' as const,
-      label: 'เลขปิดสิทธิ Visit 2',
-      value: kpi?.visit2ClaimFail ?? 0,
-      sub: (kpi?.visit2ClaimFail ?? 0) > 0 ? 'Visit 2 ขาด/ซ้ำเลขปิดสิทธิ' : '✓ ปกติ เลขปิดสิทธิถูกต้อง',
-      icon: FileText,
-      iconBg: 'bg-orange-500/15 text-orange-600 dark:bg-orange-500/20 dark:text-orange-300 border border-orange-500/30',
-      valueColor: (kpi?.visit2ClaimFail ?? 0) > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.visit2ClaimFail ?? 0) > 0 ? 'text-orange-700/80 dark:text-orange-400/80' : 'text-slate-400 dark:text-slate-400',
-      activeBorder: 'border-orange-500 dark:border-orange-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(249,115,22,0.3)]',
-      activeBg: 'bg-orange-500/[0.06] dark:bg-orange-950/40',
-      hoverBorder: 'hover:border-orange-400/60 dark:hover:border-orange-500/40',
     },
     {
       id: 'KNEE' as const,
@@ -789,20 +859,6 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       activeShadow: 'shadow-[0_0_20px_rgba(217,70,239,0.3)]',
       activeBg: 'bg-fuchsia-500/[0.06] dark:bg-fuchsia-950/40',
       hoverBorder: 'hover:border-fuchsia-400/60 dark:hover:border-fuchsia-500/40',
-    },
-    {
-      id: 'EP' as const,
-      label: 'ปิดสิทธิ (EP)',
-      value: kpi?.epFail ?? 0,
-      sub: (kpi?.epFail ?? 0) > 0 ? 'ติดรหัสปิดสิทธิ UC' : '✓ ปกติ ไม่มีปิดสิทธิ',
-      icon: ShieldAlert,
-      iconBg: 'bg-red-500/15 text-red-600 dark:bg-red-500/20 dark:text-red-300 border border-red-500/30',
-      valueColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-600 dark:text-red-400' : 'text-slate-600 dark:text-slate-300',
-      subColor: (kpi?.epFail ?? 0) > 0 ? 'text-red-700/80 dark:text-red-400/80' : 'text-slate-400 dark:text-slate-400',
-      activeBorder: 'border-red-500 dark:border-red-400',
-      activeShadow: 'shadow-[0_0_20px_rgba(239,68,68,0.3)]',
-      activeBg: 'bg-red-500/[0.06] dark:bg-red-950/40',
-      hoverBorder: 'hover:border-red-400/60 dark:hover:border-red-500/40',
     },
   ]
 
@@ -877,7 +933,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           </div>
         ) : (
           /* If Expanded: Render Compact Space-Saving KPI Cards */
-          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5 mt-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
+          <div className="grid grid-cols-2 sm:grid-cols-5 lg:grid-cols-5 gap-2.5 mt-3 pt-3 border-t border-slate-200/80 dark:border-white/10">
             {kpiCards.map((card) => {
               const isSelected = kpiFilter === card.id
               const Icon = card.icon
@@ -948,11 +1004,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 'flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs shadow-2xs transition-all animate-in fade-in',
                 kpiFilter === 'PASS' && 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200',
                 kpiFilter === 'FAIL' && 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200',
+                kpiFilter === 'CLOSED_EP' && 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-500/30 text-teal-800 dark:text-teal-200',
+                (kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200',
+                kpiFilter === 'VISIT2_CLAIM' && 'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-500/30 text-orange-800 dark:text-orange-200',
                 kpiFilter === 'DUPLICATE' && 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200',
                 kpiFilter === 'KNEE' && 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-500/30 text-cyan-800 dark:text-cyan-200',
                 kpiFilter === 'MUSCLE' && 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-500/30 text-violet-800 dark:text-violet-200',
-                kpiFilter === 'POSTPARTUM' && 'bg-fuchsia-50 dark:bg-fuchsia-950/40 border-fuchsia-200 dark:border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200',
-                kpiFilter === 'EP' && 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200'
+                kpiFilter === 'POSTPARTUM' && 'bg-fuchsia-50 dark:bg-fuchsia-950/40 border-fuchsia-200 dark:border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200'
               )}
             >
               <span className="size-2 rounded-full bg-current animate-pulse shrink-0" />
@@ -960,11 +1018,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               <strong className="font-bold text-xs">
                 {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
                 {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
+                {kpiFilter === 'CLOSED_EP' && 'ปิดสิทธิแล้ว (EP)'}
+                {(kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && 'ยังไม่ปิดสิทธิ'}
+                {kpiFilter === 'VISIT2_CLAIM' && 'ปัญหาเลขปิดสิทธิ Visit 2'}
                 {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
                 {kpiFilter === 'KNEE' && 'ข้อเข่า (M179+U5753)'}
                 {kpiFilter === 'MUSCLE' && 'กล้ามเนื้อ (M+U)'}
                 {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด'}
-                {kpiFilter === 'EP' && 'ปิดสิทธิ (EP)'}
               </strong>
               <span className="font-mono font-bold text-xs">({filteredRecords.length})</span>
               <button

@@ -891,25 +891,28 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
           DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate,
           TIME_FORMAT(o.vsttime, '%H:%i:%s') AS vsttime,
           sp.name AS spclty_name,
+          (
+            SELECT MAX(NULLIF(TRIM(ncp.nhso_authen_code), ''))
+            FROM nhso_confirm_privilege ncp
+            WHERE ncp.vn = o.vn
+              AND IFNULL(ncp.nhso_status, 'Y') != 'C'
+          ) AS ep_code,
           COALESCE(
-            NULLIF(TRIM(vp.claim_code), ''),
-            NULLIF(TRIM(vp.auth_code), ''),
-            NULLIF(TRIM(rd.claim_code), ''),
+            (
+              SELECT MAX(
+                COALESCE(
+                  NULLIF(TRIM(vp.auth_code), ''),
+                  CASE WHEN vp.claim_code NOT LIKE 'PG%' THEN NULLIF(TRIM(vp.claim_code), '') ELSE NULL END
+                )
+              )
+              FROM visit_pttype vp
+              WHERE vp.vn = o.vn
+            ),
             NULLIF(TRIM(o.anonymous_vn), ''),
             ''
           ) AS claim_code
         FROM ovst o
         LEFT JOIN spclty sp ON o.spclty = sp.spclty
-        LEFT JOIN (
-          SELECT vn, MAX(COALESCE(NULLIF(TRIM(claim_code), ''), NULLIF(TRIM(auth_code), ''))) AS claim_code
-          FROM visit_pttype
-          GROUP BY vn
-        ) vp ON vp.vn = o.vn
-        LEFT JOIN (
-          SELECT vn, MAX(NULLIF(TRIM(claim_code), '')) AS claim_code
-          FROM rcpt_debt
-          GROUP BY vn
-        ) rd ON rd.vn = o.vn
         WHERE o.vstdate BETWEEN ? AND ?
           AND o.hn IN (${patientHns.map(() => '?').join(',')})
         ORDER BY o.hn ASC, o.vstdate ASC, o.vsttime ASC, o.vn ASC
@@ -939,19 +942,41 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
 
       // คัดเฉพาะแถวที่มีรายการบริการหัตถการแพทย์แผนไทย
       const rowsWithServices = group.filter((r) => Boolean(r.service_items_raw && r.service_items_raw.trim()) || (opsByVn.get(r.vn)?.length ?? 0) > 0)
-      const targetRows = rowsWithServices.length > 0 ? rowsWithServices : group
+      const thaiMedVisit = group.find((r) => String(r.department_name).includes('แผนไทย') || String(r.doctor_name).includes('พท.'))
+      const fallbackRow = thaiMedVisit || group[group.length - 1]
+      const targetRows = rowsWithServices.length > 0 ? rowsWithServices : [fallbackRow]
 
       for (const r of targetRows) {
         const visitIdx = allDayVisits.findIndex((v) => String(v.vn) === String(r.vn))
         const visitOrder = visitIdx >= 0 ? visitIdx + 1 : (allDayVisits.length > 1 ? 2 : 1)
-        const currClaimCode = r.claim_code || (visitIdx >= 0 ? allDayVisits[visitIdx]?.claim_code : '') || ''
+        const currOv = visitIdx >= 0 ? allDayVisits[visitIdx] : null
+        const currEp = String(r.ep_code || currOv?.ep_code || '').trim()
+        const currVpClaim = String(r.claim_code || currOv?.claim_code || '').trim()
+        // ถ้ามีเลขปิดสิทธิ EP ของ Visit นี้ใน nhso_confirm_privilege โดยตรง ให้ใช้เป็นหลัก
+        const effectiveClaimCode = currEp || currVpClaim
+        const firstVisitClaim = firstVisit ? String(firstVisit.ep_code || firstVisit.claim_code || '').trim() : ''
+
+        let claimCloseStatus = 'NONE'
+        if (currEp.toUpperCase().startsWith('EP')) {
+          claimCloseStatus = 'CLOSED'
+        } else if (currVpClaim.toUpperCase().startsWith('EP')) {
+          if (visitOrder >= 2 && firstVisitClaim && currVpClaim.toUpperCase() === firstVisitClaim.toUpperCase()) {
+            claimCloseStatus = 'VISIT2_DUP'
+          } else {
+            claimCloseStatus = 'CLOSED'
+          }
+        } else if (currVpClaim.toUpperCase().startsWith('PP')) {
+          claimCloseStatus = 'OPEN_ONLY'
+        }
 
         validRows.push({
           ...r,
-          claim_code: currClaimCode,
+          ep_code: currEp || null,
+          claim_code: effectiveClaimCode,
+          claim_close_status: claimCloseStatus,
           visit_order: visitOrder,
           total_day_visits: allDayVisits.length,
-          first_visit_claim_code: firstVisit ? firstVisit.claim_code : null,
+          first_visit_claim_code: firstVisitClaim || null,
           first_visit_vn: firstVisit ? firstVisit.vn : null,
           first_visit_dept: firstVisit ? firstVisit.spclty_name : null,
         })
@@ -1070,16 +1095,31 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       return true
     })
 
+    const closedCount = evaluated.filter((r) => r.is_claim_closed).length
+    const unclosedCount = evaluated.filter((r) => !r.is_claim_closed).length
+    const unclosedOpenOnlyCount = evaluated.filter((r) => r.claim_close_status === 'OPEN_ONLY').length
+    const unclosedVisit2DupCount = evaluated.filter((r) => r.claim_close_status === 'VISIT2_DUP').length
+    const unclosedNoneCount = evaluated.filter((r) => r.claim_close_status === 'NONE').length
+    const visit2Rows = evaluated.filter((r) => (r.visit_order ?? 1) >= 2)
+
     const kpi = {
       total: evaluated.length,
       pass: evaluated.filter((r) => r.audit_result === 'PASS').length,
       fail: evaluated.filter((r) => r.audit_result === 'FAIL').length,
-      duplicateFail: evaluated.filter((r) => r.is_duplicate_fail || r.failures?.some((f) => f.includes('ซ้ำ') && !f.includes('เลขปิดสิทธิ'))).length,
+      closedCount,
+      closedRate: evaluated.length ? Math.round((closedCount / evaluated.length) * 1000) / 10 : 0,
+      unclosedCount,
+      unclosedOpenOnlyCount,
+      unclosedVisit2DupCount,
+      unclosedNoneCount,
+      visit2TotalCount: visit2Rows.length,
+      visit2ClosedCount: visit2Rows.filter((r) => r.is_claim_closed && !r.is_visit2_claim_fail).length,
+      duplicateFail: evaluated.filter((r) => r.is_duplicate_fail).length,
       kneeFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length,
       postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))).length,
       muscleFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))).length,
-      epFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('EP'))).length,
-      visit2ClaimFail: evaluated.filter((r) => r.is_visit2_claim_fail || r.failures?.some((f) => f.includes('เลขปิดสิทธิ'))).length,
+      epFail: unclosedCount,
+      visit2ClaimFail: evaluated.filter((r) => r.is_visit2_claim_fail).length,
     }
     kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
 
