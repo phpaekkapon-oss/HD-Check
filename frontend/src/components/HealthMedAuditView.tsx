@@ -609,9 +609,14 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
         accessorKey: 'visit_date',
         header: ({ column }) => <DataTableColumnHeader column={column} title="วันที่ / เวลา" className="justify-center" />,
         cell: ({ row }) => (
-          <div className="font-mono whitespace-nowrap text-center">
-            <div className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px] leading-tight">{row.original.visit_date}</div>
-            <div className="text-xs sm:text-xs text-slate-400 dark:text-slate-400 flex items-center justify-center gap-1 mt-0.5 font-medium leading-tight">
+          <div className="whitespace-nowrap text-center">
+            <div
+              className="text-slate-900 dark:text-slate-100 font-bold text-xs sm:text-[13px] leading-tight"
+              title={`วันที่บันทึก (ค.ศ.): ${row.original.visit_date}`}
+            >
+              {toThaiDate(row.original.visit_date)}
+            </div>
+            <div className="text-xs sm:text-xs text-slate-400 dark:text-slate-400 flex items-center justify-center gap-1 mt-0.5 font-medium leading-tight font-mono">
               <Clock className="size-3 text-slate-400 shrink-0" />
               <span>{row.original.visit_time ? `${row.original.visit_time.substring(0, 5)} น.` : '—'}</span>
             </div>
