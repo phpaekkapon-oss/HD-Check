@@ -143,12 +143,12 @@ export function useSyncHerbDx() {
   })
 }
 
-export function useHealthMedAudit(filters: AuditFilterParams) {
+export function useHealthMedAudit(filters: AuditFilterParams, refetchInterval: number | false = 15_000) {
   return useQuery({
     queryKey: [...herbDxKeys.all, 'healthmed', filters] as const,
     queryFn: () => herbDxApi.healthMedAudit(filters),
     placeholderData: keepPreviousData,
-    refetchInterval: 15_000,
+    refetchInterval,
   })
 }
 

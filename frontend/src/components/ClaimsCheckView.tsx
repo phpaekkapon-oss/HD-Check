@@ -21,9 +21,11 @@ import { PaginationBar } from '@/components/PaginationBar'
 import { usePagination } from '@/hooks/usePagination'
 import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { PhiName, PhiHn } from '@/components/Phi'
+import { ThaiDatePickerModal } from '@/components/ThaiDatePickerModal'
 
 interface ClaimsCheckViewProps {
   readonly range: DateRange
+  readonly onRangeChange?: (r: DateRange) => void
 }
 
 type Filter = 'ALL' | 'ICD' | ClaimState
@@ -42,7 +44,7 @@ const dxList = (v: ClaimVisit): [string, string][] =>
     [['PDX', v.pdx], ['DX0', v.dx0], ['DX1', v.dx1], ['DX2', v.dx2], ['DX3', v.dx3], ['DX4', v.dx4], ['DX5', v.dx5]] as [string, string | null][]
   ).flatMap(([slot, code]) => (code ? [[slot, code] as [string, string]] : []))
 
-export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
+export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range, onRangeChange }) => {
   const { data, isLoading, error, isFetching, isPlaceholderData } = useClaimCheck(range)
   const [filter, setFilter] = useState<Filter>('ALL')
   const [search, setSearch] = useState('')
@@ -117,9 +119,13 @@ export const ClaimsCheckView: FC<ClaimsCheckViewProps> = ({ range }) => {
               ตรวจรหัสวินิจฉัยตามหลักการเบิก และติดตามผลเบิกจาก FDH · visit แผนกแพทย์แผนไทย {toThaiDate(range.startDate)} – {toThaiDate(range.endDate)}
             </p>
           </div>
-          <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
-            {isFetching && <Loader2 className="size-3.5 animate-spin" />}
-            ผลเบิกจาก FDH อัปเดตล่าสุดใน HOSxP: <span className="font-medium text-slate-700 dark:text-slate-200">{data.meta.fdhLastChecked ?? '—'}</span>
+          <div className="flex flex-wrap items-center gap-2.5 text-xs text-slate-500 dark:text-slate-400">
+            {onRangeChange && <ThaiDatePickerModal range={range} onChange={onRangeChange} />}
+            <div className="flex items-center gap-1.5">
+              {isFetching && <Loader2 className="size-3.5 animate-spin" />}
+              <span>ผลเบิกจาก FDH อัปเดตล่าสุดใน HOSxP:</span>
+              <span className="font-medium text-slate-700 dark:text-slate-200">{data.meta.fdhLastChecked ?? '—'}</span>
+            </div>
           </div>
         </div>
         {noFdhForPeriod && (

@@ -343,8 +343,11 @@ async function main() {
       const deploySuccess = run('node backend/deploy.mjs')
       if (deploySuccess) {
         console.log(`\n[SUCCESS] Deploy เวอร์ชันปัจจุบัน v${currentVersion} ขึ้นเซิร์ฟเวอร์สำเร็จเรียบร้อย!\n`)
+        process.exit(0)
+      } else {
+        console.log(`\n[WARNING] อัปโหลด v${currentVersion} เข้าเซิร์ฟเวอร์ 192.168.1.241 ไม่สำเร็จ! กรุณาตรวจสอบ LAN (วง 192.168.1.x) หรือ FortiClient VPN\n`)
+        process.exit(1)
       }
-      process.exit(0)
     } else if (choice === '1' || choice.toLowerCase() === 'y') {
       isForce = true
       console.log('\n[+] ยืนยันการบังคับสร้างเวอร์ชันใหม่และเริ่มกระบวนการ Release & Deploy...')
@@ -545,15 +548,22 @@ async function main() {
   const deploySuccess = run('node backend/deploy.mjs')
   if (deploySuccess) {
     console.log(`[+] Deploy ขึ้นเซิร์ฟเวอร์ 192.168.1.241 สำเร็จเรียบร้อย!`)
+    console.log('\n====================================================================')
+    console.log(`  [SUCCESS] Release v${newVersion} ดำเนินการเสร็จสมบูรณ์ 100%!`)
+    console.log(`  - เวอร์ชันใหม่  : v${newVersion}`)
+    console.log(`  - ผู้ช่วย AI    : ${aiResult.aiModel}`)
+    console.log(`  - เว็บไซต์     : http://pkhospital.moph.go.th/hd-check/`)
+    console.log(`  - GitHub Tag  : https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${newVersion}`)
+    console.log('====================================================================\n')
+  } else {
+    console.log('\n====================================================================')
+    console.log(`  [WARNING] บันทึก v${newVersion} ขึ้น GitHub แล้ว แต่ยังอัปโหลดเข้าเซิร์ฟเวอร์ 192.168.1.241 ไม่สำเร็จ!`)
+    console.log(`  - สาเหตุ       : เชื่อมต่อ SSH ไปยัง 192.168.1.241:22 ไม่ได้ (Timed out)`)
+    console.log(`  - วิธีแก้ไข     : ตรวจสอบการเชื่อมต่อ LAN (วง 192.168.1.x) หรือต่อ FortiClient VPN`)
+    console.log(`                  แล้วรันคำสั่ง: node backend/deploy.mjs (หรือรัน deploy.bat แล้วเลือกกด 2)`)
+    console.log('====================================================================\n')
+    process.exit(1)
   }
-
-  console.log('\n====================================================================')
-  console.log(`  [SUCCESS] Release v${newVersion} ดำเนินการเสร็จสมบูรณ์ 100%!`)
-  console.log(`  - เวอร์ชันใหม่  : v${newVersion}`)
-  console.log(`  - ผู้ช่วย AI    : ${aiResult.aiModel}`)
-  console.log(`  - เว็บไซต์     : http://pkhospital.moph.go.th/hd-check/`)
-  console.log(`  - GitHub Tag  : https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${newVersion}`)
-  console.log('====================================================================\n')
 }
 
 main().catch((err) => {

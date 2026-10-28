@@ -1,4 +1,4 @@
-import { useState, useMemo, type FC } from 'react'
+import { useState, useMemo, useEffect, type FC } from 'react'
 import {
   useReactTable,
   getCoreRowModel,
@@ -19,9 +19,11 @@ import {
   Bone,
   Layers,
   ShieldAlert,
+  ShieldCheck,
   Loader2,
   Cpu,
   RotateCcw,
+  RefreshCw,
   Eye,
   X,
   Stethoscope,
@@ -34,6 +36,7 @@ import {
   SlidersHorizontal,
   Check,
   Copy,
+  Download,
 } from 'lucide-react'
 import { useHealthMedAudit } from '@/hooks/useHerbDx'
 import { herbDxApi } from '@/api/herbdx.api'
@@ -44,6 +47,9 @@ import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
 import { CopyButton } from '@/components/CopyButton'
+import { ThaiDatePickerModal } from '@/components/ThaiDatePickerModal'
+import { downloadExcel, fmtNum, toReporter, toThaiDate, type ExcelColumn, type ExcelReport } from '@/lib/format'
+import { useAuth } from '@/context/AuthContext'
 import {
   Table,
   TableBody,
@@ -57,6 +63,7 @@ import { PhiName, PhiHn } from '@/components/Phi'
 
 interface HealthMedAuditViewProps {
   readonly range: DateRange
+  readonly onRangeChange?: (r: DateRange) => void
 }
 
 type KpiFilterType = 'ALL' | 'PASS' | 'FAIL' | 'CLOSED_EP' | 'UNCLOSED_EP' | 'DUPLICATE' | 'VISIT2_CLAIM' | 'KNEE' | 'MUSCLE' | 'POSTPARTUM' | 'EP'
@@ -69,7 +76,7 @@ const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber
   if (record.claim_close_status === 'VISIT2_DUP') {
     tags.push({ label: 'Visit 2 เลข EP ซ้ำ Visit 1', color: 'rose' })
   } else if (record.claim_close_status === 'OPEN_ONLY') {
-    tags.push({ label: `รอปิดสิทธิ (${record.claim_code || 'PP'})`, color: 'amber' })
+    tags.push({ label: 'รอปิดสิทธิ (เปิด PP แล้ว)', color: 'amber' })
   } else if (record.claim_close_status === 'NONE') {
     tags.push({ label: 'ยังไม่ปิดสิทธิ (ไม่มีเลข)', color: 'rose' })
   } else if (record.is_visit2_claim_fail || text.includes('เลขปิดสิทธิ')) {
@@ -139,13 +146,46 @@ const parseAuditTags = (record: HealthMedRecord): { label: string; color: 'amber
   return tags
 }
 
-export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
+export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRangeChange }) => {
+  const { user } = useAuth()
   const [kpiFilter, setKpiFilter] = useState<KpiFilterType>('ALL')
+  const [claimStatusFilter, setClaimStatusFilter] = useState<'ALL' | 'CLOSED' | 'UNCLOSED' | 'OPEN_ONLY' | 'VISIT2_DUP' | 'NONE'>('ALL')
+  const [visitDateFilter, setVisitDateFilter] = useState<string>('ALL')
+  const [doctorFilter, setDoctorFilter] = useState<string>('ALL')
+  const [pttypeFilter, setPttypeFilter] = useState<string>('ALL')
+  const [serviceFilter, setServiceFilter] = useState<'ALL' | '58130' | '58101' | '58201' | 'KNEE' | 'POSTPARTUM' | 'VISIT2'>('ALL')
+  const [hnFilter, setHnFilter] = useState('')
   const [search, setSearch] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
   const [selectedRecord, setSelectedRecord] = useState<HealthMedRecord | null>(null)
   const [isKpiCollapsed, setIsKpiCollapsed] = useState(false)
   const [density, setDensity] = useState<'compact' | 'normal'>('compact')
+
+  // Real-time Auto-Sync State
+  const [autoSync, setAutoSync] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    return localStorage.getItem('hd_healthmed_autosync') !== 'false'
+  })
+  const [syncIntervalSec, setSyncIntervalSec] = useState<number>(() => {
+    if (typeof window === 'undefined') return 15
+    const saved = Number(localStorage.getItem('hd_healthmed_sync_sec'))
+    return [10, 15, 30, 60].includes(saved) ? saved : 15
+  })
+  const [countdown, setCountdown] = useState<number>(syncIntervalSec)
+
+  const handleToggleAutoSync = () => {
+    setAutoSync((prev) => {
+      const next = !prev
+      localStorage.setItem('hd_healthmed_autosync', String(next))
+      return next
+    })
+  }
+
+  const handleChangeSyncInterval = (sec: number) => {
+    setSyncIntervalSec(sec)
+    setCountdown(sec)
+    localStorage.setItem('hd_healthmed_sync_sec', String(sec))
+  }
 
   // AI Clinical Advisor State
   const [aiAdvice, setAiAdvice] = useState<{
@@ -184,13 +224,40 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
     setTimeout(() => setCopiedAdvice(false), 2000)
   }
 
-  const { data, isLoading, isFetching, isPlaceholderData } = useHealthMedAudit({
-    startDate: range.startDate,
-    endDate: range.endDate,
-    result: 'ALL',
-    search: '',
-    hn: '',
-  })
+  const { data, isLoading, isFetching, isPlaceholderData, refetch, dataUpdatedAt } = useHealthMedAudit(
+    {
+      startDate: range.startDate,
+      endDate: range.endDate,
+      result: 'ALL',
+      search: '',
+      hn: '',
+    },
+    autoSync ? syncIntervalSec * 1000 : false
+  )
+
+  // Countdown timer for Real-Time Auto-Sync
+  useEffect(() => {
+    setCountdown(syncIntervalSec)
+  }, [dataUpdatedAt, syncIntervalSec])
+
+  useEffect(() => {
+    if (!autoSync) return
+    const timer = window.setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : syncIntervalSec))
+    }, 1000)
+    return () => window.clearInterval(timer)
+  }, [autoSync, syncIntervalSec])
+
+  const lastUpdatedTimeStr = useMemo(() => {
+    if (!dataUpdatedAt) return ''
+    const d = new Date(dataUpdatedAt)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')} น.`
+  }, [dataUpdatedAt])
+
+  const handleManualSyncNow = () => {
+    setCountdown(syncIntervalSec)
+    void refetch()
+  }
 
   // กรองเฉพาะเคสที่มีรหัสหัตถการหรือค่าบริการ (ตัดเคสไม่มีหัตถการ/ค่าบริการออก เพราะไปเช็คที่หน้าตรวจจ่ายยาสมุนไพร)
   const rawRecords = useMemo(() => {
@@ -203,7 +270,31 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
   }, [data?.data])
   const kpi = data?.kpi
 
-  // Filter records based on active KPI filter & search input
+  // ตัวเลือกสำหรับ Dropdown ตัวกรอง (วันที่รับบริการ, ผู้ให้บริการ, สิทธิการรักษา)
+  const filterOptions = useMemo(() => {
+    const dateCounts = new Map<string, number>()
+    const doctorCounts = new Map<string, number>()
+    const pttypeCounts = new Map<string, number>()
+
+    for (const r of rawRecords) {
+      if (r.visit_date) {
+        dateCounts.set(r.visit_date, (dateCounts.get(r.visit_date) ?? 0) + 1)
+      }
+      const doc = (r.doctor_name || '').trim() || 'ไม่ระบุผู้ให้บริการ'
+      doctorCounts.set(doc, (doctorCounts.get(doc) ?? 0) + 1)
+
+      const pt = (r.pttype_name || '').trim() || 'ไม่ระบุสิทธิ'
+      pttypeCounts.set(pt, (pttypeCounts.get(pt) ?? 0) + 1)
+    }
+
+    const dates = [...dateCounts.entries()].sort((a, b) => b[0].localeCompare(a[0]))
+    const doctors = [...doctorCounts.entries()].sort((a, b) => b[1] - a[1])
+    const pttypes = [...pttypeCounts.entries()].sort((a, b) => b[1] - a[1])
+
+    return { dates, doctors, pttypes }
+  }, [rawRecords])
+
+  // Filter records based on active KPI filter & detailed filter controls
   const filteredRecords = useMemo(() => {
     return rawRecords.filter((r) => {
       // 1. KPI Category Filter
@@ -217,18 +308,287 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
       if (kpiFilter === 'MUSCLE' && !r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))) return false
       if (kpiFilter === 'POSTPARTUM' && !r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))) return false
 
-      // 2. Text Search Filter
+      // 2. Claim Close Status Filter
+      if (claimStatusFilter === 'CLOSED' && !r.is_claim_closed) return false
+      if (claimStatusFilter === 'UNCLOSED' && r.is_claim_closed) return false
+      if (claimStatusFilter === 'OPEN_ONLY' && r.claim_close_status !== 'OPEN_ONLY') return false
+      if (claimStatusFilter === 'VISIT2_DUP' && r.claim_close_status !== 'VISIT2_DUP') return false
+      if (claimStatusFilter === 'NONE' && r.claim_close_status !== 'NONE') return false
+
+      // 3. Specific Visit Date Filter
+      if (visitDateFilter !== 'ALL' && r.visit_date !== visitDateFilter) return false
+
+      // 4. Doctor Filter
+      if (doctorFilter !== 'ALL') {
+        const doc = (r.doctor_name || '').trim() || 'ไม่ระบุผู้ให้บริการ'
+        if (doc !== doctorFilter) return false
+      }
+
+      // 5. Pttype Filter
+      if (pttypeFilter !== 'ALL') {
+        const pt = (r.pttype_name || '').trim() || 'ไม่ระบุสิทธิ'
+        if (pt !== pttypeFilter) return false
+      }
+
+      // 6. Service / Visit Type Filter
+      if (serviceFilter === '58130' && !(r.count_58130 > 0)) return false
+      if (serviceFilter === '58101' && !(r.count_58101 > 0)) return false
+      if (serviceFilter === '58201' && !((r.count_compress ?? 0) > 0)) return false
+      if (serviceFilter === 'KNEE') {
+        const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5].filter(Boolean)
+        if (!dxs.includes('M179') && !dxs.includes('U5753') && !(r.count_58301 > 0)) return false
+      }
+      if (serviceFilter === 'POSTPARTUM') {
+        const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5].filter(Boolean)
+        const hasOp = r.operation_codes?.some((c) => c.startsWith('900-77'))
+        if (!dxs.includes('U506') && !(r.count_58131 > 0) && !(r.count_58220 > 0) && !hasOp) return false
+      }
+      if (serviceFilter === 'VISIT2' && !((r.visit_order ?? 1) >= 2)) return false
+
+      // 7. HN Filter
+      if (hnFilter.trim() && !r.hn.includes(hnFilter.trim())) return false
+
+      // 8. Text Search Filter
       if (search.trim()) {
         const q = search.toLowerCase()
         const opCodesText = r.operation_codes?.join(' ') ?? ''
         const laborText = r.labor_date ?? ''
         const claimText = `${r.claim_code ?? ''} ${r.ep_code ?? ''} ${r.first_visit_claim_code ?? ''}`
-        const text = `${r.hn} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText} ${claimText}`.toLowerCase()
+        const text = `${r.hn} ${r.vn ?? ''} ${r.patient_name} ${r.doctor_name} ${r.pdx} ${r.dx0} ${r.dx1} ${r.pttype_name} ${r.audit_reason} ${opCodesText} ${laborText} ${claimText}`.toLowerCase()
         if (!text.includes(q)) return false
       }
       return true
     })
-  }, [rawRecords, kpiFilter, search])
+  }, [rawRecords, kpiFilter, claimStatusFilter, visitDateFilter, doctorFilter, pttypeFilter, serviceFilter, hnFilter, search])
+
+  const hasActiveFilters =
+    kpiFilter !== 'ALL' ||
+    claimStatusFilter !== 'ALL' ||
+    visitDateFilter !== 'ALL' ||
+    doctorFilter !== 'ALL' ||
+    pttypeFilter !== 'ALL' ||
+    serviceFilter !== 'ALL' ||
+    Boolean(hnFilter.trim()) ||
+    Boolean(search.trim())
+
+  const handleResetFilters = () => {
+    setKpiFilter('ALL')
+    setClaimStatusFilter('ALL')
+    setVisitDateFilter('ALL')
+    setDoctorFilter('ALL')
+    setPttypeFilter('ALL')
+    setServiceFilter('ALL')
+    setHnFilter('')
+    setSearch('')
+  }
+
+  const handleExportExcel = () => {
+    if (filteredRecords.length === 0) return
+
+    const parseServiceInfo = (r: HealthMedRecord) => {
+      const items = (r.service_items_raw || '').split('||').filter(Boolean)
+      const labels: string[] = []
+      let totalFee = 0
+      for (const s of items) {
+        const [code, name, qty, price] = s.split(':')
+        const isThaiMed =
+          Boolean(code && ['58101', '58102', '58130', '58131', '58201', '58220', '58301'].includes(code)) ||
+          Boolean(code?.startsWith('58')) ||
+          Boolean(name?.includes('นวด') && !name?.includes('กายภาพ')) ||
+          Boolean(name?.includes('ประคบ') && !name?.includes('ความร้อน') && !name?.includes('ประคบร้อน') && !name?.includes('ประคบเย็น') && !name?.includes('กายภาพ')) ||
+          Boolean(name?.includes('ทับหม้อเกลือ')) ||
+          Boolean(name?.includes('อบไอน้ำ'))
+        if (isThaiMed) {
+          const cleanName = (name || '').replace(/\s*\(\d+\)\s*$/, '').trim()
+          const q = Number(qty) || 1
+          const p = Number(price) || 0
+          labels.push(`[${code}] ${cleanName} x${q}`)
+          totalFee += q * p
+        }
+      }
+      return {
+        label: labels.join(', ') || '-',
+        totalFee,
+      }
+    }
+
+    const detailColumns: ExcelColumn[] = [
+      { header: 'ลำดับ', type: 'center', width: 8 },
+      { header: 'วันที่รับบริการ', type: 'center', width: 14 },
+      { header: 'เวลา', type: 'center', width: 10 },
+      { header: 'HN', type: 'center', width: 13 },
+      { header: 'ชื่อ-สกุล ผู้รับบริการ', width: 26 },
+      { header: 'อายุ (ปี)', type: 'int', width: 9 },
+      { header: 'สิทธิการรักษา', width: 25 },
+      { header: 'ผู้ให้บริการ', width: 24 },
+      { header: 'ลำดับ Visit', type: 'center', width: 12 },
+      { header: 'สถานะการปิดสิทธิ', type: 'center', width: 22 },
+      { header: 'เลขปิดสิทธิ (EP)', type: 'center', width: 18 },
+      { header: 'เลขเปิดสิทธิ (PP/Authen)', type: 'center', width: 18 },
+      { header: 'รายการค่าบริการ (กรมบัญชีกลาง)', width: 34 },
+      { header: 'มูลค่าบริการ (บาท)', type: 'money', width: 15, total: true },
+      { header: 'รหัสหัตถการ (ICD-10-TM)', width: 28 },
+      { header: 'รหัสโรคหลัก (PDX)', type: 'center', width: 14 },
+      { header: 'รหัสโรครอง (DX0-DX5)', width: 20 },
+      { header: 'ผลการตรวจ', type: 'center', width: 15 },
+      { header: 'สาเหตุ / รายละเอียดการตรวจสอบ', width: 44 },
+    ]
+
+    const buildRows = (list: readonly HealthMedRecord[]) =>
+      list.map((r, i) => {
+        const closeLabel = r.is_claim_closed
+          ? 'ปิดสิทธิแล้ว (EP)'
+          : r.claim_close_status === 'OPEN_ONLY'
+          ? 'รอปิดสิทธิ (เปิด PP แล้ว)'
+          : r.claim_close_status === 'VISIT2_DUP'
+          ? 'Visit 2 ยังไม่ปิดสิทธิ (ซ้ำ V1)'
+          : 'ยังไม่ปิดสิทธิ (ไม่มีเลข)'
+        const secondaryDxs = [r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5].filter(Boolean).join(', ')
+        const { label: serviceLabel, totalFee } = parseServiceInfo(r)
+        const reasonText =
+          r.audit_result === 'FAIL' && r.failures && r.failures.length > 0
+            ? r.failures.join(' | ')
+            : r.audit_reason || 'ผ่านเกณฑ์มาตรฐานครบถ้วน'
+
+        return [
+          i + 1,
+          toThaiDate(r.visit_date),
+          r.visit_time ? `${r.visit_time.substring(0, 5)} น.` : '',
+          r.hn,
+          r.patient_name,
+          r.age_y,
+          r.pttype_name || '',
+          r.doctor_name || '',
+          (r.visit_order ?? 1) >= 2 ? `Visit ${r.visit_order}` : 'Visit 1',
+          closeLabel,
+          r.ep_code || '-',
+          r.claim_code || '-',
+          serviceLabel,
+          totalFee,
+          (r.operation_codes ?? []).join(', ') || '-',
+          r.pdx || '-',
+          secondaryDxs || '-',
+          r.audit_result === 'PASS' ? 'ผ่านเกณฑ์' : 'ไม่ผ่านเกณฑ์',
+          reasonText,
+        ]
+      })
+
+    const buildSummary = (list: readonly HealthMedRecord[]) => {
+      const total = list.length
+      const pass = list.filter((r) => r.audit_result === 'PASS').length
+      const fail = total - pass
+      const closed = list.filter((r) => r.is_claim_closed).length
+      const unclosed = total - closed
+      const passRate = total > 0 ? `${fmtNum((pass / total) * 100, 1)}%` : '0%'
+      return [
+        { label: 'ผู้รับบริการทั้งหมด', value: `${fmtNum(total)} ราย` },
+        { label: 'ผ่านเกณฑ์', value: `${fmtNum(pass)} ราย (${passRate})`, tone: 'good' as const },
+        { label: 'ไม่ผ่านเกณฑ์', value: `${fmtNum(fail)} ราย`, tone: (fail > 0 ? 'bad' : 'good') as 'bad' | 'good' },
+        { label: 'ปิดสิทธิแล้ว (EP)', value: `${fmtNum(closed)} ราย`, tone: 'good' as const },
+        { label: 'ยังไม่ปิดสิทธิ', value: `${fmtNum(unclosed)} ราย`, tone: (unclosed > 0 ? 'bad' : 'good') as 'bad' | 'good' },
+      ]
+    }
+
+    const reporter = toReporter(user)
+    const extraSheets: Omit<ExcelReport, 'filename' | 'extraSheets'>[] = []
+
+    // Sheet 2: เฉพาะรายการที่ไม่ผ่านเกณฑ์ / พบปัญหา
+    const failRecords = filteredRecords.filter((r) => r.audit_result === 'FAIL')
+    if (failRecords.length > 0 && failRecords.length < filteredRecords.length) {
+      extraSheets.push({
+        sheetName: 'เฉพาะไม่ผ่านเกณฑ์',
+        title: 'รายงานรายการไม่ผ่านเกณฑ์ตรวจสอบหัตถการแพทย์แผนไทย (ต้องทบทวนแก้ไข)',
+        range,
+        reporter,
+        columns: detailColumns,
+        rows: buildRows(failRecords),
+        summary: buildSummary(failRecords),
+        statusColumn: 17,
+        rowTones: failRecords.map(() => 'bad'),
+      })
+    }
+
+    // Sheet 3: เฉพาะรายการที่ยังไม่ปิดสิทธิ (EP)
+    const unclosedRecords = filteredRecords.filter((r) => !r.is_claim_closed)
+    if (unclosedRecords.length > 0 && unclosedRecords.length < filteredRecords.length) {
+      extraSheets.push({
+        sheetName: 'เฉพาะยังไม่ปิดสิทธิ',
+        title: 'รายงานติดตามรายการที่ยังไม่ปิดสิทธิการรักษา (ไม่มีเลข EP / รอปิด PP / Visit 2 ซ้ำ)',
+        range,
+        reporter,
+        columns: detailColumns,
+        rows: buildRows(unclosedRecords),
+        summary: buildSummary(unclosedRecords),
+        statusColumn: 17,
+        rowTones: unclosedRecords.map((r) => (r.audit_result === 'PASS' ? 'good' : 'bad')),
+      })
+    }
+
+    // Sheet 4: สรุปผลงานแยกตามผู้ให้บริการ (Provider Summary)
+    const providerMap = new Map<
+      string,
+      { total: number; pass: number; fail: number; closed: number; unclosed: number; fee: number }
+    >()
+    for (const r of filteredRecords) {
+      const doc = (r.doctor_name || '').trim() || 'ไม่ระบุผู้ให้บริการ'
+      const cur = providerMap.get(doc) ?? { total: 0, pass: 0, fail: 0, closed: 0, unclosed: 0, fee: 0 }
+      cur.total += 1
+      if (r.audit_result === 'PASS') cur.pass += 1
+      else cur.fail += 1
+      if (r.is_claim_closed) cur.closed += 1
+      else cur.unclosed += 1
+      cur.fee += parseServiceInfo(r).totalFee
+      providerMap.set(doc, cur)
+    }
+    const providerEntries = [...providerMap.entries()].sort((a, b) => b[1].total - a[1].total)
+    if (providerEntries.length > 0) {
+      extraSheets.push({
+        sheetName: 'สรุปรายผู้ให้บริการ',
+        title: 'สรุปผลการตรวจสอบหัตถการและการปิดสิทธิ แยกตามผู้ให้บริการ',
+        range,
+        reporter,
+        columns: [
+          { header: 'ลำดับ', type: 'center', width: 8 },
+          { header: 'ชื่อผู้ให้บริการ / แพทย์แผนไทย', width: 32 },
+          { header: 'ผู้รับบริการรวม (ราย)', type: 'int', width: 18, total: true },
+          { header: 'ผ่านเกณฑ์ (ราย)', type: 'int', width: 16, total: true },
+          { header: 'ไม่ผ่านเกณฑ์ (ราย)', type: 'int', width: 16, total: true },
+          { header: 'ปิดสิทธิแล้ว EP (ราย)', type: 'int', width: 18, total: true },
+          { header: 'ยังไม่ปิดสิทธิ (ราย)', type: 'int', width: 18, total: true },
+          { header: 'มูลค่าบริการรวม (บาท)', type: 'money', width: 18, total: true },
+          { header: 'อัตราผ่านเกณฑ์', type: 'center', width: 16 },
+        ],
+        rows: providerEntries.map(([doc, st], idx) => [
+          idx + 1,
+          doc,
+          st.total,
+          st.pass,
+          st.fail,
+          st.closed,
+          st.unclosed,
+          st.fee,
+          `${fmtNum((st.pass / st.total) * 100, 1)}%`,
+        ]),
+        summary: buildSummary(filteredRecords),
+        statusColumn: 8,
+        rowTones: providerEntries.map(([, st]) => (st.fail === 0 ? 'good' : st.pass / st.total >= 0.85 ? 'warn' : 'bad')),
+      })
+    }
+
+    void downloadExcel({
+      filename: `ตรวจหัตถการแผนไทย_${range.startDate}_${range.endDate}.xlsx`,
+      sheetName: 'รายการตรวจหัตถการทั้งหมด',
+      title: 'รายงานตรวจสอบหัตถการและสถานะการปิดสิทธิแพทย์แผนไทย (HOSxP Audit Report)',
+      range,
+      reporter,
+      columns: detailColumns,
+      rows: buildRows(filteredRecords),
+      summary: buildSummary(filteredRecords),
+      statusColumn: 17,
+      rowTones: filteredRecords.map((r) => (r.audit_result === 'PASS' ? 'good' : 'bad')),
+      extraSheets,
+    })
+  }
 
   const columns = useMemo<ColumnDef<HealthMedRecord>[]>(
     () => [
@@ -262,26 +622,42 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         accessorKey: 'patient_name',
         header: ({ column }) => <DataTableColumnHeader column={column} title="ผู้รับบริการ / HN" />,
         cell: ({ row }) => (
-          <div className="whitespace-nowrap min-w-[160px] max-w-[240px]">
-            <div className="flex items-center gap-1 group">
+          <div className="min-w-[230px] space-y-1">
+            {/* บรรทัดที่ 1: ชื่อผู้รับบริการ + ป้าย Visit 2 (ถ้ามี) */}
+            <div className="flex items-center gap-1.5 group whitespace-nowrap">
               <button
                 type="button"
                 onClick={() => setSelectedRecord(row.original)}
-                className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer flex items-center gap-1.5 truncate text-xs sm:text-[13.5px]"
+                className="text-left font-bold text-slate-900 dark:text-white hover:text-teal-600 dark:hover:text-teal-400 transition cursor-pointer inline-flex items-center gap-1 text-xs sm:text-[13.5px]"
                 title="คลิกเพื่อดูรายละเอียดเวชระเบียน"
               >
-                <span className="truncate"><PhiName value={row.original.patient_name} /></span>
+                <span className="truncate max-w-[185px]"><PhiName value={row.original.patient_name} /></span>
                 <Eye className="size-3.5 text-slate-400 opacity-0 group-hover:opacity-100 transition shrink-0" />
               </button>
               <CopyButton
                 text={row.original.patient_name} sensitive
                 title="คัดลอกชื่อผู้รับบริการ"
-                iconSize="size-3.5"
+                iconSize="size-3"
                 className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-opacity shrink-0"
               />
+              {row.original.visit_order && row.original.visit_order >= 2 && (
+                <span
+                  title={`ผู้ป่วยมารับบริการครั้งที่ ${row.original.visit_order} ของวัน (รวม ${row.original.total_day_visits ?? 2} Visit)`}
+                  className={cn(
+                    'inline-flex items-center px-1.5 py-0.2 rounded-md text-[10px] font-bold border shrink-0 leading-tight',
+                    row.original.is_visit2_claim_fail
+                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30'
+                      : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
+                  )}
+                >
+                  Visit {row.original.visit_order}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-1.5 mt-1 text-xs">
-              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shadow-2xs">
+
+            {/* บรรทัดที่ 2: ป้าย HN + สถานะการปิดสิทธิ (เรียงในบรรทัดเดียวกันเสมอ ไม่ตกบรรทัดใหม่) */}
+            <div className="flex items-center gap-1.5 text-[11px] whitespace-nowrap">
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono font-bold bg-teal-500/10 text-teal-700 dark:text-teal-300 border border-teal-500/25 shrink-0">
                 <span>HN: <PhiHn value={row.original.hn} /></span>
                 <CopyButton
                   text={row.original.hn} sensitive
@@ -290,65 +666,36 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   className="p-0.5 hover:bg-teal-500/25 text-teal-600 dark:text-teal-300 rounded cursor-pointer transition"
                 />
               </span>
-              {row.original.vn && (
-                <span className="inline-flex items-center gap-0.5 font-mono text-slate-400 dark:text-slate-400 text-xs font-medium">
-                  <span>VN: {row.original.vn}</span>
-                  <CopyButton
-                    text={row.original.vn}
-                    title="คัดลอก VN"
-                    iconSize="size-2.5"
-                    className="p-0.5 hover:bg-slate-500/20 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded cursor-pointer transition"
-                  />
-                </span>
-              )}
-              {row.original.visit_order && row.original.visit_order >= 2 && (
-                <span
-                  title={`ผู้ป่วยมีทั้งหมด ${row.original.total_day_visits ?? 2} Visit ในวันเดียวกัน | เลขปิดสิทธิ: ${row.original.claim_code || 'ไม่มี'}${row.original.first_visit_claim_code ? ` (Visit 1: ${row.original.first_visit_claim_code})` : ''}`}
-                  className={cn(
-                    'inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold border transition shadow-2xs',
-                    row.original.is_visit2_claim_fail
-                      ? 'bg-rose-500/15 text-rose-700 dark:text-rose-300 border-rose-500/30 animate-pulse'
-                      : 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30'
-                  )}
-                >
-                  <span>Visit {row.original.visit_order}</span>
-                  {row.original.is_visit2_claim_fail ? (
-                    <span className="text-rose-600 dark:text-rose-400 font-extrabold text-[10px]">✕ ซ้ำ/ขาด</span>
-                  ) : (
-                    <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[10px]">✓</span>
-                  )}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-1 mt-1 text-[11px]">
+
               {row.original.is_claim_closed ? (
                 <span
                   title={`ปิดสิทธิแล้ว (Endpoint): ${row.original.ep_code || row.original.claim_code}`}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 shrink-0"
                 >
-                  <span className="text-emerald-500 font-bold">✓ ปิดสิทธิ:</span>
+                  <span className="text-emerald-500 font-bold">✓</span>
                   <span>{row.original.ep_code || row.original.claim_code}</span>
                 </span>
               ) : row.original.claim_close_status === 'OPEN_ONLY' ? (
                 <span
                   title={`เปิดสิทธิแล้ว (${row.original.claim_code}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono font-semibold bg-amber-500/15 text-amber-800 dark:text-amber-300 border border-amber-500/30 shrink-0"
                 >
-                  <span>⏳ รอปิดสิทธิ ({row.original.claim_code})</span>
+                  <span>⏳</span>
+                  <span>{row.original.claim_code || 'รอปิดสิทธิ'}</span>
                 </span>
               ) : row.original.claim_close_status === 'VISIT2_DUP' ? (
                 <span
                   title={`Visit 2 ยังไม่ได้ปิดสิทธิใหม่ (เลข ${row.original.claim_code} ซ้ำกับ Visit 1)`}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-mono font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0"
                 >
-                  <span>✕ ยังไม่ปิดสิทธิ Visit 2 (ซ้ำ V1)</span>
+                  <span>✕ V2 ซ้ำ V1</span>
                 </span>
               ) : (
                 <span
                   title="ไม่พบเลขเปิดสิทธิ (PP) และเลขปิดสิทธิ (EP)"
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0"
                 >
-                  <span>✕ ยังไม่ปิดสิทธิ (ไม่มีเลข)</span>
+                  <span>✕ ไม่มีเลขสิทธิ</span>
                 </span>
               )}
             </div>
@@ -607,16 +954,12 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           }
 
           const tags = parseAuditTags(row.original)
-          const isDup = Boolean(
-            row.original.is_duplicate_fail ||
-            row.original.failures?.some((f) => f.includes('ซ้ำ')) ||
-            row.original.audit_reason?.includes('ซ้ำ')
-          )
+          const isDup = Boolean(row.original.is_duplicate_fail)
 
           return (
-            <div className="flex flex-col items-center justify-center gap-1 max-w-[210px] mx-auto text-center">
+            <div className="flex flex-col items-center justify-center gap-1 mx-auto text-center whitespace-nowrap">
               {/* บรรทัดบน: สถานะหลัก (ไม่ผ่าน) + ปุ่ม AI สไตล์โมเดิร์น */}
-              <div className="flex items-center justify-center gap-1.5 w-full">
+              <div className="flex items-center justify-center gap-1.5">
                 <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shadow-2xs shrink-0">
                   <XCircle className="size-3.5 text-rose-500 shrink-0" />
                   <span>ไม่ผ่านเกณฑ์</span>
@@ -642,16 +985,16 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                 </button>
               </div>
 
-              {/* บรรทัดล่าง: ป้ายแท็กสรุปสาเหตุสั้นๆ กระชับ ชัดเจน พร้อม Tooltip แสดงข้อความเต็มเมื่อชี้เมาส์ */}
+              {/* บรรทัดล่าง: ป้ายแท็กสรุปสาเหตุสั้นๆ กระชับ บรรทัดเดียวเสมอ พร้อม Tooltip แสดงข้อความเต็มเมื่อชี้เมาส์ */}
               <div
-                className="flex flex-wrap items-center justify-center gap-1 cursor-help"
+                className="flex items-center justify-center gap-1 cursor-help whitespace-nowrap"
                 title={`[รายละเอียดสาเหตุที่ไม่ผ่าน]\n${row.original.failures?.join('\n') || row.original.audit_reason}`}
               >
                 {tags.slice(0, 2).map((t, idx) => (
                   <span
                     key={idx}
                     className={cn(
-                      'text-xs font-medium px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs transition-colors',
+                      'text-[11px] font-medium px-2 py-0.5 rounded-md border inline-flex items-center gap-1 shadow-2xs transition-colors whitespace-nowrap',
                       t.color === 'amber'
                         ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-800 dark:text-amber-200 border-amber-300/80 dark:border-amber-500/30 font-semibold'
                         : t.color === 'purple'
@@ -873,24 +1216,104 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
               <Activity className="size-4 sm:size-4.5" />
             </div>
             <div>
-              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <h2 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white flex items-center gap-2 flex-wrap">
                 <span>ตรวจหัตถการแพทย์แผนไทย</span>
                 <span className="text-xs font-mono font-medium px-2 py-0.5 rounded-full bg-teal-500/20 text-teal-300 border border-teal-400/30 flex items-center gap-1">
                   <Cpu className="size-3" /> HOSxP Audit Engine
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                คลิกการ์ดสรุปตัวชี้วัดเพื่อกรองดูรายชื่อผู้ป่วยในแต่ละกลุ่ม
+              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span>ช่วงวันที่ {toThaiDate(range.startDate)} – {toThaiDate(range.endDate)}</span>
+                <span>•</span>
+                <span>คลิกการ์ดสรุปตัวชี้วัดเพื่อกรองดูรายชื่อผู้ป่วย</span>
+                {lastUpdatedTimeStr && (
+                  <>
+                    <span>•</span>
+                    <span className="inline-flex items-center gap-1 text-teal-600 dark:text-teal-400 font-medium">
+                      <span className={cn('size-1.5 rounded-full', isFetching ? 'bg-amber-400 animate-ping' : 'bg-emerald-400')} />
+                      <span>ซิงค์ล่าสุด {lastUpdatedTimeStr}</span>
+                    </span>
+                  </>
+                )}
               </p>
             </div>
           </div>
 
-          {/* Quick Action: Collapse/Expand KPI Cards */}
-          <div className="flex items-center gap-2">
+          {/* Right Actions: Real-time Auto-Sync + Manual Sync + Export Excel + Collapse/Expand KPI Cards */}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 1. Real-Time Auto-Sync Toggle & Interval Selector */}
+            <div className="inline-flex items-center h-8.5 rounded-xl bg-slate-100/90 dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] p-0.5 shadow-2xs">
+              <button
+                type="button"
+                onClick={handleToggleAutoSync}
+                className={cn(
+                  'inline-flex items-center gap-1.5 h-7.5 px-2.5 rounded-lg text-xs font-semibold transition cursor-pointer',
+                  autoSync
+                    ? 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                )}
+                title={autoSync ? 'คลิกเพื่อปิดซิงค์ข้อมูลอัตโนมัติ' : 'คลิกเพื่อเปิดซิงค์ข้อมูลอัตโนมัติแบบเรียลไทม์'}
+              >
+                <span
+                  className={cn(
+                    'size-2 rounded-full shrink-0',
+                    autoSync ? 'bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.8)]' : 'bg-slate-400 dark:bg-slate-600'
+                  )}
+                />
+                <span>ซิงค์อัตโนมัติ</span>
+                {autoSync && (
+                  <span className="font-mono text-[11px] font-bold px-1 py-0.2 rounded bg-emerald-500/20 text-emerald-700 dark:text-emerald-200 min-w-[26px] text-center">
+                    {countdown}s
+                  </span>
+                )}
+              </button>
+
+              {autoSync && (
+                <select
+                  value={syncIntervalSec}
+                  onChange={(e) => handleChangeSyncInterval(Number(e.target.value))}
+                  aria-label="ตั้งเวลาซิงค์อัตโนมัติ"
+                  title="ตั้งความถี่การซิงค์อัตโนมัติ"
+                  className="h-7.5 bg-transparent pl-1.5 pr-1 text-[11px] font-semibold text-slate-600 dark:text-slate-300 focus:outline-none cursor-pointer"
+                >
+                  <option value={10} className="bg-white dark:bg-slate-900">ทุก 10 วิ</option>
+                  <option value={15} className="bg-white dark:bg-slate-900">ทุก 15 วิ</option>
+                  <option value={30} className="bg-white dark:bg-slate-900">ทุก 30 วิ</option>
+                  <option value={60} className="bg-white dark:bg-slate-900">ทุก 1 นาที</option>
+                </select>
+              )}
+            </div>
+
+            {/* 2. Manual Real-Time Sync Button */}
+            <button
+              type="button"
+              onClick={handleManualSyncNow}
+              disabled={isFetching}
+              className="inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl text-xs font-bold bg-teal-500/15 hover:bg-teal-500/25 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition shadow-2xs cursor-pointer active:scale-95 disabled:opacity-60 shrink-0"
+              title="ดึงข้อมูลสดจากฐานข้อมูล HOSxP ทันที (Real-time Sync)"
+            >
+              <RefreshCw className={cn('size-3.5 text-teal-500', isFetching && 'animate-spin')} />
+              <span>{isFetching ? 'กำลังซิงค์...' : 'ซิงค์ทันที'}</span>
+            </button>
+
+            {/* 3. Export Excel Button */}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={filteredRecords.length === 0}
+              className="btn-pill-action inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-xs transition shrink-0"
+              title="ส่งออกรายงาน Excel ฉบับสมบูรณ์ (แยกชีตอัตโนมัติ: ทั้งหมด / เฉพาะไม่ผ่าน / เฉพาะยังไม่ปิดสิทธิ / สรุปรายผู้ให้บริการ)"
+            >
+              <Download className="size-3.5 text-white" />
+              <span className="hidden sm:inline">ส่งออก Excel ({filteredRecords.length})</span>
+              <span className="sm:hidden">Excel</span>
+            </button>
+
+            {/* 4. Collapse/Expand KPI Button */}
             <button
               type="button"
               onClick={() => setIsKpiCollapsed(!isKpiCollapsed)}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 transition shadow-2xs cursor-pointer"
+              className="inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl text-xs font-semibold bg-slate-100 hover:bg-slate-200/80 dark:bg-white/5 dark:hover:bg-white/10 text-slate-700 dark:text-slate-200 border border-slate-200/80 dark:border-white/10 transition shadow-2xs cursor-pointer"
               title={isKpiCollapsed ? 'ขยายดูการ์ดสรุปทั้งหมด' : 'ย่อการ์ดสรุปเพื่อประหยัดพื้นที่หน้าจอ'}
             >
               {isKpiCollapsed ? <ChevronDown className="size-3.5 text-teal-500" /> : <ChevronUp className="size-3.5 text-teal-500" />}
@@ -899,9 +1322,9 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
           </div>
         </div>
 
-        {/* If Collapsed: Render High-Density Single-Line Stat Ribbon */}
+        {/* If Collapsed: Render 5-Column Compact Stat Grid (100% Visible, Zero Clipping, Balanced) */}
         {isKpiCollapsed ? (
-          <div className="flex items-center gap-1.5 overflow-x-auto pt-2.5 mt-2.5 border-t border-slate-200/80 dark:border-white/10 scrollbar-none">
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-3 mt-3 border-t border-slate-200/80 dark:border-white/10">
             {kpiCards.map((card) => {
               const isSelected = kpiFilter === card.id
               const Icon = card.icon
@@ -911,22 +1334,33 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
                   type="button"
                   onClick={() => setKpiFilter(isSelected && card.id !== 'ALL' ? 'ALL' : card.id)}
                   className={cn(
-                    'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-medium whitespace-nowrap transition-all border cursor-pointer shrink-0 shadow-2xs',
+                    'flex items-center justify-between gap-2 px-3 py-1.5 rounded-xl text-xs font-medium transition-all border cursor-pointer shadow-2xs min-w-0',
                     isSelected
-                      ? cn(card.activeBorder, card.activeBg, 'ring-1 ring-current')
-                      : 'bg-white/90 dark:bg-slate-900/80 border-slate-200 dark:border-white/10 hover:border-slate-300 dark:hover:border-white/20'
+                      ? cn(card.activeBorder, card.activeBg, card.activeShadow, 'ring-1')
+                      : cn(
+                          'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 hover:shadow-xs',
+                          card.hoverBorder
+                        )
                   )}
                 >
-                  <Icon className="size-3 shrink-0" />
-                  <span className="text-slate-600 dark:text-slate-300 text-xs">{card.label}:</span>
-                  <strong className={cn('font-mono font-bold text-sm', card.valueColor)}>
-                    <AnimatedNumber value={card.value} />
-                  </strong>
-                  {card.rate !== undefined && (
-                    <span className="text-xs text-emerald-600 dark:text-emerald-400 font-bold">
-                      ({card.rate}%)
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className={cn('size-5 rounded-md grid place-items-center shrink-0 border', card.iconBg)}>
+                      <Icon className="size-3" />
+                    </div>
+                    <span className="text-slate-700 dark:text-slate-200 font-semibold truncate text-xs">
+                      {card.label}
                     </span>
-                  )}
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <strong className={cn('font-mono font-bold text-sm tabular-nums', card.valueColor)}>
+                      <AnimatedNumber value={card.value} />
+                    </strong>
+                    {card.rate !== undefined && (
+                      <span className="text-[10.5px] text-emerald-600 dark:text-emerald-300 font-bold px-1.5 py-0.2 rounded-full bg-emerald-500/10 border border-emerald-500/25">
+                        {card.rate}%
+                      </span>
+                    )}
+                  </div>
                 </button>
               )
             })}
@@ -995,75 +1429,234 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range }) => {
         )}
       </div>
 
-      {/* Filter Status Badge & Search Toolbar */}
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2 flex-wrap">
-          {kpiFilter !== 'ALL' && (
-            <div
-              className={cn(
-                'flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs shadow-2xs transition-all animate-in fade-in',
-                kpiFilter === 'PASS' && 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-500/30 text-emerald-800 dark:text-emerald-200',
-                kpiFilter === 'FAIL' && 'bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-500/30 text-rose-800 dark:text-rose-200',
-                kpiFilter === 'CLOSED_EP' && 'bg-teal-50 dark:bg-teal-950/40 border-teal-200 dark:border-teal-500/30 text-teal-800 dark:text-teal-200',
-                (kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-500/30 text-red-800 dark:text-red-200',
-                kpiFilter === 'VISIT2_CLAIM' && 'bg-orange-50 dark:bg-orange-950/40 border-orange-200 dark:border-orange-500/30 text-orange-800 dark:text-orange-200',
-                kpiFilter === 'DUPLICATE' && 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-500/30 text-amber-800 dark:text-amber-200',
-                kpiFilter === 'KNEE' && 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-200 dark:border-cyan-500/30 text-cyan-800 dark:text-cyan-200',
-                kpiFilter === 'MUSCLE' && 'bg-violet-50 dark:bg-violet-950/40 border-violet-200 dark:border-violet-500/30 text-violet-800 dark:text-violet-200',
-                kpiFilter === 'POSTPARTUM' && 'bg-fuchsia-50 dark:bg-fuchsia-950/40 border-fuchsia-200 dark:border-fuchsia-500/30 text-fuchsia-800 dark:text-fuchsia-200'
+      {/* Comprehensive Filter Bar Card (Row 1: Date Bar + Search/HN/Density | Row 2: Segmented Status Pills + Icon Dropdown Filters) */}
+      <section className="rounded-2xl bg-themed-card border border-themed p-3 sm:p-3.5 shadow-xs space-y-2.5">
+        {/* Row 1: Inline Date Picker Bar (Left) + HN / Search / Reset / Density (Right) */}
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2.5 pb-2.5 border-b border-slate-200/80 dark:border-white/10">
+          {/* Left: Full Inline Date Navigation & Range Picker */}
+          <div className="min-w-0 overflow-x-auto scrollbar-none">
+            {onRangeChange && (
+              <ThaiDatePickerModal
+                range={range}
+                onChange={(nextRange) => {
+                  setVisitDateFilter('ALL')
+                  onRangeChange(nextRange)
+                }}
+              />
+            )}
+          </div>
+
+          {/* Right: HN Input + Search Box + Reset + Density */}
+          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+            {/* HN Filter Box */}
+            <div className="flex items-center gap-1.5 h-8.5 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] px-3 shadow-2xs shrink-0 focus-within:ring-2 focus-within:ring-teal-500/40 focus-within:border-teal-500/50 transition">
+              <label htmlFor="healthmed-filter-hn" className="text-xs font-bold text-slate-400 dark:text-slate-400 select-none">
+                HN
+              </label>
+              <input
+                id="healthmed-filter-hn"
+                inputMode="numeric"
+                value={hnFilter}
+                onChange={(e) => setHnFilter(e.target.value.replace(/\D/g, ''))}
+                placeholder="000009716"
+                className="w-20 bg-transparent font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
+              />
+              {hnFilter && (
+                <button
+                  type="button"
+                  onClick={() => setHnFilter('')}
+                  className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                  aria-label="ล้าง HN"
+                >
+                  <X className="size-3" />
+                </button>
               )}
-            >
-              <span className="size-2 rounded-full bg-current animate-pulse shrink-0" />
-              <span className="opacity-75 text-xs">กลุ่ม:</span>
-              <strong className="font-bold text-xs">
-                {kpiFilter === 'PASS' && 'ผ่านเกณฑ์'}
-                {kpiFilter === 'FAIL' && 'ไม่ผ่าน / พบปัญหา'}
-                {kpiFilter === 'CLOSED_EP' && 'ปิดสิทธิแล้ว (EP)'}
-                {(kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && 'ยังไม่ปิดสิทธิ'}
-                {kpiFilter === 'VISIT2_CLAIM' && 'ปัญหาเลขปิดสิทธิ Visit 2'}
-                {kpiFilter === 'DUPLICATE' && 'คิดค่าบริการซ้ำ'}
-                {kpiFilter === 'KNEE' && 'ข้อเข่า (M179+U5753)'}
-                {kpiFilter === 'MUSCLE' && 'กล้ามเนื้อ (M+U)'}
-                {kpiFilter === 'POSTPARTUM' && 'บริบาลหลังคลอด'}
-              </strong>
-              <span className="font-mono font-bold text-xs">({filteredRecords.length})</span>
+            </div>
+
+            {/* Search Box */}
+            <div className="relative flex-1 sm:w-44 lg:w-48">
+              <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="ค้นหาชื่อ, HN, แพทย์, EP/PP..."
+                className="w-full h-8.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 shadow-2xs transition"
+              />
+              {search && (
+                <button
+                  type="button"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                  aria-label="ล้างคำค้นหา"
+                >
+                  <X className="size-3" />
+                </button>
+              )}
+            </div>
+
+            {/* Reset All Filters Button */}
+            {hasActiveFilters && (
               <button
                 type="button"
-                onClick={() => setKpiFilter('ALL')}
-                className="ml-0.5 p-0.5 rounded-md hover:bg-black/10 dark:hover:bg-white/20 transition cursor-pointer"
-                title="ล้างตัวกรอง"
+                onClick={handleResetFilters}
+                className="inline-flex items-center gap-1 h-8.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/25 text-xs font-bold transition cursor-pointer shadow-2xs shrink-0"
+                title="ล้างตัวกรองทั้งหมด"
               >
-                <X className="size-3" />
+                <RotateCcw className="size-3" />
+                <span>ล้าง ({filteredRecords.length})</span>
               </button>
-            </div>
-          )}
-        </div>
+            )}
 
-        <div className="flex items-center gap-2">
-          {/* Density Switch Button */}
-          <button
-            type="button"
-            onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
-            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 text-xs font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-white/5 transition shadow-2xs cursor-pointer"
-            title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
-          >
-            <SlidersHorizontal className="size-3 text-teal-500" />
-            <span className="text-xs font-semibold">{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
-          </button>
+            {/* Density Switch Button */}
+            <button
+              type="button"
+              onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
+              className="inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d] transition shadow-2xs cursor-pointer shrink-0"
+              title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
+            >
+              <SlidersHorizontal className="size-3.5 text-teal-500" />
+              <span>{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
+            </button>
 
-          {/* Search Box */}
-          <div className="relative min-w-[220px] sm:min-w-[260px]">
-            <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="ค้นหา HN, ผู้ป่วย, แพทย์..."
-              className="w-full rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-slate-900/80 pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-teal-500/50 focus:border-teal-500 shadow-2xs"
-            />
+            {/* Export Excel Button in Filter Bar */}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={filteredRecords.length === 0}
+              className="btn-pill-action inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-xs transition shrink-0"
+              title="ส่งออกรายงาน Excel ฉบับสมบูรณ์ (แยกชีตอัตโนมัติ: ทั้งหมด / เฉพาะไม่ผ่าน / เฉพาะยังไม่ปิดสิทธิ / สรุปรายผู้ให้บริการ)"
+            >
+              <Download className="size-3.5 text-white" />
+              <span>Excel</span>
+            </button>
           </div>
         </div>
-      </div>
+
+        {/* Row 2: 5-Column Equal Grid for Enterprise Filter Dropdowns (100% Aligned, Zero Clipping, Zero Orphan Wrapping) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+          {/* 1. Claim Close Status Dropdown */}
+          <div className="relative min-w-0">
+            <ShieldCheck className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-violet-500 dark:text-violet-400 pointer-events-none" />
+            <select
+              value={claimStatusFilter}
+              onChange={(e) => setClaimStatusFilter(e.target.value as typeof claimStatusFilter)}
+              aria-label="กรองตามสถานะการปิดสิทธิ"
+              className={cn(
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                claimStatusFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+            >
+              <option value="ALL">ทุกสถานะสิทธิ ({rawRecords.length} ราย)</option>
+              <option value="CLOSED">✓ ปิดสิทธิแล้ว EP ({kpi?.closedCount ?? 0} ราย)</option>
+              <option value="UNCLOSED">✕ ยังไม่ปิดสิทธิรวม ({kpi?.unclosedCount ?? 0} ราย)</option>
+              <option value="OPEN_ONLY">⏳ รอปิดสิทธิ PP ({kpi?.unclosedOpenOnlyCount ?? 0} ราย)</option>
+              <option value="VISIT2_DUP">⚠️ Visit 2 ซ้ำ V1 ({kpi?.unclosedVisit2DupCount ?? 0} ราย)</option>
+              <option value="NONE">✕ ไม่มีเลขสิทธิ ({kpi?.unclosedNoneCount ?? 0} ราย)</option>
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* 2. Specific Visit Date Dropdown */}
+          <div className="relative min-w-0">
+            <Clock className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-cyan-500 dark:text-cyan-400 pointer-events-none" />
+            <select
+              value={visitDateFilter}
+              onChange={(e) => setVisitDateFilter(e.target.value)}
+              aria-label="กรองตามวันที่รับบริการ"
+              className={cn(
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                visitDateFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+            >
+              <option value="ALL">ทุกวันที่ในช่วง ({filterOptions.dates.length} วัน)</option>
+              {filterOptions.dates.map(([d, count]) => (
+                <option key={d} value={d}>
+                  {toThaiDate(d)} ({count} ราย)
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* 3. Provider / Doctor Dropdown */}
+          <div className="relative min-w-0">
+            <Stethoscope className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-teal-500 dark:text-teal-400 pointer-events-none" />
+            <select
+              value={doctorFilter}
+              onChange={(e) => setDoctorFilter(e.target.value)}
+              aria-label="กรองตามผู้ให้บริการ"
+              className={cn(
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                doctorFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+            >
+              <option value="ALL">ผู้ให้บริการทั้งหมด ({filterOptions.doctors.length})</option>
+              {filterOptions.doctors.map(([doc, count]) => (
+                <option key={doc} value={doc}>
+                  {doc} ({count})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* 4. Pttype / Right Dropdown */}
+          <div className="relative min-w-0">
+            <FileText className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 dark:text-indigo-400 pointer-events-none" />
+            <select
+              value={pttypeFilter}
+              onChange={(e) => setPttypeFilter(e.target.value)}
+              aria-label="กรองตามสิทธิการรักษา"
+              className={cn(
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                pttypeFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+            >
+              <option value="ALL">สิทธิการรักษาทั้งหมด ({filterOptions.pttypes.length})</option>
+              {filterOptions.pttypes.map(([pt, count]) => (
+                <option key={pt} value={pt}>
+                  {pt} ({count})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+
+          {/* 5. Service / Procedure Type Dropdown */}
+          <div className="relative min-w-0">
+            <Activity className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-emerald-500 dark:text-emerald-400 pointer-events-none" />
+            <select
+              value={serviceFilter}
+              onChange={(e) => setServiceFilter(e.target.value as typeof serviceFilter)}
+              aria-label="กรองตามประเภทหัตถการ"
+              className={cn(
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                serviceFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+            >
+              <option value="ALL">ทุกหัตถการ / บริการ</option>
+              <option value="58130">ค่านวดและประคบ (58130)</option>
+              <option value="58101">ค่านวดเพื่อการรักษา (58101)</option>
+              <option value="58201">ค่าประคบสมุนไพร (58201)</option>
+              <option value="KNEE">พอกเข่า / ข้อเข่าเสื่อม (M179/U5753)</option>
+              <option value="POSTPARTUM">บริบาลหลังคลอด (U506/58131)</option>
+              <option value="VISIT2">เฉพาะ Visit 2+ (มารับบริการซ้ำ)</option>
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+          </div>
+        </div>
+      </section>
 
       {/* Main DataTable Container */}
       <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-themed-card shadow-xs overflow-hidden">

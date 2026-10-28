@@ -494,8 +494,8 @@ const DashboardView: FC = () => {
       )}
 
       {/* Page: ตรวจสอบหัตถการและค่าบริการแพทย์แผนไทย */}
-      {shownPage === 'healthmed' && <HealthMedAuditView range={range} />}
-      {shownPage === 'claims' && <ClaimsCheckView range={range} />}
+      {shownPage === 'healthmed' && <HealthMedAuditView range={range} onRangeChange={handleRangeChange} />}
+      {shownPage === 'claims' && <ClaimsCheckView range={range} onRangeChange={handleRangeChange} />}
 
       {/* Page: รายได้แผนไทย (เฉพาะ IT / ผู้ดูแลแผนไทย) */}
       {shownPage === 'thaimedvalue' && <ThaiMedValueView range={range} onRangeChange={handleRangeChange} />}
