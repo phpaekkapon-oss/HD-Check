@@ -1,6 +1,6 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { herbDxApi } from '@/api/herbdx.api'
-import type { AuditFilterParams, DateRange, DxMapUpdate, DispensingRule, MenuPermissionMatrix, ThaiMedDuplicateRules } from '@/types/herbdx.types'
+import type { AuditFilterParams, DateRange, DxMapUpdate, DxMapBatchItem, DispensingRule, MenuPermissionMatrix, ThaiMedDuplicateRules } from '@/types/herbdx.types'
 
 export const herbDxKeys = {
   all: ['herbdx'] as const,
@@ -113,7 +113,7 @@ export function useUpdateDxMap() {
 export function useBatchUpdateDxMap() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: (items: readonly { icode: string; drug_name?: string; dx_prefixes: string; indication?: string; mergeWithExisting?: boolean }[]) =>
+    mutationFn: (items: readonly DxMapBatchItem[]) =>
       herbDxApi.batchUpdateDxMap({ items }),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: herbDxKeys.dxMap() })
@@ -164,6 +164,17 @@ export function useSaveDispensingRule() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (rule: Partial<DispensingRule>) => herbDxApi.saveDispensingRule(rule),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
+      await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })
+    },
+  })
+}
+
+export function useBatchSaveDispensingRules() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (rules: Partial<DispensingRule>[]) => herbDxApi.batchSaveDispensingRules(rules),
     onSuccess: async () => {
       await qc.invalidateQueries({ queryKey: herbDxKeys.dispensingRules() })
       await qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'prescriptions'] })

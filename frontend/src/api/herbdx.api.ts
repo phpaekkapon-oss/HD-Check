@@ -201,6 +201,12 @@ export const herbDxApi = {
       body: JSON.stringify(rule),
     }),
 
+  batchSaveDispensingRules: (rules: Partial<DispensingRule>[]) =>
+    request<{ success: true; count: number }>('/api/dispensing-rules/batch', {
+      method: 'POST',
+      body: JSON.stringify({ rules }),
+    }),
+
   toggleDispensingRule: (id: number, isActive: boolean) =>
     request<{ success: true }>(`/api/dispensing-rules/${id}/toggle`, {
       method: 'PUT',

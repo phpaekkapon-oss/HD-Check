@@ -14,6 +14,8 @@ import {
   Copy,
   BookOpen,
   Info,
+  Download,
+  Upload,
 } from 'lucide-react'
 import {
   useDispensingRules,
@@ -28,6 +30,8 @@ import { ConfirmModal } from './ConfirmModal'
 import { PaginationBar } from '@/components/PaginationBar'
 import { LoadingSkeleton } from '@/components/LoadingSkeleton'
 import { usePagination } from '@/hooks/usePagination'
+import { exportDispensingRulesToExcel } from '@/lib/dispensingRulesExcel'
+import { DispensingRulesImportModal } from './DispensingRulesImportModal'
 
 interface DispensingRulesTabProps {
   readonly dxMap: readonly DxMapRecord[]
@@ -82,6 +86,22 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRule, setEditingRule] = useState<DispensingRule | null>(null)
+
+  // State for Excel Import & Export
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    try {
+      await exportDispensingRulesToExcel(rules)
+    } catch (err) {
+      console.error(err)
+      window.alert('ส่งออกไฟล์ Excel ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+    } finally {
+      setIsExportingExcel(false)
+    }
+  }
 
   // ICD Codes viewing & expansion
   const [viewingDxDrug, setViewingDxDrug] = useState<{
@@ -449,10 +469,42 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
             className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
-        <div className="flex items-center justify-between sm:justify-end gap-2.5 w-full sm:w-auto">
-          <div className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0">
+        <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+          <div className="text-xs sm:text-xs text-slate-500 dark:text-slate-400 font-medium sm:shrink-0 mr-1">
             เปิดใช้งาน <strong className="font-bold text-slate-800 dark:text-slate-200">{rules.filter((r) => r.is_active).length}</strong>/{rules.length} เงื่อนไข
           </div>
+
+          {/* ปุ่มส่งออก Excel */}
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            disabled={isExportingExcel || rules.length === 0}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-1.5 sm:py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition cursor-pointer disabled:opacity-50"
+            title="ส่งออกรายการเงื่อนไขรอบการจ่ายยาสมุนไพรทั้งหมดเป็นไฟล์ Excel (.xlsx) เพื่อนำไปแก้ไขรอบการจ่ายหรือสถานะ"
+          >
+            {isExportingExcel ? (
+              <Loader2 className="size-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+            ) : (
+              <Download className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+            )}
+            <span className="hidden sm:inline">ส่งออก Excel</span>
+            <span className="sm:hidden">ส่งออก</span>
+          </button>
+
+          {/* ปุ่มนำเข้า Excel (เฉพาะผู้มีสิทธิ์จัดการ) */}
+          {canEdit && (
+            <button
+              type="button"
+              onClick={() => setIsImportModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-950/30 px-3 py-1.5 sm:py-1.5 text-xs font-semibold text-violet-800 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition cursor-pointer"
+              title="นำเข้าไฟล์ Excel เงื่อนไขรอบการจ่ายที่แก้ไขแล้วกลับเข้าสู่ระบบ พร้อมแสดงตัวอย่างเปรียบเทียบก่อนบันทึก"
+            >
+              <Upload className="size-3.5 text-violet-600 dark:text-violet-400" />
+              <span className="hidden sm:inline">นำเข้า Excel</span>
+              <span className="sm:hidden">นำเข้า</span>
+            </button>
+          )}
+
           {canEdit && (
             <button
               type="button"
@@ -1244,6 +1296,13 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
           </div>
         </div>
       )}
+
+      {/* Excel Import Modal */}
+      <DispensingRulesImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        existingRules={rules}
+      />
     </div>
   )
 }

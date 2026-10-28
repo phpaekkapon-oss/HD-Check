@@ -8,9 +8,11 @@ import {
   type SortingState,
   flexRender,
 } from '@tanstack/react-table'
-import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers, CircleHelp, RefreshCw } from 'lucide-react'
+import { Edit3, Check, X, Search, Info, FlaskConical, ShieldAlert, Plus, Loader2, BadgeCheck, Clock, Layers, CircleHelp, RefreshCw, Download, Upload } from 'lucide-react'
 import { DispensingRulesTab } from '@/components/DispensingRulesTab'
 import { ThaiMedRulesTab } from '@/components/ThaiMedRulesTab'
+import { DxMapImportModal } from '@/components/DxMapImportModal'
+import { exportDxMapToExcel } from '@/lib/dxMapExcel'
 import { herbDxApi } from '@/api/herbdx.api'
 import { useAuth } from '@/context/AuthContext'
 import { useDxMap, useUpdateDxMap, useSyncHosxpMinQty } from '@/hooks/useHerbDx'
@@ -152,6 +154,381 @@ const QUICK_FILTERS: readonly { readonly id: QuickFilter; readonly label: string
   { id: 'min-qty', label: 'มีจ่ายขั้นต่ำ (UC)', test: (d) => (d.min_qty ?? 0) > 0 },
 ]
 
+interface DxPrefixesEditorProps {
+  readonly prefixes: string
+  readonly onChange: (value: string) => void
+  readonly onPreviewReset?: () => void
+  readonly placeholder?: string
+  readonly helperText?: string
+  readonly compact?: boolean
+}
+
+/**
+ * ตัวแก้ไขรายการรหัส ICD-10 พร้อมแถบชิป, เช็คบ็อกซ์เลือกทั้งหมด / ติ๊กออก, ปุ่มค้นหา, กรองค้นหาแบบเรียลไทม์ และปุ่มเพิ่มรหัสด่วน
+ */
+function DxPrefixesEditor({
+  prefixes,
+  onChange,
+  onPreviewReset,
+  placeholder = 'พิมพ์รหัส ICD-10 คั่นด้วยจุลภาค เช่น K30, R14, U6680',
+  helperText,
+  compact = false,
+}: DxPrefixesEditorProps) {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [isSearchOpen, setIsSearchOpen] = useState(false)
+  const [unselectedCodes, setUnselectedCodes] = useState<string[]>([])
+  const searchInputRef = useRef<HTMLInputElement>(null)
+  const masterCheckboxRef = useRef<HTMLInputElement>(null)
+
+  // Current active codes from props string
+  const activeCodes = useMemo(() => {
+    return prefixes
+      ? prefixes
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean)
+      : []
+  }, [prefixes])
+
+  // All chips (both active and unchecked)
+  const allChips = useMemo(() => {
+    const list: { code: string; selected: boolean }[] = []
+    const seen = new Set<string>()
+
+    for (const c of activeCodes) {
+      const upper = c.toUpperCase()
+      if (!seen.has(upper)) {
+        seen.add(upper)
+        list.push({ code: c, selected: true })
+      }
+    }
+
+    for (const c of unselectedCodes) {
+      const upper = c.toUpperCase()
+      if (!seen.has(upper)) {
+        seen.add(upper)
+        list.push({ code: c, selected: false })
+      }
+    }
+
+    return list
+  }, [activeCodes, unselectedCodes])
+
+  const totalCount = allChips.length
+  const selectedCount = activeCodes.length
+  const unselectedCount = totalCount - selectedCount
+  const allChecked = totalCount > 0 && selectedCount === totalCount
+  const isIndeterminate = selectedCount > 0 && selectedCount < totalCount
+
+  useEffect(() => {
+    if (masterCheckboxRef.current) {
+      masterCheckboxRef.current.indeterminate = isIndeterminate
+    }
+  }, [isIndeterminate])
+
+  const hasManyCodes = totalCount >= 8
+  const trimmedQuery = searchQuery.trim().toUpperCase()
+
+  const filteredChips = useMemo(() => {
+    if (!trimmedQuery) return allChips
+    return allChips.filter((chip) => chip.code.toUpperCase().includes(trimmedQuery))
+  }, [allChips, trimmedQuery])
+
+  const canAddSearchedCode = useMemo(() => {
+    if (!trimmedQuery) return false
+    const clean = trimmedQuery.replace(/[^A-Z0-9]/g, '')
+    if (!clean) return false
+    return !allChips.some((chip) => chip.code.toUpperCase() === clean)
+  }, [trimmedQuery, allChips])
+
+  const handleToggleCode = (code: string) => {
+    const upper = code.toUpperCase()
+    const isCurrentlyActive = activeCodes.some((c) => c.toUpperCase() === upper)
+
+    if (isCurrentlyActive) {
+      // Uncheck it!
+      const nextActive = activeCodes.filter((c) => c.toUpperCase() !== upper)
+      onChange(nextActive.join(', '))
+      onPreviewReset?.()
+      setUnselectedCodes((prev) => (prev.some((c) => c.toUpperCase() === upper) ? prev : [...prev, code]))
+    } else {
+      // Check it!
+      const nextActive = [...activeCodes, code]
+      onChange(nextActive.join(', '))
+      onPreviewReset?.()
+      setUnselectedCodes((prev) => prev.filter((c) => c.toUpperCase() !== upper))
+    }
+  }
+
+  const handleToggleMasterCheckbox = () => {
+    if (allChecked) {
+      // Deselect all
+      const allCodesList = allChips.map((c) => c.code)
+      setUnselectedCodes(allCodesList)
+      onChange('')
+      onPreviewReset?.()
+    } else {
+      // Select all
+      const allCodesList = allChips.map((c) => c.code)
+      setUnselectedCodes([])
+      onChange(allCodesList.join(', '))
+      onPreviewReset?.()
+    }
+  }
+
+  const handleDeleteCodePermanently = (code: string) => {
+    const upper = code.toUpperCase()
+    const nextActive = activeCodes.filter((c) => c.toUpperCase() !== upper)
+    onChange(nextActive.join(', '))
+    onPreviewReset?.()
+    setUnselectedCodes((prev) => prev.filter((c) => c.toUpperCase() !== upper))
+  }
+
+  const handlePurgeUnselected = () => {
+    setUnselectedCodes([])
+  }
+
+  const handleAddSearchedCode = () => {
+    if (!trimmedQuery) return
+    const newItems = trimmedQuery
+      .split(/[,\s]+/)
+      .map((p) => p.trim().replace(/[^A-Z0-9]/gi, '').toUpperCase())
+      .filter((p) => p && !allChips.some((c) => c.code.toUpperCase() === p))
+
+    if (newItems.length === 0) return
+    const nextActive = [...activeCodes, ...newItems]
+    onChange(nextActive.join(', '))
+    onPreviewReset?.()
+    setSearchQuery('')
+  }
+
+  const handleClearAll = () => {
+    setUnselectedCodes([])
+    onChange('')
+    onPreviewReset?.()
+    setSearchQuery('')
+  }
+
+  const handleToggleSearch = () => {
+    setIsSearchOpen((prev) => {
+      const next = !prev
+      if (next) {
+        setTimeout(() => searchInputRef.current?.focus(), 50)
+      } else {
+        setSearchQuery('')
+      }
+      return next
+    })
+  }
+
+  const showSearchInput = isSearchOpen || hasManyCodes || Boolean(searchQuery)
+
+  return (
+    <div className={cn('space-y-2 py-1', compact ? 'w-full' : 'min-w-[380px] lg:min-w-[460px] max-w-[600px]')}>
+      {totalCount > 0 ? (
+        <div className="p-2.5 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] space-y-2">
+          {/* แถบหัวเรื่อง: Master Checkbox + จำนวนที่เลือก + ปุ่มค้นหา + ปุ่มลบ */}
+          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <label
+                className="inline-flex items-center gap-1.5 cursor-pointer select-none font-medium text-slate-700 dark:text-slate-200 hover:text-violet-600 dark:hover:text-violet-300 transition-colors"
+                title={allChecked ? 'คลิกเพื่อยกเลิกการเลือกทั้งหมด' : 'คลิกเพื่อเลือกทั้งหมด'}
+              >
+                <input
+                  ref={masterCheckboxRef}
+                  type="checkbox"
+                  checked={allChecked}
+                  onChange={handleToggleMasterCheckbox}
+                  className="rounded border-slate-300 dark:border-slate-600 text-violet-600 focus:ring-violet-500 size-3.5 cursor-pointer accent-violet-600"
+                />
+                <span>
+                  {allChecked ? (
+                    <>เลือกทั้งหมด (<strong>{totalCount}</strong> รหัส)</>
+                  ) : (
+                    <>เลือกแล้ว <strong>{selectedCount}</strong> / {totalCount} รหัส</>
+                  )}
+                </span>
+              </label>
+
+              {unselectedCount > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300 font-semibold">
+                  ติ๊กออก {unselectedCount}
+                </span>
+              )}
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              {unselectedCount > 0 && (
+                <button
+                  type="button"
+                  onClick={handlePurgeUnselected}
+                  className="text-[11px] text-slate-500 hover:text-rose-500 dark:hover:text-rose-400 cursor-pointer underline mr-1"
+                  title="ลบรหัสที่ติ๊กออกออกจากรายการทั้งหมด"
+                >
+                  ลบรหัสที่ติ๊กออก ({unselectedCount})
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={handleToggleSearch}
+                className={cn(
+                  'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md border font-medium transition-all cursor-pointer',
+                  showSearchInput
+                    ? 'bg-violet-500/15 text-violet-700 dark:text-violet-300 border-violet-500/30'
+                    : 'bg-white/80 dark:bg-white/5 text-slate-600 dark:text-slate-300 border-slate-300 dark:border-white/10 hover:bg-slate-200 dark:hover:bg-white/10'
+                )}
+                title={showSearchInput ? 'ซ่อนช่องค้นหา' : 'ค้นหารหัสในรายการ'}
+              >
+                <Search className="size-3" />
+                <span>ค้นหา</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleClearAll}
+                className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
+              >
+                ลบทั้งหมด
+              </button>
+            </div>
+          </div>
+
+          {/* กล่องค้นหารหัสในรายการ พร้อมปุ่มล้างคำค้น */}
+          {showSearchInput && (
+            <div className="relative flex items-center">
+              <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-slate-400 pointer-events-none" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    handleAddSearchedCode()
+                  } else if (e.key === 'Escape') {
+                    setSearchQuery('')
+                    setIsSearchOpen(false)
+                  }
+                }}
+                placeholder="ค้นหารหัสในรายการ (พิมพ์แล้วกด Enter เพื่อเพิ่ม)..."
+                className="w-full pl-8 pr-16 py-1 text-xs rounded-lg border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#15182d] text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-violet-500"
+              />
+              <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setSearchQuery('')}
+                    className="p-1 rounded-md text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                    title="ล้างคำค้นหา"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* รายการชิปรหัส พร้อม Checkbox ในตัว */}
+          {filteredChips.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5 max-h-36 overflow-y-auto pr-1">
+              {filteredChips.map((chip) => {
+                const isSelected = chip.selected
+                const isU = chip.code.toUpperCase().startsWith('U')
+                const isExactMatch = trimmedQuery && chip.code.toUpperCase() === trimmedQuery
+
+                return (
+                  <span
+                    key={chip.code}
+                    onClick={() => handleToggleCode(chip.code)}
+                    className={cn(
+                      'group inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border transition-all shadow-2xs select-none cursor-pointer',
+                      isExactMatch
+                        ? 'ring-2 ring-violet-500 ring-offset-1 dark:ring-offset-[#101326]'
+                        : '',
+                      isSelected
+                        ? isU
+                          ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40 hover:bg-purple-500/25'
+                          : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40 hover:bg-emerald-100/70'
+                        : 'bg-slate-100/80 dark:bg-white/5 text-slate-400 dark:text-slate-500 border-dashed border-slate-300 dark:border-white/10 opacity-70 hover:opacity-100 line-through'
+                    )}
+                    title={isSelected ? `คลิกเพื่อติ๊กออก (ไม่เอารหัส ${chip.code})` : `คลิกเพื่อเลือก (เอารหัส ${chip.code})`}
+                  >
+                    {/* Checkbox indicator */}
+                    <span
+                      className={cn(
+                        'size-3.5 rounded flex items-center justify-center shrink-0 transition-colors',
+                        isSelected
+                          ? isU
+                            ? 'bg-purple-600 dark:bg-purple-500 text-white'
+                            : 'bg-emerald-600 dark:bg-emerald-500 text-white'
+                          : 'border border-slate-400 dark:border-slate-500 bg-white dark:bg-black/30'
+                      )}
+                    >
+                      {isSelected && <Check className="size-2.5 stroke-[3]" />}
+                    </span>
+
+                    <span className={cn(!isSelected && 'line-through')}>{chip.code}</span>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        handleDeleteCodePermanently(chip.code)
+                      }}
+                      title={`คลิกเพื่อลบรหัส ${chip.code} ออกจากรายการ`}
+                      className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 dark:hover:bg-rose-600 transition-colors cursor-pointer"
+                    >
+                      <X className="size-3" />
+                    </button>
+                  </span>
+                )
+              })}
+            </div>
+          ) : (
+            <div className="py-2.5 px-2 text-center bg-white/50 dark:bg-black/20 rounded-lg space-y-1.5 border border-dashed border-slate-300 dark:border-white/10">
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                ไม่พบรหัส <code className="text-violet-600 dark:text-violet-400 font-bold font-mono">{searchQuery.trim()}</code> ในรายการนี้
+              </p>
+              {canAddSearchedCode && (
+                <button
+                  type="button"
+                  onClick={handleAddSearchedCode}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-violet-600 hover:bg-violet-700 text-white cursor-pointer transition-colors shadow-2xs"
+                >
+                  <Plus className="size-3.5" />
+                  เพิ่มรหัส "{searchQuery.trim().toUpperCase()}"
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-[11px] text-rose-500 dark:text-rose-400 italic px-1">
+          ยังไม่มีรหัส (พิมพ์รหัสในช่องด้านล่าง เช่น K30, R14, U6680)
+        </div>
+      )}
+
+      {/* กล่องข้อความแบบกว้างและหลายบรรทัด สำหรับพิมพ์เพิ่ม ลบ หรือวางหลายรหัส */}
+      <div className="space-y-1">
+        <textarea
+          rows={2}
+          value={prefixes}
+          onChange={(e) => {
+            onChange(e.target.value)
+            onPreviewReset?.()
+          }}
+          placeholder={placeholder}
+          className="w-full min-h-[56px] rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y leading-relaxed"
+        />
+        <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
+          <span>{helperText || 'คั่นรหัสด้วยจุลภาค (,) พิมพ์รหัสเดี่ยวหรือคำนำหน้ากลุ่มโรคได้ • คลิกที่ชิปรหัสเพื่อติ๊กออก/เลือก'}</span>
+          {!compact && <span className="hidden sm:inline text-slate-400">ขยายความสูงได้จากมุมขวาล่าง</span>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }) => {
   const { user } = useAuth()
   const canEdit = canManageHerbDx(user)
@@ -188,6 +565,22 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
   const [newIndication, setNewIndication] = useState('')
   const [newIntervalDays, setNewIntervalDays] = useState<number>(0)
   const [addError, setAddError] = useState<string | null>(null)
+
+  // State for Excel Import & Export
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false)
+  const [isExportingExcel, setIsExportingExcel] = useState(false)
+
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true)
+    try {
+      await exportDxMapToExcel(dxMap)
+    } catch (err) {
+      console.error(err)
+      window.alert('ส่งออกไฟล์ Excel ไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
+    } finally {
+      setIsExportingExcel(false)
+    }
+  }
 
   const handleSyncHosxpMinQty = () => {
     setSyncStatusMsg(null)
@@ -440,91 +833,12 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           const item = row.original
           const isEditing = editingIcode === item.icode
           if (isEditing) {
-            const editCodes = prefixes
-              ? prefixes
-                  .split(',')
-                  .map((p) => p.trim())
-                  .filter(Boolean)
-              : []
-
-            const handleRemoveCode = (codeToRemove: string) => {
-              const remaining = editCodes.filter(
-                (c) => c.toUpperCase() !== codeToRemove.toUpperCase()
-              )
-              setPrefixes(remaining.join(', '))
-              setPreview(null)
-            }
-
             return (
-              <div className="min-w-[380px] lg:min-w-[460px] max-w-[600px] space-y-2 py-1">
-                {/* แถบชิปรหัส ICD-10 พร้อมปุ่ม ✕ สำหรับคลิกลบออกทีละรหัสได้ทันที */}
-                {editCodes.length > 0 ? (
-                  <div className="p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
-                      <span>รหัสปัจจุบัน (<strong>{editCodes.length}</strong> รหัส) • คลิก ✕ เพื่อลบออก</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setPrefixes('')
-                          setPreview(null)
-                        }}
-                        className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
-                      >
-                        ลบทั้งหมด
-                      </button>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-1.5 max-h-36 overflow-y-auto pr-1">
-                      {editCodes.map((p) => {
-                        const isU = p.toUpperCase().startsWith('U')
-                        return (
-                          <span
-                            key={p}
-                            className={cn(
-                              'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border transition-all shadow-2xs',
-                              isU
-                                ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
-                                : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
-                            )}
-                          >
-                            <span>{p}</span>
-                            <button
-                              type="button"
-                              onClick={() => handleRemoveCode(p)}
-                              title={`คลิกเพื่อลบรหัส ${p}`}
-                              className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 dark:hover:bg-rose-600 transition-colors cursor-pointer"
-                            >
-                              <X className="size-3" />
-                            </button>
-                          </span>
-                        )
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className="text-[11px] text-rose-500 dark:text-rose-400 italic px-1">
-                    ยังไม่มีรหัส (พิมพ์รหัสในช่องด้านล่าง เช่น K30, R14, U6680)
-                  </div>
-                )}
-
-                {/* กล่องข้อความแบบกว้างและหลายบรรทัด สำหรับพิมพ์เพิ่ม ลบ หรือวางหลายรหัส */}
-                <div className="space-y-1">
-                  <textarea
-                    rows={2}
-                    value={prefixes}
-                    onChange={(e) => {
-                      setPrefixes(e.target.value)
-                      setPreview(null)
-                    }}
-                    placeholder="พิมพ์รหัส ICD-10 คั่นด้วยจุลภาค เช่น K30, R14, U6680"
-                    className="w-full min-h-[56px] rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y leading-relaxed"
-                    autoFocus
-                  />
-                  <div className="flex items-center justify-between text-[11px] text-slate-400 px-0.5">
-                    <span>คั่นรหัสด้วยจุลภาค (,) พิมพ์รหัสเดี่ยวหรือคำนำหน้ากลุ่มโรคได้</span>
-                    <span className="hidden sm:inline text-slate-400">ขยายความสูงได้จากมุมขวาล่าง</span>
-                  </div>
-                </div>
-              </div>
+              <DxPrefixesEditor
+                prefixes={prefixes}
+                onChange={setPrefixes}
+                onPreviewReset={() => setPreview(null)}
+              />
             )
           }
           const allCodes = item.dx_prefixes
@@ -828,6 +1142,37 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
             />
           </div>
           <div className="flex items-center justify-end gap-2 flex-wrap">
+            {/* ปุ่มส่งออก Excel */}
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={isExportingExcel}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 dark:border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/30 px-3 py-2 text-xs font-semibold text-emerald-800 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition cursor-pointer disabled:opacity-50"
+              title="ส่งออกรายการเกณฑ์จับคู่รหัส ICD-10 ทั้งหมดเป็นไฟล์ Excel (.xlsx) เพื่อนำไปแก้ไขหรือคัดกรอง"
+            >
+              {isExportingExcel ? (
+                <Loader2 className="size-3.5 animate-spin text-emerald-600 dark:text-emerald-400" />
+              ) : (
+                <Download className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+              )}
+              <span className="hidden sm:inline">ส่งออก Excel</span>
+              <span className="sm:hidden">ส่งออก</span>
+            </button>
+
+            {/* ปุ่มนำเข้า Excel (เฉพาะผู้มีสิทธิ์จัดการ) */}
+            {canEdit && (
+              <button
+                type="button"
+                onClick={() => setIsImportModalOpen(true)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-violet-300 dark:border-violet-500/30 bg-violet-50 dark:bg-violet-950/30 px-3 py-2 text-xs font-semibold text-violet-800 dark:text-violet-300 hover:bg-violet-100 dark:hover:bg-violet-900/40 transition cursor-pointer"
+                title="นำเข้าไฟล์ Excel ที่แก้ไขรหัส ICD-10 แล้วกลับเข้าสู่ระบบ พร้อมแสดงตัวอย่างเปรียบเทียบก่อนบันทึก"
+              >
+                <Upload className="size-3.5 text-violet-600 dark:text-violet-400" />
+                <span className="hidden sm:inline">นำเข้า Excel</span>
+                <span className="sm:hidden">นำเข้า</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={toggleHelp}
@@ -1083,62 +1428,13 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
               {isEditing ? (
                 <div className="space-y-3 border-t border-slate-100 dark:border-white/10 pt-3">
                   <div className="space-y-1.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">รหัส ICD-10 ที่อนุญาต</span>
-                      {prefixes && (
-                        <button
-                          type="button"
-                          onClick={() => { setPrefixes(''); setPreview(null) }}
-                          className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
-                        >
-                          ลบทั้งหมด
-                        </button>
-                      )}
-                    </div>
-                    {(() => {
-                      const mCodes = prefixes ? prefixes.split(',').map((p) => p.trim()).filter(Boolean) : []
-                      if (mCodes.length === 0) return null
-                      return (
-                        <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] max-h-32 overflow-y-auto">
-                          {mCodes.map((p) => {
-                            const isU = p.toUpperCase().startsWith('U')
-                            return (
-                              <span
-                                key={p}
-                                className={cn(
-                                  'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border',
-                                  isU
-                                    ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
-                                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
-                                )}
-                              >
-                                <span>{p}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const rem = mCodes.filter((c) => c.toUpperCase() !== p.toUpperCase())
-                                    setPrefixes(rem.join(', '))
-                                    setPreview(null)
-                                  }}
-                                  className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 cursor-pointer"
-                                  title={`คลิกลบรหัส ${p}`}
-                                >
-                                  <X className="size-3" />
-                                </button>
-                              </span>
-                            )
-                          })}
-                        </div>
-                      )
-                    })()}
-                    <textarea
-                      rows={2}
-                      value={prefixes}
-                      onChange={(e) => { setPrefixes(e.target.value); setPreview(null) }}
-                      placeholder="เช่น M, S หรือ K30, R14, U6680"
-                      className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-white dark:bg-[#101326] px-3 py-2 font-mono text-sm text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
+                    <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">รหัส ICD-10 ที่อนุญาต</span>
+                    <DxPrefixesEditor
+                      prefixes={prefixes}
+                      onChange={setPrefixes}
+                      onPreviewReset={() => setPreview(null)}
+                      compact
                     />
-                    <p className="text-[11px] text-slate-400">แตะปุ่ม ✕ ที่รหัสเพื่อลบออกได้ทันที หรือพิมพ์แก้ไขในช่องข้อความ</p>
                   </div>
                   <label className="block space-y-1.5">
                     <span className="text-xs font-semibold text-slate-600 dark:text-slate-300">ข้อบ่งใช้ / สรรพคุณ</span>
@@ -1363,66 +1659,16 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
                 )}
 
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                      รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)
-                    </span>
-                    {newPrefixes && (
-                      <button
-                        type="button"
-                        onClick={() => setNewPrefixes('')}
-                        className="text-[11px] text-rose-500 dark:text-rose-400 hover:underline cursor-pointer"
-                      >
-                        ลบทั้งหมด
-                      </button>
-                    )}
-                  </div>
-                  {(() => {
-                    const nCodes = newPrefixes ? newPrefixes.split(',').map((p) => p.trim()).filter(Boolean) : []
-                    if (nCodes.length === 0) return null
-                    return (
-                      <div className="flex flex-wrap items-center gap-1.5 p-2 rounded-xl bg-slate-100/90 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] max-h-28 overflow-y-auto">
-                        {nCodes.map((p) => {
-                          const isU = p.toUpperCase().startsWith('U')
-                          return (
-                            <span
-                              key={p}
-                              className={cn(
-                                'inline-flex items-center gap-1.5 pl-2 pr-1 py-0.5 rounded-md text-xs font-mono font-bold border',
-                                isU
-                                  ? 'bg-purple-500/15 text-purple-700 dark:text-purple-300 border-purple-500/40'
-                                  : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border-emerald-300 dark:border-emerald-500/40'
-                              )}
-                            >
-                              <span>{p}</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  const rem = nCodes.filter((c) => c.toUpperCase() !== p.toUpperCase())
-                                  setNewPrefixes(rem.join(', '))
-                                }}
-                                className="size-4 rounded-md inline-flex items-center justify-center text-slate-400 hover:text-white hover:bg-rose-500 cursor-pointer"
-                                title={`คลิกลบรหัส ${p}`}
-                              >
-                                <X className="size-3" />
-                              </button>
-                            </span>
-                          )
-                        })}
-                      </div>
-                    )
-                  })()}
-                  <textarea
-                    rows={2}
-                    value={newPrefixes}
-                    onChange={(e) => setNewPrefixes(e.target.value)}
-                    placeholder="เช่น M, S หรือ K30, R14, U6680"
-                    className="w-full rounded-xl border border-slate-300 dark:border-[#34304a] bg-slate-50 dark:bg-[#101326] px-3 py-2 font-mono text-xs text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500 resize-y"
-                    autoFocus
-                  />
-                  <span className="text-xs text-slate-400 block">
-                    ใส่คำนำหน้า เช่น <code className="text-teal-500">M</code> (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น <code className="text-teal-500">K30, R14</code> (คลิก ✕ ที่รหัสเพื่อลบออกได้)
+                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                    รหัส ICD-10 ที่อนุญาต (คั่นด้วยจุลภาค)
                   </span>
+                  <DxPrefixesEditor
+                    prefixes={newPrefixes}
+                    onChange={setNewPrefixes}
+                    placeholder="เช่น M, S หรือ K30, R14, U6680"
+                    helperText="ใส่คำนำหน้า เช่น M (ครอบคลุม M00-M99) หรือระบุเฉพาะรหัส เช่น K30, R14 (คลิก ✕ ที่รหัสเพื่อลบออกได้)"
+                    compact
+                  />
                 </div>
 
                 <label className="block space-y-1">
@@ -1541,6 +1787,20 @@ export const DxMapSettingsModal: FC<DxMapSettingsModalProps> = ({ initialIcode }
           </div>
         </div>
       )}
+
+      {/* Modal: นำเข้ารหัส ICD-10 จากไฟล์ Excel */}
+      <DxMapImportModal
+        isOpen={isImportModalOpen}
+        onClose={() => setIsImportModalOpen(false)}
+        existingMap={dxMap}
+        onImportSuccess={(count) => {
+          setSyncStatusMsg({
+            type: 'success',
+            text: `นำเข้าและปรับปรุงเกณฑ์รหัส ICD-10 จาก Excel สำเร็จแล้ว ${count} รายการ`,
+          })
+          setTimeout(() => setSyncStatusMsg(null), 6000)
+        }}
+      />
         </>
       )}
     </div>

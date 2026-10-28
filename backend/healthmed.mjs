@@ -60,6 +60,14 @@ export const HEALTH_MED_AUDIT_SQL = `
       sp.name AS department_name,
       ov.pdx,
       ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
+      -- เลขปิดสิทธิ / Claim Code สปสช. ของ Visit
+      COALESCE(
+        NULLIF(TRIM(vp.claim_code), ''),
+        NULLIF(TRIM(vp.auth_code), ''),
+        NULLIF(TRIM(rd.claim_code), ''),
+        NULLIF(TRIM(o.anonymous_vn), ''),
+        ''
+      ) AS claim_code,
       -- รวบรวมรายการค่าบริการแพทย์แผนไทย (เฉพาะ nondrugitems / ค่าบริการ ไม่เอารหัสยา)
       GROUP_CONCAT(DISTINCT CONCAT(COALESCE(nd.nhso_adp_code, nd.icode), ':', COALESCE(nd.name, ''), ':', op.qty, ':', op.unitprice) SEPARATOR '||') AS service_items_raw,
       GROUP_CONCAT(DISTINCT COALESCE(nd.nhso_adp_code, nd.icode)) AS service_codes,
@@ -89,13 +97,24 @@ export const HEALTH_MED_AUDIT_SQL = `
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
+  LEFT JOIN (
+    SELECT vn, MAX(COALESCE(NULLIF(TRIM(claim_code), ''), NULLIF(TRIM(auth_code), ''))) AS claim_code
+    FROM visit_pttype
+    GROUP BY vn
+  ) vp ON vp.vn = o.vn
+  LEFT JOIN (
+    SELECT vn, MAX(NULLIF(TRIM(claim_code), '')) AS claim_code
+    FROM rcpt_debt
+    GROUP BY vn
+  ) rd ON rd.vn = o.vn
   WHERE o.vstdate BETWEEN ? AND ?
     AND (
       hms.vn IS NOT NULL
       OR nd.icode IS NOT NULL
     )
   GROUP BY o.vn, o.hn, o.vstdate, o.vsttime, pt.pname, pt.fname, pt.lname, pt.birthday,
-           ps.name, ps.pttype, ps.hipdata_code, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5
+           ps.name, ps.pttype, ps.hipdata_code, o.doctor, doc.name, sp.name, ov.pdx, ov.dx0, ov.dx1, ov.dx2, ov.dx3, ov.dx4, ov.dx5,
+           vp.claim_code, rd.claim_code, o.anonymous_vn
   ORDER BY o.vstdate DESC, o.vsttime DESC
 `
 
@@ -296,6 +315,31 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   }
 
   // -------------------------------------------------------------
+  // กฎข้อที่ 7 (ตามคำขอแผนกแพทย์แผนไทย):
+  // ถ้าเปิด Visit 2 (visit_order >= 2) ตรวจสอบว่า:
+  // 1. มีเลขปิดสิทธิ์ หรือไม่ ถ้าไม่มี -> ไม่ผ่าน
+  // 2. เลขปิดสิทธิ ซ้ำกับ visit แรก ถ้าซ้ำ -> ไม่ผ่าน
+  // -------------------------------------------------------------
+  const checkVisit2Claim = duplicateRuleConfig?.check_visit2_claim_code !== false
+  const visitOrder = Number(row.visit_order ?? 1)
+  let isVisit2ClaimFail = false
+
+  if (checkVisit2Claim && visitOrder >= 2) {
+    const currClaim = String(row.claim_code ?? '').trim()
+    const firstClaim = String(row.first_visit_claim_code ?? '').trim()
+
+    if (!currClaim) {
+      isVisit2ClaimFail = true
+      failures.push('Visit 2 แผนกแพทย์แผนไทย: ไม่มีเลขปิดสิทธิ (สปสช. จะปฏิเสธการจ่ายชดเชย)')
+    } else if (firstClaim && currClaim.toUpperCase() === firstClaim.toUpperCase()) {
+      isVisit2ClaimFail = true
+      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เลขปิดสิทธิ (${currClaim}) ซ้ำกับ Visit แรก (ต้องขอเลข Authen Code ใหม่สำหรับ Visit 2)`)
+    } else {
+      passes.push(`Visit 2 แผนกแพทย์แผนไทย: มีเลขปิดสิทธิ (${currClaim}) ถูกต้อง และไม่ซ้ำกับ Visit แรก`)
+    }
+  }
+
+  // -------------------------------------------------------------
   // สรุปผลการประเมิน
   // -------------------------------------------------------------
   const auditResult = failures.length > 0 ? 'FAIL' : 'PASS'
@@ -312,7 +356,14 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     operations,
     operation_codes: opCodesList,
     labor_date: row.labor_date || null,
-    is_duplicate_fail: failures.some((f) => f.includes('ซ้ำ')),
+    is_duplicate_fail: failures.some((f) => f.includes('ซ้ำ') && !f.includes('เลขปิดสิทธิ')),
+    is_visit2_claim_fail: isVisit2ClaimFail,
+    visit_order: visitOrder,
+    total_day_visits: Number(row.total_day_visits ?? visitOrder),
+    claim_code: row.claim_code || null,
+    first_visit_claim_code: row.first_visit_claim_code || null,
+    first_visit_vn: row.first_visit_vn || null,
+    first_visit_dept: row.first_visit_dept || null,
     service_items_count: {
       count_58101: count58101,
       count_58130: count58130,
@@ -328,6 +379,7 @@ export const DEFAULT_DUPLICATE_RULES = {
   block_coexist: true,
   block_both_multiple: true,
   block_single_multiple: true,
+  check_visit2_claim_code: true,
 }
 
 export async function getDuplicateRules(dwPool) {

@@ -23,6 +23,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
     block_coexist: true,
     block_both_multiple: true,
     block_single_multiple: true,
+    check_visit2_claim_code: true,
     massage_and_compress_codes: ['58130', '58131'],
     massage_only_codes: ['58101', '58102'],
     compress_only_codes: ['58201'],
@@ -37,6 +38,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
         block_coexist: remoteSettings.block_coexist ?? true,
         block_both_multiple: remoteSettings.block_both_multiple ?? true,
         block_single_multiple: remoteSettings.block_single_multiple ?? true,
+        check_visit2_claim_code: remoteSettings.check_visit2_claim_code ?? true,
         massage_and_compress_codes: remoteSettings.massage_and_compress_codes?.length
           ? remoteSettings.massage_and_compress_codes
           : ['58130', '58131'],
@@ -234,6 +236,57 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-amber-500"></div>
+            </label>
+          </div>
+        </div>
+
+        {/* Rule 4: Visit 2 Claim Code Verification (Thai Traditional Medicine) */}
+        <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-5 shadow-xs space-y-3">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1.5 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
+                  เงื่อนไข Visit 2 (สปสช.)
+                </span>
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                  ตรวจสอบเลขปิดสิทธิ (Claim Code / Authen Code) เมื่อเปิด Visit 2 แผนกแพทย์แผนไทย
+                </h3>
+              </div>
+              <p className="text-xs sm:text-[13px] text-slate-600 dark:text-slate-300 leading-relaxed">
+                กรณีผู้ป่วยมารับบริการและเปิด Visit 2 (หรือมากกว่า) ในวันเดียวกันที่แผนกแพทย์แผนไทย ระบบจะตรวจสอบ 2 เงื่อนไขสำคัญตามข้อกำหนด สปสช.:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1 text-xs">
+                <div className="rounded-lg bg-slate-50 dark:bg-white/5 p-2.5 border border-slate-200/80 dark:border-white/10">
+                  <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1">
+                    <span className="size-1.5 rounded-full bg-purple-500"></span>
+                    <span>1. ต้องมีเลขปิดสิทธิ (Claim Code)</span>
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400">
+                    หากไม่มีการบันทึกเลขปิดสิทธิใน Visit 2 จะประเมินเป็น <span className="text-rose-600 dark:text-rose-400 font-bold">ไม่ผ่าน</span> (สปสช. จะปฏิเสธการจ่ายชดเชย)
+                  </div>
+                </div>
+                <div className="rounded-lg bg-slate-50 dark:bg-white/5 p-2.5 border border-slate-200/80 dark:border-white/10">
+                  <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5 mb-1">
+                    <span className="size-1.5 rounded-full bg-rose-500"></span>
+                    <span>2. เลขปิดสิทธิต้องไม่ซ้ำกับ Visit แรก</span>
+                  </div>
+                  <div className="text-slate-500 dark:text-slate-400">
+                    หากเลขปิดสิทธิซ้ำกับ Visit 1 ของวันเดียวกัน จะประเมินเป็น <span className="text-rose-600 dark:text-rose-400 font-bold">ไม่ผ่าน</span> (ต้องขอรหัส Authen Code ใหม่สำหรับ Visit 2)
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Toggle switch */}
+            <label className="relative inline-flex items-center cursor-pointer shrink-0 mt-1">
+              <input
+                type="checkbox"
+                disabled={!canEdit}
+                checked={formState.check_visit2_claim_code ?? true}
+                onChange={(e) => setFormState({ ...formState, check_visit2_claim_code: e.target.checked })}
+                className="sr-only peer"
+              />
+              <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer dark:bg-slate-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-slate-600 peer-checked:bg-purple-600"></div>
             </label>
           </div>
         </div>

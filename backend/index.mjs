@@ -83,15 +83,17 @@ const possibleDistPaths = [
 ]
 const distPath = possibleDistPaths.find((p) => fs.existsSync(path.join(p, 'index.html'))) || possibleDistPaths[0]
 
-let appVersion = '1.0.0'
-try {
-  const pkgPath = path.join(__dirname, 'package.json')
-  if (fs.existsSync(pkgPath)) {
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
-    appVersion = pkg.version || '1.0.0'
+export function getAppVersion() {
+  try {
+    const pkgPath = path.join(__dirname, 'package.json')
+    if (fs.existsSync(pkgPath)) {
+      const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'))
+      return pkg.version || '1.0.0'
+    }
+  } catch {
+    // ignore
   }
-} catch {
-  // ignore
+  return '1.0.0'
 }
 
 // After an uncaught exception the process state is undefined; exit so PM2 (autorestart) starts
@@ -461,7 +463,7 @@ app.get('/api/status', requireSession, async (_req, res) => {
     )
     res.json({
       status: 'online',
-      appVersion,
+      appVersion: getAppVersion(),
       host: `${DW_DB_BASE.host}:${DW_DB_BASE.port}`,
       database: DW_DB,
       totalPrescriptions: prescriptionTotal,
@@ -480,7 +482,7 @@ app.get('/api/status', requireSession, async (_req, res) => {
 app.get('/api/version', (_req, res) => {
   res.json({
     success: true,
-    version: appVersion,
+    version: getAppVersion(),
     timestamp: Date.now(),
   })
 })
@@ -878,7 +880,51 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       return hasOps || hasServices
     })
 
-    // รวมข้อมูลของผู้ป่วยคนเดียวกันในวันเดียวกัน (แก้ปัญหาเคส 2 Visit เช่น เช้าตรวจอายุรกรรม บ่ายส่งทำหัตถการแผนไทย เพื่อไม่ให้แยกเป็นแถวที่ไม่มีค่าบริการ)
+    // 3.1 ดึงข้อมูลทุก Visit ของผู้ป่วยในวันนั้นเพื่อตรวจลำดับ Visit (Visit 1, Visit 2, ...) และเลขปิดสิทธิ
+    const patientHns = [...new Set(rawValidRows.map((r) => r.hn).filter(Boolean))]
+    const dayVisitsMap = new Map() // key: `${hn}__${vstdate}` => array of { vn, vsttime, claim_code, spclty_name }
+    if (patientHns.length > 0) {
+      const [allOvstRows] = await hosPool.query(`
+        SELECT 
+          o.vn,
+          o.hn,
+          DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate,
+          TIME_FORMAT(o.vsttime, '%H:%i:%s') AS vsttime,
+          sp.name AS spclty_name,
+          COALESCE(
+            NULLIF(TRIM(vp.claim_code), ''),
+            NULLIF(TRIM(vp.auth_code), ''),
+            NULLIF(TRIM(rd.claim_code), ''),
+            NULLIF(TRIM(o.anonymous_vn), ''),
+            ''
+          ) AS claim_code
+        FROM ovst o
+        LEFT JOIN spclty sp ON o.spclty = sp.spclty
+        LEFT JOIN (
+          SELECT vn, MAX(COALESCE(NULLIF(TRIM(claim_code), ''), NULLIF(TRIM(auth_code), ''))) AS claim_code
+          FROM visit_pttype
+          GROUP BY vn
+        ) vp ON vp.vn = o.vn
+        LEFT JOIN (
+          SELECT vn, MAX(NULLIF(TRIM(claim_code), '')) AS claim_code
+          FROM rcpt_debt
+          GROUP BY vn
+        ) rd ON rd.vn = o.vn
+        WHERE o.vstdate BETWEEN ? AND ?
+          AND o.hn IN (${patientHns.map(() => '?').join(',')})
+        ORDER BY o.hn ASC, o.vstdate ASC, o.vsttime ASC, o.vn ASC
+      `, [startDate, endDate, ...patientHns])
+
+      for (const ov of allOvstRows) {
+        const key = `${ov.hn}__${ov.vstdate}`
+        if (!dayVisitsMap.has(key)) dayVisitsMap.set(key, [])
+        dayVisitsMap.get(key).push(ov)
+      }
+    }
+
+    // รวม/จัดกลุ่มข้อมูลการตรวจหัตถการ
+    // หากผู้ป่วยมี 2 Visit ขึ้นไป และเป็นเคสทำหัตถการทั้งคู่ ให้แสดงทั้ง 2 Visit
+    // หาก Visit หนึ่งเป็นตรวจทั่วไป อีก Visit หนึ่งเป็นแพทย์แผนไทย ให้ตรวจรอบแพทย์แผนไทยตามลำดับจริงในวันนั้น
     const rowsByPatientDay = new Map()
     for (const r of rawValidRows) {
       const dayKey = `${r.hn}__${r.visit_date}`
@@ -887,31 +933,29 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
     }
 
     const validRows = []
-    for (const group of rowsByPatientDay.values()) {
-      if (group.length === 1) {
-        validRows.push(group[0])
-        continue
+    for (const [dayKey, group] of rowsByPatientDay.entries()) {
+      const allDayVisits = dayVisitsMap.get(dayKey) || []
+      const firstVisit = allDayVisits[0] || null
+
+      // คัดเฉพาะแถวที่มีรายการบริการหัตถการแพทย์แผนไทย
+      const rowsWithServices = group.filter((r) => Boolean(r.service_items_raw && r.service_items_raw.trim()) || (opsByVn.get(r.vn)?.length ?? 0) > 0)
+      const targetRows = rowsWithServices.length > 0 ? rowsWithServices : group
+
+      for (const r of targetRows) {
+        const visitIdx = allDayVisits.findIndex((v) => String(v.vn) === String(r.vn))
+        const visitOrder = visitIdx >= 0 ? visitIdx + 1 : (allDayVisits.length > 1 ? 2 : 1)
+        const currClaimCode = r.claim_code || (visitIdx >= 0 ? allDayVisits[visitIdx]?.claim_code : '') || ''
+
+        validRows.push({
+          ...r,
+          claim_code: currClaimCode,
+          visit_order: visitOrder,
+          total_day_visits: allDayVisits.length,
+          first_visit_claim_code: firstVisit ? firstVisit.claim_code : null,
+          first_visit_vn: firstVisit ? firstVisit.vn : null,
+          first_visit_dept: firstVisit ? firstVisit.spclty_name : null,
+        })
       }
-      // หากมีหลาย visit: เลือกรอบที่เป็นแพทย์แผนไทย หรือรอบที่มีค่าบริการ 58xxx เป็นหลัก
-      const thaiMedVisit = group.find((r) => String(r.department_name).includes('แผนไทย') || String(r.doctor_name).includes('พท.'))
-      const serviceVisit = group.find((r) => Boolean(r.service_items_raw && r.service_items_raw.trim()))
-      const primary = thaiMedVisit || serviceVisit || group[group.length - 1]
-
-      // รวมรายการค่าบริการทั้งหมดในวันนั้น
-      const allServices = [...new Set(group.map((r) => r.service_items_raw).filter(Boolean))].join('||')
-      const allCodes = [...new Set(group.map((r) => r.service_codes).filter(Boolean).flatMap((s) => s.split(',')))].join(',')
-
-      validRows.push({
-        ...primary,
-        service_items_raw: allServices,
-        service_codes: allCodes,
-        count_58130: group.reduce((s, r) => s + Number(r.count_58130 || 0), 0),
-        count_58101: group.reduce((s, r) => s + Number(r.count_58101 || 0), 0),
-        count_compress: group.reduce((s, r) => s + Number(r.count_compress || 0), 0),
-        count_58301: group.reduce((s, r) => s + Number(r.count_58301 || 0), 0),
-        count_58220: group.reduce((s, r) => s + Number(r.count_58220 || 0), 0),
-        count_58131: group.reduce((s, r) => s + Number(r.count_58131 || 0), 0),
-      })
     }
 
     // 4. ดึงวันคลอดจากระบบงานบัญชี 2 (person_anc) เฉพาะผู้ป่วยที่เป็นเคสบริบาลหลังคลอด
@@ -1030,11 +1074,12 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       total: evaluated.length,
       pass: evaluated.filter((r) => r.audit_result === 'PASS').length,
       fail: evaluated.filter((r) => r.audit_result === 'FAIL').length,
-      duplicateFail: evaluated.filter((r) => r.is_duplicate_fail || r.failures?.some((f) => f.includes('ซ้ำ'))).length,
+      duplicateFail: evaluated.filter((r) => r.is_duplicate_fail || r.failures?.some((f) => f.includes('ซ้ำ') && !f.includes('เลขปิดสิทธิ'))).length,
       kneeFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length,
       postpartumFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))).length,
       muscleFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))).length,
       epFail: evaluated.filter((r) => r.failures?.some((f) => f.includes('EP'))).length,
+      visit2ClaimFail: evaluated.filter((r) => r.is_visit2_claim_fail || r.failures?.some((f) => f.includes('เลขปิดสิทธิ'))).length,
     }
     kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
 
@@ -1749,7 +1794,7 @@ app.post('/api/dx-map/batch-update', requireHerbDxManager, async (req, res) => {
       }
 
       const indication = String(item.indication ?? (existing[0]?.indication ?? '')).slice(0, 255)
-      const min_qty = Number(existing[0]?.min_qty ?? 0)
+      const min_qty = item.min_qty !== undefined ? Math.max(0, parseInt(item.min_qty, 10) || 0) : Number(existing[0]?.min_qty ?? 0)
 
       await dwPool.query(
         `INSERT INTO dw_hd_check_drug_dx_map (icode, drug_name, dx_prefixes, min_qty, indication)
@@ -1757,6 +1802,7 @@ app.post('/api/dx-map/batch-update', requireHerbDxManager, async (req, res) => {
          ON DUPLICATE KEY UPDATE
            drug_name = COALESCE(VALUES(drug_name), drug_name),
            dx_prefixes = VALUES(dx_prefixes),
+           min_qty = VALUES(min_qty),
            indication = VALUES(indication)`,
         [icode, drugName, finalPrefixes.join(','), min_qty, indication]
       )
@@ -1909,6 +1955,20 @@ app.post('/api/dispensing-rules', requireHerbDxManager, async (req, res) => {
   try {
     const result = await saveDispensingRule(dwPool, req.body)
     res.json(result)
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.post('/api/dispensing-rules/batch', requireHerbDxManager, async (req, res) => {
+  try {
+    const rules = Array.isArray(req.body?.rules) ? req.body.rules : []
+    let updatedCount = 0
+    for (const r of rules) {
+      await saveDispensingRule(dwPool, r)
+      updatedCount++
+    }
+    res.json({ success: true, count: updatedCount })
   } catch (err) {
     fail(res, err)
   }

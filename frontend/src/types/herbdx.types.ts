@@ -162,6 +162,7 @@ export interface DxMapBatchItem {
   readonly icode: string
   readonly drug_name?: string
   readonly dx_prefixes: string
+  readonly min_qty?: number
   readonly indication?: string
   readonly mergeWithExisting?: boolean
 }
@@ -315,6 +316,13 @@ export interface HealthMedRecord {
   readonly count_58131: number
   readonly count_compress?: number
   readonly is_duplicate_fail?: boolean
+  readonly is_visit2_claim_fail?: boolean
+  readonly claim_code?: string | null
+  readonly visit_order?: number
+  readonly total_day_visits?: number
+  readonly first_visit_claim_code?: string | null
+  readonly first_visit_vn?: string | null
+  readonly first_visit_dept?: string | null
   readonly audit_result: 'PASS' | 'FAIL'
   readonly audit_reason: string
   readonly failures: readonly string[]
@@ -331,6 +339,7 @@ export interface HealthMedKpi {
   readonly postpartumFail: number
   readonly muscleFail?: number
   readonly epFail: number
+  readonly visit2ClaimFail?: number
 }
 
 export interface DispensingRule {
@@ -351,6 +360,7 @@ export interface ThaiMedDuplicateRules {
   readonly block_coexist: boolean
   readonly block_both_multiple: boolean
   readonly block_single_multiple: boolean
+  readonly check_visit2_claim_code?: boolean
   readonly massage_and_compress_codes?: readonly string[]
   readonly massage_only_codes?: readonly string[]
   readonly compress_only_codes?: readonly string[]
