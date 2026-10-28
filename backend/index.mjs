@@ -956,16 +956,25 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
         const effectiveClaimCode = currEp || currVpClaim
         const firstVisitClaim = firstVisit ? String(firstVisit.ep_code || firstVisit.claim_code || '').trim() : ''
 
+        // รวบรวมเลขสิทธิของ Visit ก่อนหน้าในวันเดียวกัน (Visit 2 ต้องเป็นคนละเลขกับ Visit 1 เท่านั้นจึงจะผ่าน)
+        const priorVisits = visitIdx > 0 ? allDayVisits.slice(0, visitIdx) : (visitOrder >= 2 && firstVisit ? [firstVisit] : [])
+        const priorClaimCodes = new Set(
+          priorVisits
+            .flatMap((v) => [String(v.ep_code || '').trim().toUpperCase(), String(v.claim_code || '').trim().toUpperCase()])
+            .filter(Boolean)
+        )
+        const isDuplicateWithPriorVisit =
+          visitOrder >= 2 &&
+          Boolean(effectiveClaimCode) &&
+          (priorClaimCodes.has(effectiveClaimCode.toUpperCase()) ||
+            (Boolean(firstVisitClaim) && effectiveClaimCode.toUpperCase() === firstVisitClaim.toUpperCase()))
+
         let claimCloseStatus = 'NONE'
-        if (currEp.toUpperCase().startsWith('EP')) {
+        if (isDuplicateWithPriorVisit) {
+          claimCloseStatus = 'VISIT2_DUP'
+        } else if (currEp.toUpperCase().startsWith('EP') || currVpClaim.toUpperCase().startsWith('EP')) {
           claimCloseStatus = 'CLOSED'
-        } else if (currVpClaim.toUpperCase().startsWith('EP')) {
-          if (visitOrder >= 2 && firstVisitClaim && currVpClaim.toUpperCase() === firstVisitClaim.toUpperCase()) {
-            claimCloseStatus = 'VISIT2_DUP'
-          } else {
-            claimCloseStatus = 'CLOSED'
-          }
-        } else if (currVpClaim.toUpperCase().startsWith('PP')) {
+        } else if (currVpClaim.toUpperCase().startsWith('PP') || currEp.toUpperCase().startsWith('PP')) {
           claimCloseStatus = 'OPEN_ONLY'
         }
 

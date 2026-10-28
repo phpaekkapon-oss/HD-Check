@@ -685,10 +685,10 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 </span>
               ) : row.original.claim_close_status === 'VISIT2_DUP' ? (
                 <span
-                  title={`Visit 2 ยังไม่ได้ปิดสิทธิใหม่ (เลข ${row.original.claim_code} ซ้ำกับ Visit 1)`}
-                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0"
+                  title={`ไม่ผ่าน: เลขปิดสิทธิของ Visit 2 (${row.original.claim_code}) ซ้ำกับ Visit 1 (${row.original.first_visit_claim_code || row.original.claim_code}) — ต้องเป็นคนละเลขถึงจะผ่าน`}
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0"
                 >
-                  <span>✕ V2 ซ้ำ V1</span>
+                  <span>✕ ซ้ำ V1 ({row.original.claim_code})</span>
                 </span>
               ) : (
                 <span

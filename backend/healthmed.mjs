@@ -326,13 +326,15 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const visitOrder = Number(row.visit_order ?? 1)
   const currEp = String(row.ep_code ?? '').trim()
   const currClaim = String(row.claim_code ?? '').trim()
+  const effectiveClaim = currEp || currClaim
   const firstClaim = String(row.first_visit_claim_code ?? '').trim()
+  const isDupWithFirst = visitOrder >= 2 && Boolean(effectiveClaim) && Boolean(firstClaim) && effectiveClaim.toUpperCase() === firstClaim.toUpperCase()
   const closeStatus = row.claim_close_status || (
-    currEp.toUpperCase().startsWith('EP')
+    isDupWithFirst
+      ? 'VISIT2_DUP'
+      : effectiveClaim.toUpperCase().startsWith('EP')
       ? 'CLOSED'
-      : currClaim.toUpperCase().startsWith('EP')
-      ? (visitOrder >= 2 && firstClaim && currClaim.toUpperCase() === firstClaim.toUpperCase() ? 'VISIT2_DUP' : 'CLOSED')
-      : currClaim.toUpperCase().startsWith('PP')
+      : effectiveClaim.toUpperCase().startsWith('PP')
       ? 'OPEN_ONLY'
       : 'NONE'
   )
@@ -340,20 +342,17 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   let isVisit2ClaimFail = false
 
   if (checkVisit2Claim && visitOrder >= 2) {
-    if (closeStatus === 'VISIT2_DUP') {
+    if (closeStatus === 'VISIT2_DUP' || isDupWithFirst) {
       isVisit2ClaimFail = true
-      failures.push(`Visit 2 แผนกแพทย์แผนไทย: ยังไม่ปิดสิทธิของ Visit 2 (เลข ${currClaim} ซ้ำกับ Visit แรก ต้องขอ Authen/ปิดสิทธิใหม่สำหรับ Visit 2)`)
+      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เลขปิดสิทธิ (${effectiveClaim}) ซ้ำกับ Visit 1 (ต้องเป็นคนละเลขจึงจะผ่านเกณฑ์)`)
     } else if (closeStatus === 'OPEN_ONLY') {
       isVisit2ClaimFail = true
-      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เปิดสิทธิแล้ว (${currClaim}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`)
-    } else if (closeStatus === 'NONE' || !currClaim) {
+      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เปิดสิทธิแล้ว (${effectiveClaim}) แต่ยังไม่ได้กดปิดสิทธิ (ยังไม่มีเลข EP)`)
+    } else if (closeStatus === 'NONE' || !effectiveClaim) {
       isVisit2ClaimFail = true
-      failures.push('Visit 2 แผนกแพทย์แผนไทย: ไม่มีเลขปิดสิทธิ (สปสช. จะปฏิเสธการจ่ายชดเชย)')
-    } else if (firstClaim && currClaim.toUpperCase() === firstClaim.toUpperCase()) {
-      isVisit2ClaimFail = true
-      failures.push(`Visit 2 แผนกแพทย์แผนไทย: เลขปิดสิทธิ (${currClaim}) ซ้ำกับ Visit แรก (ต้องขอเลข Authen Code ใหม่สำหรับ Visit 2)`)
+      failures.push('Visit 2 แผนกแพทย์แผนไทย: ไม่มีเลขปิดสิทธิ (ต้องขอ Authen/ปิดสิทธิใหม่สำหรับ Visit 2)')
     } else {
-      passes.push(`Visit 2 แผนกแพทย์แผนไทย: ปิดสิทธิแล้ว (${currClaim}) ถูกต้อง และไม่ซ้ำกับ Visit แรก`)
+      passes.push(`Visit 2 แผนกแพทย์แผนไทย: ปิดสิทธิแล้ว (${effectiveClaim}) เป็นคนละเลขกับ Visit 1 (${firstClaim || '-'}) ถูกต้องตามเกณฑ์`)
     }
   } else if (row.claim_close_status && !isClaimClosed) {
     // กรณี Visit 1 ที่ยังไม่ได้ปิดสิทธิ (มีเฉพาะเลข PP เปิดสิทธิ หรือไม่มีเลขเลย)
