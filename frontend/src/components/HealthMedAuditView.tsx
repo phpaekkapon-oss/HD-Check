@@ -987,7 +987,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 laborDate ? (
                   <div className="text-xs text-fuchsia-700 dark:text-fuchsia-300 font-mono flex items-center gap-1 font-bold">
                     <Baby className="size-3 shrink-0" />
-                    <span>คลอด: {laborDate}</span>
+                    <span>คลอด: {toThaiDate(laborDate)}</span>
                   </div>
                 ) : (
                   <div className="text-xs text-rose-600 dark:text-rose-400 font-sans flex items-center gap-1 font-bold">
@@ -1992,7 +1992,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               <div>
                 <span className="text-slate-400 block text-xs uppercase font-semibold">วันที่ / เวลาที่รับบริการ</span>
                 <span className="font-medium text-slate-800 dark:text-slate-200 font-mono">
-                  {selectedRecord.visit_date} {selectedRecord.visit_time}
+                  {toThaiDate(selectedRecord.visit_date)} {selectedRecord.visit_time ? `${selectedRecord.visit_time.substring(0, 5)} น.` : ''}
                 </span>
               </div>
               <div>
@@ -2197,7 +2197,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                     <span className="text-slate-600 dark:text-slate-300">วันคลอดที่บันทึกในระบบงานบัญชี 2:</span>
                     {selectedRecord.labor_date ? (
                       <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-md border border-emerald-500/30">
-                        ✓ {selectedRecord.labor_date}
+                        ✓ {toThaiDate(selectedRecord.labor_date)}
                       </span>
                     ) : (
                       <span className="font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2.5 py-1 rounded-md border border-rose-500/30">

@@ -42,6 +42,16 @@ export function normalizeOpCode(code) {
 }
 
 /**
+ * ฟังก์ชันแปลงวันที่ ISO (YYYY-MM-DD) เป็น วัน/เดือน/ปี พ.ศ. ไทย (DD/MM/YYYY)
+ */
+export function formatThaiDate(iso) {
+  if (!iso || typeof iso !== 'string') return ''
+  const [y, m, d] = iso.split('-')
+  if (!y || !m || !d) return iso
+  return `${d}/${m}/${Number(y) + 543}`
+}
+
+/**
  * SQL สำหรับดึงข้อมูลการรับบริการแพทย์แผนไทย (เฉพาะค่าบริการ/หัตถการ ไม่รวมรายการยาสมุนไพร)
  */
 export const HEALTH_MED_AUDIT_SQL = `
@@ -317,7 +327,7 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     }
 
     if (hasM6260 && hasU506 && missingPostpartumOps.length === 0 && row.labor_date) {
-      passes.push(`บริบาลหญิงหลังคลอด: ครบคู่ M6260 + U506, ครบ 5 รหัสหัตถการ และมีวันคลอดในบัญชี 2 (${row.labor_date})`)
+      passes.push(`บริบาลหญิงหลังคลอด: ครบคู่ M6260 + U506, ครบ 5 รหัสหัตถการ และมีวันคลอดในบัญชี 2 (${formatThaiDate(row.labor_date)})`)
     }
   } else if (hasM6260 && !hasU506) {
     // ข้อ 5: M6260 + U อื่นๆ ถือว่าเป็น "โรคกล้ามเนื้ออื่นๆ"
