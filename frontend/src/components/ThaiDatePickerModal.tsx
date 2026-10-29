@@ -196,7 +196,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
   return (
     <>
       {/* Inline Date Navigation & Range Bar: [<] [ปี 2569 ▼] [ต.ค. ▼] [>] [📅 1 ต.ค. 2569] – [📅 31 ต.ค. 2569] [ทั้งเดือน] [วันนี้] [เดือนนี้] [เดือนที่แล้ว] */}
-      <div className="flex items-center gap-1.5 flex-nowrap overflow-x-auto scrollbar-none py-0.5">
+      <div className="flex items-center gap-1.5 flex-wrap py-0.5">
         {/* Prev Month */}
         <button
           type="button"

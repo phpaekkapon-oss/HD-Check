@@ -1579,12 +1579,12 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
         )}
       </div>
 
-      {/* Comprehensive Filter Bar Card (Row 1: Date Bar + Search/HN/Density | Row 2: Segmented Status Pills + Icon Dropdown Filters) */}
-      <section className="rounded-2xl bg-themed-card border border-themed p-3 sm:p-3.5 shadow-xs space-y-2.5">
-        {/* Row 1: Inline Date Picker Bar (Left) + HN / Search / Reset / Density (Right) */}
-        <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 pb-2.5 border-b border-slate-200/80 dark:border-white/10">
-          {/* Left: Full Inline Date Navigation & Range Picker */}
-          <div className="min-w-0 overflow-x-auto scrollbar-none">
+      {/* Comprehensive Filter Bar Card (Tiered Professional Architecture) */}
+      <section className="rounded-2xl bg-themed-card border border-themed p-3 sm:p-3.5 shadow-xs space-y-3">
+        {/* Tier 1: Time Scope (Date Navigation & Presets) + View & Export Tools */}
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-3 pb-3 border-b border-slate-200/80 dark:border-white/10">
+          {/* Left: Full Inline Date Navigation & Range Picker (Unconstrained, Never Clipped) */}
+          <div className="min-w-0 flex-1">
             {onRangeChange && (
               <ThaiDatePickerModal
                 range={range}
@@ -1596,85 +1596,14 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
             )}
           </div>
 
-          {/* Right: HN Input + Search Box + Reset + Density */}
-          <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
-            {/* HN Filter Box */}
-            <div className="flex items-center gap-1.5 h-8.5 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] px-3 shadow-2xs shrink-0 focus-within:ring-2 focus-within:ring-teal-500/40 focus-within:border-teal-500/50 transition">
-              <label htmlFor="healthmed-filter-hn" className="text-xs font-bold text-slate-400 dark:text-slate-400 select-none">
-                HN
-              </label>
-              <input
-                id="healthmed-filter-hn"
-                inputMode="numeric"
-                value={hnFilter}
-                onChange={(e) => setHnFilter(e.target.value.replace(/\D/g, ''))}
-                placeholder="000009716"
-                className="w-20 bg-transparent font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
-              />
-              {hnFilter && (
-                <button
-                  type="button"
-                  onClick={() => setHnFilter('')}
-                  className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-                  aria-label="ล้าง HN"
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Search Box */}
-            <div className="relative flex-1 sm:w-44 lg:w-48">
-              <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-              <input
-                type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="ค้นหาชื่อ, HN, แพทย์, EP/PP..."
-                className="w-full h-8.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 shadow-2xs transition"
-              />
-              {search && (
-                <button
-                  type="button"
-                  onClick={() => setSearch('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
-                  aria-label="ล้างคำค้นหา"
-                >
-                  <X className="size-3" />
-                </button>
-              )}
-            </div>
-
-            {/* Reset All Filters Button */}
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={handleResetFilters}
-                className="inline-flex items-center gap-1 h-8.5 px-2.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/25 text-xs font-bold transition cursor-pointer shadow-2xs shrink-0"
-                title="ล้างตัวกรองทั้งหมด"
-              >
-                <RotateCcw className="size-3" />
-                <span>ล้าง ({filteredRecords.length})</span>
-              </button>
-            )}
-
-            {/* Density Switch Button */}
-            <button
-              type="button"
-              onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
-              className="inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d] transition shadow-2xs cursor-pointer shrink-0"
-              title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
-            >
-              <SlidersHorizontal className="size-3.5 text-teal-500" />
-              <span>{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
-            </button>
-
+          {/* Right: Page-level Tools (Treatment Rights Config, View Density, Export Excel) */}
+          <div className="flex items-center gap-2 self-start xl:self-auto shrink-0 flex-wrap">
             {/* Treatment Rights Exclusion / Configuration Button */}
             <button
               type="button"
               onClick={() => setShowPttypeConfigModal(true)}
               className={cn(
-                'inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl border text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0',
+                'inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl border text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0',
                 excludedPttypes.length > 0
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-200 font-bold'
                   : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
@@ -1694,21 +1623,95 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               )}
             </button>
 
+            {/* Density Switch Button */}
+            <button
+              type="button"
+              onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
+              className="inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d] transition shadow-2xs cursor-pointer shrink-0"
+              title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
+            >
+              <SlidersHorizontal className="size-3.5 text-teal-500" />
+              <span>{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
+            </button>
+
             {/* Export Excel Button in Filter Bar */}
             <button
               type="button"
               onClick={handleExportExcel}
               disabled={filteredRecords.length === 0}
-              className="btn-pill-action inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-xs transition shrink-0"
+              className="btn-pill-action inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl text-xs font-bold disabled:opacity-50 cursor-pointer shadow-xs transition shrink-0"
               title="ส่งออกรายงาน Excel ฉบับสมบูรณ์ (แยกชีตอัตโนมัติ: ทั้งหมด / เฉพาะไม่ผ่าน / เฉพาะยังไม่ปิดสิทธิ / สรุปรายผู้ให้บริการ)"
             >
               <Download className="size-3.5 text-white" />
-              <span>Excel</span>
+              <span>ส่งออก Excel</span>
             </button>
           </div>
         </div>
 
-        {/* Row 2: 5-Column Equal Grid for Enterprise Filter Dropdowns (100% Aligned, Zero Clipping, Zero Orphan Wrapping) */}
+        {/* Tier 2: Search Bar + HN Filter + Clear Filters */}
+        <div className="flex flex-col sm:flex-row items-center gap-2">
+          {/* HN Filter Box */}
+          <div className="flex items-center gap-1.5 h-9 w-full sm:w-36 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] px-3 shadow-2xs shrink-0 focus-within:ring-2 focus-within:ring-teal-500/40 focus-within:border-teal-500/50 transition">
+            <label htmlFor="healthmed-filter-hn" className="text-xs font-bold text-slate-400 dark:text-slate-400 select-none">
+              HN
+            </label>
+            <input
+              id="healthmed-filter-hn"
+              inputMode="numeric"
+              value={hnFilter}
+              onChange={(e) => setHnFilter(e.target.value.replace(/\D/g, ''))}
+              placeholder="ค้นหา HN..."
+              className="w-full bg-transparent font-mono text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none"
+            />
+            {hnFilter && (
+              <button
+                type="button"
+                onClick={() => setHnFilter('')}
+                className="text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                aria-label="ล้าง HN"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Search Box */}
+          <div className="relative flex-1 w-full">
+            <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="ค้นหาชื่อ-สกุล, HN, แพทย์, เลขปิดสิทธิ EP / PP, รหัสหัตถการ..."
+              className="w-full h-9 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 shadow-2xs transition"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                aria-label="ล้างคำค้นหา"
+              >
+                <X className="size-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Reset All Filters Button */}
+          {hasActiveFilters && (
+            <button
+              type="button"
+              onClick={handleResetFilters}
+              className="inline-flex items-center justify-center gap-1.5 h-9 px-3 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 text-rose-600 dark:text-rose-300 border border-rose-500/25 text-xs font-bold transition cursor-pointer shadow-2xs shrink-0 w-full sm:w-auto"
+              title="ล้างตัวกรองทั้งหมด คืนค่าเริ่มต้น"
+            >
+              <RotateCcw className="size-3.5" />
+              <span>ล้างตัวกรอง ({filteredRecords.length})</span>
+            </button>
+          )}
+        </div>
+
+        {/* Tier 3: 5-Column Equal Grid for Enterprise Filter Dropdowns (100% Aligned, Zero Clipping) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
           {/* 1. Claim Close Status Dropdown */}
           <div className="relative min-w-0">
