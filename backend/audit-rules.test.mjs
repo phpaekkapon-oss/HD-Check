@@ -375,6 +375,58 @@ test('HealthMed duplicate - coexistence of (นวดและประคบ + 
   assert.match(r4.audit_reason, /ค่านวดและประคบ ร่วมกับ ค่านวด ร่วมกับ ค่าประคบ/)
 })
 
+test('HealthMed - UC patient fails if both compress and steam are billed in the same visit', () => {
+  // 1. UC patient with 58201 (compress) + 58301 (steam)
+  const r1 = evaluateHealthMedAudit({
+    pttype_hipdata: 'UCS',
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-20', '900-78-30'],
+    count_compress: 1,
+    count_58301: 1,
+  })
+  assert.equal(r1.audit_result, 'FAIL')
+  assert.equal(r1.is_duplicate_fail, true)
+  assert.match(r1.audit_reason, /ห้ามทำประคบสมุนไพร.*ร่วมกับอบสมุนไพร/)
+
+  // 2. UC patient with 58130 (massage+compress) + 58301 (steam)
+  const r2 = evaluateHealthMedAudit({
+    pttype_hipdata: 'UCS',
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11', '900-78-30'],
+    count_58130: 1,
+    count_58301: 1,
+  })
+  assert.equal(r2.audit_result, 'FAIL')
+  assert.equal(r2.is_duplicate_fail, true)
+  assert.match(r2.audit_reason, /ห้ามทำประคบสมุนไพร.*ร่วมกับอบสมุนไพร/)
+
+  // 3. Non-UC patient (e.g. Civil Servant / OFC) is not blocked by this UC rule
+  const r3 = evaluateHealthMedAudit({
+    pttype_hipdata: 'OFC',
+    pttype_name: 'สิทธิเบิกกรมบัญชีกลาง',
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-20', '900-78-30'],
+    count_compress: 1,
+    count_58301: 1,
+  })
+  // Doesn't fail the UC compress+steam rule
+  assert.ok(!r3.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
+
+  // 4. UC patient with only compress (no steam) does not fail this rule
+  const r4 = evaluateHealthMedAudit({
+    pttype_hipdata: 'UCS',
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11'],
+    count_58130: 1,
+    count_58301: 0,
+  })
+  assert.ok(!r4.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
+})
+
 
 
 const { analyzeHerbRecord } = await import('./herb-advice.mjs')

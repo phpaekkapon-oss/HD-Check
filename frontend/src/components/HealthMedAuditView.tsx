@@ -155,7 +155,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
   const [visitDateFilter, setVisitDateFilter] = useState<string>('ALL')
   const [doctorFilter, setDoctorFilter] = useState<string>('ALL')
   const [pttypeFilter, setPttypeFilter] = useState<string>('ALL')
-  const [serviceFilter, setServiceFilter] = useState<'ALL' | '58130' | '58101' | '58201' | 'KNEE' | 'POSTPARTUM' | 'VISIT2'>('ALL')
+  const [serviceFilter, setServiceFilter] = useState<'ALL' | '58130' | '58101' | '58201' | '58301' | 'KNEE' | 'POSTPARTUM' | 'VISIT2'>('ALL')
   const [hnFilter, setHnFilter] = useState('')
   const [search, setSearch] = useState('')
   const [sorting, setSorting] = useState<SortingState>([])
@@ -477,7 +477,8 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       // 6. Service / Visit Type Filter
       if (serviceFilter === '58130' && !(r.count_58130 > 0)) return false
       if (serviceFilter === '58101' && !(r.count_58101 > 0)) return false
-      if (serviceFilter === '58201' && !((r.count_compress ?? 0) > 0)) return false
+      if (serviceFilter === '58201' && !((r.count_compress ?? 0) > 0 || r.service_items_raw?.includes('58201') || r.service_items_raw?.includes('ประคบ'))) return false
+      if (serviceFilter === '58301' && !(Number(r.count_58301 ?? 0) > 0 || r.service_items_raw?.includes('58301') || r.service_items_raw?.includes('อบ'))) return false
       if (serviceFilter === 'KNEE') {
         const dxs = [r.pdx, r.dx0, r.dx1, r.dx2, r.dx3, r.dx4, r.dx5].filter(Boolean)
         if (!dxs.includes('M179') && !dxs.includes('U5753') && !(r.count_58301 > 0)) return false
@@ -1581,7 +1582,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       {/* Comprehensive Filter Bar Card (Row 1: Date Bar + Search/HN/Density | Row 2: Segmented Status Pills + Icon Dropdown Filters) */}
       <section className="rounded-2xl bg-themed-card border border-themed p-3 sm:p-3.5 shadow-xs space-y-2.5">
         {/* Row 1: Inline Date Picker Bar (Left) + HN / Search / Reset / Density (Right) */}
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-2.5 pb-2.5 border-b border-slate-200/80 dark:border-white/10">
+        <div className="flex flex-col 2xl:flex-row 2xl:items-center 2xl:justify-between gap-3 pb-2.5 border-b border-slate-200/80 dark:border-white/10">
           {/* Left: Full Inline Date Navigation & Range Picker */}
           <div className="min-w-0 overflow-x-auto scrollbar-none">
             {onRangeChange && (
@@ -1781,47 +1782,32 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
             <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* 4. Pttype / Right Dropdown with Quick Config Button */}
-          <div className="relative min-w-0 flex items-center gap-1">
-            <div className="relative flex-1 min-w-0">
-              <FileText className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 dark:text-indigo-400 pointer-events-none" />
-              <select
-                value={pttypeFilter}
-                onChange={(e) => setPttypeFilter(e.target.value)}
-                aria-label="กรองตามสิทธิการรักษา"
-                className={cn(
-                  'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
-                  pttypeFilter !== 'ALL'
-                    ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                    : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
-                )}
-              >
-                <option value="ALL">
-                  {excludedPttypes.length > 0
-                    ? `สิทธิที่ตรวจ (${filterOptions.pttypes.length} • ยกเว้น ${excludedPttypes.length})`
-                    : `สิทธิการรักษาทั้งหมด (${filterOptions.pttypes.length})`}
-                </option>
-                {filterOptions.pttypes.map(([pt, count]) => (
-                  <option key={pt} value={pt}>
-                    {pt} ({count})
-                  </option>
-                ))}
-              </select>
-              <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowPttypeConfigModal(true)}
+          {/* 4. Pttype / Right Dropdown */}
+          <div className="relative min-w-0">
+            <FileText className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 dark:text-indigo-400 pointer-events-none" />
+            <select
+              value={pttypeFilter}
+              onChange={(e) => setPttypeFilter(e.target.value)}
+              aria-label="กรองตามสิทธิการรักษา"
               className={cn(
-                'size-9 rounded-xl border grid place-items-center shrink-0 cursor-pointer transition shadow-2xs',
-                excludedPttypes.length > 0
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                pttypeFilter !== 'ALL'
+                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
               )}
-              title="เปิดหน้าต่างตั้งค่าเลือกติ๊กสิทธิที่ต้องการตรวจ / ยกเว้นสิทธิที่ไม่ต้องการแสดง"
             >
-              <Settings2 className="size-4" />
-            </button>
+              <option value="ALL">
+                {excludedPttypes.length > 0
+                  ? `สิทธิที่ตรวจ (${filterOptions.pttypes.length} • ยกเว้น ${excludedPttypes.length})`
+                  : `สิทธิการรักษาทั้งหมด (${filterOptions.pttypes.length})`}
+              </option>
+              {filterOptions.pttypes.map(([pt, count]) => (
+                <option key={pt} value={pt}>
+                  {pt} ({count})
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
           {/* 5. Service / Procedure Type Dropdown */}
@@ -1842,6 +1828,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               <option value="58130">ค่านวดและประคบ (58130)</option>
               <option value="58101">ค่านวดเพื่อการรักษา (58101)</option>
               <option value="58201">ค่าประคบสมุนไพร (58201)</option>
+              <option value="58301">ค่าอบไอน้ำสมุนไพร (58301)</option>
               <option value="KNEE">พอกเข่า / ข้อเข่าเสื่อม (M179/U5753)</option>
               <option value="POSTPARTUM">บริบาลหลังคลอด (U506/58131)</option>
               <option value="VISIT2">เฉพาะ Visit 2+ (มารับบริการซ้ำ)</option>

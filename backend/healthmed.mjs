@@ -89,7 +89,7 @@ export const HEALTH_MED_AUDIT_SQL = `
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) IN ('58130', '58131') OR nd.name LIKE '%นวดและประคบ%' OR nd.name LIKE '%นวดประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58130,
       SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102') OR nd.name LIKE '%ค่านวด%') AND nd.name NOT LIKE '%ประคบ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58101,
       SUM(CASE WHEN (COALESCE(nd.nhso_adp_code, nd.icode) = '58201' OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')) AND nd.name NOT LIKE '%นวด%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_compress,
-      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58301' OR COALESCE(nd.name, '') LIKE '%ค่าอบไอน้ำ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
+      SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58301' OR COALESCE(nd.name, '') LIKE '%อบไอน้ำ%' OR COALESCE(nd.name, '') LIKE '%อบสมุนไพร%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58301,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58220' OR COALESCE(nd.name, '') LIKE '%ค่าทับหม้อเกลือ%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58220,
       SUM(CASE WHEN COALESCE(nd.nhso_adp_code, nd.icode) = '58131' OR COALESCE(nd.name, '') LIKE '%ค่านวดและประคบ%ฟื้นฟู%' THEN IFNULL(op.qty, 1) ELSE 0 END) AS count_58131
   FROM ovst o
@@ -105,6 +105,8 @@ export const HEALTH_MED_AUDIT_SQL = `
         OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')
         OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
         OR nd.name LIKE '%ค่าอบไอน้ำ%'
+        OR nd.name LIKE '%อบสมุนไพร%'
+        OR nd.name LIKE '%อบไอน้ำ%'
       )
       AND COALESCE(nd.nhso_adp_code, nd.icode) NOT IN ('58001', '58002')
       AND nd.name NOT LIKE '%ฝังเข็ม%'
@@ -165,10 +167,12 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const hasBothFromRaw = rawServices.includes('58130') || rawServices.includes('58131') || rawServices.includes('นวดและประคบ') || rawServices.includes('นวดประคบ')
   const hasMassageFromRaw = (rawServices.includes('58101') || rawServices.includes('58102') || rawServices.includes('ค่านวด')) && !rawServices.includes('นวดและประคบ')
   const hasCompressFromRaw = (rawServices.includes('58201') || (rawServices.includes('ประคบ') && !rawServices.includes('ความร้อน') && !rawServices.includes('ประคบร้อน') && !rawServices.includes('กายภาพ'))) && !rawServices.includes('นวดและประคบ')
+  const hasSteamFromRaw = rawServices.includes('58301') || rawServices.includes('อบไอน้ำ') || rawServices.includes('อบสมุนไพร')
 
   const effectiveCountBoth = Math.max(count58130, hasBothFromRaw ? 1 : 0)
   const effectiveCountMassage = Math.max(count58101, hasMassageFromRaw ? 1 : 0)
   const effectiveCountCompress = Math.max(countCompress, hasCompressFromRaw ? 1 : 0)
+  const effectiveCountSteam = Math.max(count58301, hasSteamFromRaw ? 1 : 0)
 
   // Normalized operation codes set
   const operations = Array.isArray(row.operations) ? row.operations : []
@@ -212,6 +216,15 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     if (effectiveCountCompress >= 2) {
       failures.push('คิดค่าบริการซ้ำ: พบค่าประคบสมุนไพรเพื่อการบำบัดรักษาโรค (58201) 2 ครั้งในครั้งเดียว')
     }
+  }
+
+  // 5. สิทธิ UC: ประคบสมุนไพร และ อบสมุนไพร ไม่ให้ทำใน visit เดียวกัน
+  const blockCompressSteamUc = duplicateRuleConfig?.block_compress_steam_uc !== false
+  const hasCompress = effectiveCountCompress > 0 || effectiveCountBoth > 0 || opCodesList.some((c) => c.startsWith('900-78-20'))
+  const hasSteam = effectiveCountSteam > 0 || opCodesList.some((c) => c.startsWith('900-78-3'))
+
+  if (blockCompressSteamUc && isUc && hasCompress && hasSteam) {
+    failures.push('คิดค่าบริการซ้ำ: ผู้ป่วยสิทธิ UC ห้ามทำประคบสมุนไพร (58201/58130) ร่วมกับอบสมุนไพร (58301) ใน Visit เดียวกัน (สปสช. ไม่อนุญาตให้เบิกจ่ายร่วมกัน)')
   }
 
   // -------------------------------------------------------------
@@ -407,6 +420,7 @@ export const DEFAULT_DUPLICATE_RULES = {
   block_both_multiple: true,
   block_single_multiple: true,
   check_visit2_claim_code: true,
+  block_compress_steam_uc: true,
 }
 
 export async function getDuplicateRules(dwPool) {
