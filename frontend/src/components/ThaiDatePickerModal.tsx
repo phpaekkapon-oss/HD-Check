@@ -461,6 +461,9 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
         </>
       )}
 
+      {/* Subtle Visual Divider */}
+      <div className="h-5 w-px bg-slate-200/80 dark:bg-[#2a334d] mx-1 shrink-0 hidden sm:block" />
+
       {/* Start Date Button with anchored Popover */}
       <div className="relative shrink-0">
         <button
@@ -504,6 +507,9 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
 
         {openPopover === 'end' && renderCalendarPopover('end')}
       </div>
+
+      {/* Subtle Visual Divider */}
+      <div className="h-5 w-px bg-slate-200/80 dark:bg-[#2a334d] mx-1 shrink-0 hidden sm:block" />
 
       {/* Quick Presets */}
       <button
