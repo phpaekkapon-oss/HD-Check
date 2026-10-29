@@ -425,6 +425,34 @@ test('HealthMed - UC patient fails if both compress and steam are billed in the 
     count_58301: 0,
   })
   assert.ok(!r4.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
+
+  // 5. ผู้สูงอายุ (Elderly - UC sub-right) with 58130 + 58301 MUST FAIL
+  const r5 = evaluateHealthMedAudit({
+    pttype_name: 'ผู้สูงอายุ',
+    pttype_hipdata: 'UCS',
+    pdx: 'M7911',
+    dx0: 'U5733',
+    service_codes: '58130,58301',
+    count_58130: 1,
+    count_58301: 1,
+    operation_codes: ['900-78-11', '900-78-20', '900-78-00'],
+  })
+  assert.equal(r5.audit_result, 'FAIL')
+  assert.equal(r5.is_duplicate_fail, true)
+  assert.match(r5.audit_reason, /ห้ามทำประคบสมุนไพร.*ร่วมกับอบสมุนไพร/)
+
+  // 6. ประกันสังคม (SSS - Non-UC) with 58130 + 58301 DOES NOT FAIL this UC rule
+  const r6 = evaluateHealthMedAudit({
+    pttype_name: 'ประกันสังคมในเครือข่าย รพ.สกลนคร',
+    pttype_hipdata: 'SSS',
+    pdx: 'M7911',
+    dx0: 'U5733',
+    service_codes: '58130,58301',
+    count_58130: 1,
+    count_58301: 1,
+    operation_codes: ['900-78-11', '900-78-20', '900-78-00'],
+  })
+  assert.ok(!r6.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
 })
 
 

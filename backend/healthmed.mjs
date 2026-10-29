@@ -147,12 +147,27 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   const uniqueDx = [...new Set(dxList)]
   const age = Number(row.age_y ?? 0)
   const pttypeName = String(row.pttype_name ?? '')
-  // สิทธิ UC ทุกประเภทย่อย (ผู้สูงอายุ, อสม., ผู้พิการ, ฯลฯ) มี hipdata_code = 'UCS' ใน HOSxP
-  // ชื่อสิทธิใช้เป็นตัวสำรองเมื่อไม่มี hipdata_code เท่านั้น
   const hipdata = String(row.pttype_hipdata ?? '').trim().toUpperCase()
-  const isUc = hipdata
-    ? hipdata === 'UCS'
-    : pttypeName.includes('ประกันสุขภาพ') || pttypeName.includes('บัตรทอง') || pttypeName.includes('UC')
+
+  // สิทธิที่ไม่ใช่ UC ชัดเจน (ข้าราชการ/เบิกตรง/ประกันสังคม/อปท.)
+  const nonUcKeywords = ['กรมบัญชีกลาง', 'เบิกจ่ายตรง', 'เบิกตรง', 'ประกันสังคม', 'อปท', 'ข้าราชการ', 'ครูเอกชน', 'ต่างด้าว']
+  const isExplicitNonUc =
+    ['OFC', 'LGO', 'SSS', 'BKK', 'CSH', 'PVT', 'BMT', 'OFE', 'A2', 'AL', 'NRD'].includes(hipdata) ||
+    nonUcKeywords.some((kw) => pttypeName.includes(kw))
+
+  // สิทธิ UC ทุกประเภทย่อย (ผู้สูงอายุ, อสม., ผู้พิการ, บัตรทอง, 30บาท ฯลฯ)
+  const isUc =
+    !isExplicitNonUc &&
+    (hipdata === 'UCS' ||
+      pttypeName.includes('ประกันสุขภาพ') ||
+      pttypeName.includes('บัตรทอง') ||
+      pttypeName.includes('UC') ||
+      pttypeName.includes('30บาท') ||
+      pttypeName.includes('ผู้สูงอายุ') ||
+      pttypeName.includes('ผู้มีรายได้น้อย') ||
+      pttypeName.includes('ผู้พิการ') ||
+      pttypeName.includes('อาสาสมัครสาธารณสุข') ||
+      pttypeName.includes('อสม'))
 
   const count58130 = Number(row.count_58130 ?? row.count_both ?? 0)
   const count58101 = Number(row.count_58101 ?? row.count_massage ?? 0)
@@ -219,9 +234,21 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   }
 
   // 5. สิทธิ UC: ประคบสมุนไพร และ อบสมุนไพร ไม่ให้ทำใน visit เดียวกัน
+  // เช่น [58130] ค่านวดและประคบสมุนไพร หรือ [58201] ค่าประคบสมุนไพร ร่วมกับ [58301] ค่าอบไอน้ำสมุนไพร
   const blockCompressSteamUc = duplicateRuleConfig?.block_compress_steam_uc !== false
-  const hasCompress = effectiveCountCompress > 0 || effectiveCountBoth > 0 || opCodesList.some((c) => c.startsWith('900-78-20'))
-  const hasSteam = effectiveCountSteam > 0 || opCodesList.some((c) => c.startsWith('900-78-3'))
+  const serviceCodes = String(row.service_codes ?? '')
+  const hasCompress =
+    effectiveCountCompress > 0 ||
+    effectiveCountBoth > 0 ||
+    serviceCodes.includes('58130') ||
+    serviceCodes.includes('58131') ||
+    serviceCodes.includes('58201') ||
+    opCodesList.some((c) => c.startsWith('900-78-20'))
+
+  const hasSteam =
+    effectiveCountSteam > 0 ||
+    serviceCodes.includes('58301') ||
+    opCodesList.some((c) => c.startsWith('900-78-3'))
 
   if (blockCompressSteamUc && isUc && hasCompress && hasSteam) {
     failures.push('คิดค่าบริการซ้ำ: ผู้ป่วยสิทธิ UC ห้ามทำประคบสมุนไพร (58201/58130) ร่วมกับอบสมุนไพร (58301) ใน Visit เดียวกัน (สปสช. ไม่อนุญาตให้เบิกจ่ายร่วมกัน)')
