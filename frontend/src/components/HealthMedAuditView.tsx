@@ -37,6 +37,8 @@ import {
   Check,
   Copy,
   Download,
+  Settings2,
+  Filter,
 } from 'lucide-react'
 import { useHealthMedAudit } from '@/hooks/useHerbDx'
 import { herbDxApi } from '@/api/herbdx.api'
@@ -259,6 +261,33 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
     void refetch()
   }
 
+  // สิทธิการรักษาที่ยกเว้น (ไม่ต้องการนำมาตรวจและแสดงในตาราง หรือนับใน KPI)
+  const [excludedPttypes, setExcludedPttypes] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('hd_healthmed_excluded_pttypes')
+      return saved ? JSON.parse(saved) : []
+    } catch {
+      return []
+    }
+  })
+  const [showPttypeConfigModal, setShowPttypeConfigModal] = useState(false)
+  const [pttypeModalSearch, setPttypeModalSearch] = useState('')
+
+  const handleToggleExcludePttype = (pttypeName: string) => {
+    setExcludedPttypes((prev) => {
+      const next = prev.includes(pttypeName)
+        ? prev.filter((p) => p !== pttypeName)
+        : [...prev, pttypeName]
+      localStorage.setItem('hd_healthmed_excluded_pttypes', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleSetExcludedPttypes = (newList: string[]) => {
+    setExcludedPttypes(newList)
+    localStorage.setItem('hd_healthmed_excluded_pttypes', JSON.stringify(newList))
+  }
+
   // กรองเฉพาะเคสที่มีรหัสหัตถการหรือค่าบริการ (ตัดเคสไม่มีหัตถการ/ค่าบริการออก เพราะไปเช็คที่หน้าตรวจจ่ายยาสมุนไพร)
   const rawRecords = useMemo(() => {
     const list = data?.data ?? []
@@ -268,15 +297,75 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       return hasOps || hasServices
     })
   }, [data?.data])
-  const kpi = data?.kpi
+
+  // รายการที่ผ่านการตัดสิทธิที่ยกเว้นออกแล้ว (ใช้คำนวณ KPI ตาราง และส่งออก Excel)
+  const activeRecords = useMemo(() => {
+    if (excludedPttypes.length === 0) return rawRecords
+    return rawRecords.filter((r) => {
+      const pt = (r.pttype_name || '').trim() || 'ไม่ระบุสิทธิ'
+      return !excludedPttypes.includes(pt)
+    })
+  }, [rawRecords, excludedPttypes])
+
+  // คำนวณ KPI สรุปผลใหม่แบบ Real-Time ตามสิทธิที่เลือกใช้งาน
+  const kpi = useMemo(() => {
+    if (excludedPttypes.length === 0 && data?.kpi) {
+      return data.kpi
+    }
+    const total = activeRecords.length
+    const pass = activeRecords.filter((r) => r.audit_result === 'PASS').length
+    const fail = activeRecords.filter((r) => r.audit_result === 'FAIL').length
+    const closedCount = activeRecords.filter((r) => r.is_claim_closed).length
+    const unclosedCount = activeRecords.filter((r) => !r.is_claim_closed).length
+    const unclosedOpenOnlyCount = activeRecords.filter((r) => r.claim_close_status === 'OPEN_ONLY').length
+    const unclosedVisit2DupCount = activeRecords.filter((r) => r.claim_close_status === 'VISIT2_DUP').length
+    const unclosedNoneCount = activeRecords.filter((r) => r.claim_close_status === 'NONE').length
+    const visit2Rows = activeRecords.filter((r) => (r.visit_order ?? 1) >= 2)
+    const visit2TotalCount = visit2Rows.length
+    const visit2ClosedCount = visit2Rows.filter((r) => r.is_claim_closed && !r.is_visit2_claim_fail).length
+    const visit2ClaimFail = activeRecords.filter((r) => r.is_visit2_claim_fail).length
+    const duplicateFail = activeRecords.filter((r) => r.is_duplicate_fail).length
+    const kneeFail = activeRecords.filter((r) => r.failures?.some((f) => f.includes('เข่า'))).length
+    const muscleFail = activeRecords.filter((r) => r.failures?.some((f) => f.includes('กล้ามเนื้อ') || f.includes('รหัส M'))).length
+    const postpartumFail = activeRecords.filter((r) => r.failures?.some((f) => f.includes('หลังคลอด') || f.includes('วันคลอด'))).length
+
+    return {
+      total,
+      pass,
+      fail,
+      passRate: total ? Math.round((pass / total) * 1000) / 10 : 0,
+      closedCount,
+      closedRate: total ? Math.round((closedCount / total) * 1000) / 10 : 0,
+      unclosedCount,
+      unclosedOpenOnlyCount,
+      unclosedVisit2DupCount,
+      unclosedNoneCount,
+      visit2TotalCount,
+      visit2ClosedCount,
+      visit2ClaimFail,
+      duplicateFail,
+      kneeFail,
+      muscleFail,
+      postpartumFail,
+      epFail: unclosedCount,
+    }
+  }, [excludedPttypes, data?.kpi, activeRecords])
 
   // ตัวเลือกสำหรับ Dropdown ตัวกรอง (วันที่รับบริการ, ผู้ให้บริการ, สิทธิการรักษา)
   const filterOptions = useMemo(() => {
     const dateCounts = new Map<string, number>()
     const doctorCounts = new Map<string, number>()
     const pttypeCounts = new Map<string, number>()
+    const allPttypeCounts = new Map<string, number>()
 
+    // นับทุกสิทธิจาก rawRecords สำหรับใช้ใน Modal ตั้งค่า
     for (const r of rawRecords) {
+      const pt = (r.pttype_name || '').trim() || 'ไม่ระบุสิทธิ'
+      allPttypeCounts.set(pt, (allPttypeCounts.get(pt) ?? 0) + 1)
+    }
+
+    // นับเฉพาะสิทธิที่เปิดใช้งานอยู่สำหรับตัวกรองตาราง
+    for (const r of activeRecords) {
       if (r.visit_date) {
         dateCounts.set(r.visit_date, (dateCounts.get(r.visit_date) ?? 0) + 1)
       }
@@ -290,13 +379,68 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
     const dates = [...dateCounts.entries()].sort((a, b) => b[0].localeCompare(a[0]))
     const doctors = [...doctorCounts.entries()].sort((a, b) => b[1] - a[1])
     const pttypes = [...pttypeCounts.entries()].sort((a, b) => b[1] - a[1])
+    const allPttypes = [...allPttypeCounts.entries()].sort((a, b) => b[1] - a[1])
 
-    return { dates, doctors, pttypes }
-  }, [rawRecords])
+    return { dates, doctors, pttypes, allPttypes }
+  }, [rawRecords, activeRecords])
+
+  // Presets:
+  // 1. รวมทุกสิทธิ (แสดงทั้งหมด)
+  const handlePresetIncludeAll = () => {
+    handleSetExcludedPttypes([])
+  }
+
+  // 2. เฉพาะสิทธิ UC / บัตรทอง (ยกเว้นสิทธิอื่นที่ไม่ใช่ UC)
+  const handlePresetOnlyUc = () => {
+    const isUcName = (name: string) => {
+      const n = name.toLowerCase()
+      return (
+        n.includes('uc') ||
+        n.includes('ucs') ||
+        n.includes('บัตรทอง') ||
+        n.includes('30บาท') ||
+        n.includes('ประกันสุขภาพ') ||
+        n.includes('ผู้สูงอายุ') ||
+        n.includes('ผู้มีรายได้น้อย') ||
+        n.includes('ผู้พิการ')
+      )
+    }
+    const toExclude = filterOptions.allPttypes
+      .map(([name]) => name)
+      .filter((name) => !isUcName(name))
+    handleSetExcludedPttypes(toExclude)
+  }
+
+  // 3. ยกเว้นสิทธิเบิกจ่ายตรง / กรมบัญชีกลาง / อปท. (ตรงกับที่ผู้ใช้ต้องการ)
+  const handlePresetExcludeGov = () => {
+    const isGovName = (name: string) => {
+      return (
+        name.includes('กรมบัญชีกลาง') ||
+        name.includes('เบิกตรง') ||
+        name.includes('เบิกจ่ายตรง') ||
+        name.includes('อปท') ||
+        name.includes('ข้าราชการ')
+      )
+    }
+    const govPttypes = filterOptions.allPttypes
+      .map(([name]) => name)
+      .filter((name) => isGovName(name))
+    const combined = Array.from(new Set([...excludedPttypes, ...govPttypes]))
+    handleSetExcludedPttypes(combined)
+  }
+
+  // 4. ยกเว้นสิทธิประกันสังคม
+  const handlePresetExcludeSso = () => {
+    const ssoPttypes = filterOptions.allPttypes
+      .map(([name]) => name)
+      .filter((name) => name.includes('ประกันสังคม'))
+    const combined = Array.from(new Set([...excludedPttypes, ...ssoPttypes]))
+    handleSetExcludedPttypes(combined)
+  }
 
   // Filter records based on active KPI filter & detailed filter controls
   const filteredRecords = useMemo(() => {
-    return rawRecords.filter((r) => {
+    return activeRecords.filter((r) => {
       // 1. KPI Category Filter
       if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
@@ -359,7 +503,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       }
       return true
     })
-  }, [rawRecords, kpiFilter, claimStatusFilter, visitDateFilter, doctorFilter, pttypeFilter, serviceFilter, hnFilter, search])
+  }, [activeRecords, kpiFilter, claimStatusFilter, visitDateFilter, doctorFilter, pttypeFilter, serviceFilter, hnFilter, search])
 
   const hasActiveFilters =
     kpiFilter !== 'ALL' ||
@@ -1524,6 +1668,31 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               <span>{density === 'compact' ? 'แถวกะทัดรัด' : 'แถวปกติ'}</span>
             </button>
 
+            {/* Treatment Rights Exclusion / Configuration Button */}
+            <button
+              type="button"
+              onClick={() => setShowPttypeConfigModal(true)}
+              className={cn(
+                'inline-flex items-center gap-1.5 h-8.5 px-2.5 rounded-xl border text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0',
+                excludedPttypes.length > 0
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-200 font-bold'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+              title="ตั้งค่าติ๊กเลือกสิทธิการรักษาที่ต้องการตรวจ หรือยกเว้นไม่นำมาแสดงในตาราง"
+            >
+              <Settings2 className="size-3.5 text-indigo-500" />
+              <span>ตั้งค่าสิทธิ</span>
+              {excludedPttypes.length > 0 ? (
+                <span className="px-1.5 py-0.2 rounded-full text-[10.5px] font-bold bg-amber-500 text-white leading-none">
+                  ยกเว้น {excludedPttypes.length}
+                </span>
+              ) : (
+                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal">
+                  ({filterOptions.allPttypes.length})
+                </span>
+              )}
+            </button>
+
             {/* Export Excel Button in Filter Bar */}
             <button
               type="button"
@@ -1554,7 +1723,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                   : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
               )}
             >
-              <option value="ALL">ทุกสถานะสิทธิ ({rawRecords.length} ราย)</option>
+              <option value="ALL">ทุกสถานะสิทธิ ({activeRecords.length} ราย)</option>
               <option value="CLOSED">✓ ปิดสิทธิแล้ว EP ({kpi?.closedCount ?? 0} ราย)</option>
               <option value="UNCLOSED">✕ ยังไม่ปิดสิทธิรวม ({kpi?.unclosedCount ?? 0} ราย)</option>
               <option value="OPEN_ONLY">⏳ รอปิดสิทธิ PP ({kpi?.unclosedOpenOnlyCount ?? 0} ราย)</option>
@@ -1612,28 +1781,47 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
             <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
           </div>
 
-          {/* 4. Pttype / Right Dropdown */}
-          <div className="relative min-w-0">
-            <FileText className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 dark:text-indigo-400 pointer-events-none" />
-            <select
-              value={pttypeFilter}
-              onChange={(e) => setPttypeFilter(e.target.value)}
-              aria-label="กรองตามสิทธิการรักษา"
-              className={cn(
-                'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
-                pttypeFilter !== 'ALL'
-                  ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
-              )}
-            >
-              <option value="ALL">สิทธิการรักษาทั้งหมด ({filterOptions.pttypes.length})</option>
-              {filterOptions.pttypes.map(([pt, count]) => (
-                <option key={pt} value={pt}>
-                  {pt} ({count})
+          {/* 4. Pttype / Right Dropdown with Quick Config Button */}
+          <div className="relative min-w-0 flex items-center gap-1">
+            <div className="relative flex-1 min-w-0">
+              <FileText className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-indigo-500 dark:text-indigo-400 pointer-events-none" />
+              <select
+                value={pttypeFilter}
+                onChange={(e) => setPttypeFilter(e.target.value)}
+                aria-label="กรองตามสิทธิการรักษา"
+                className={cn(
+                  'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
+                  pttypeFilter !== 'ALL'
+                    ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
+                    : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                )}
+              >
+                <option value="ALL">
+                  {excludedPttypes.length > 0
+                    ? `สิทธิที่ตรวจ (${filterOptions.pttypes.length} • ยกเว้น ${excludedPttypes.length})`
+                    : `สิทธิการรักษาทั้งหมด (${filterOptions.pttypes.length})`}
                 </option>
-              ))}
-            </select>
-            <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                {filterOptions.pttypes.map(([pt, count]) => (
+                  <option key={pt} value={pt}>
+                    {pt} ({count})
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="size-3.5 absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPttypeConfigModal(true)}
+              className={cn(
+                'size-9 rounded-xl border grid place-items-center shrink-0 cursor-pointer transition shadow-2xs',
+                excludedPttypes.length > 0
+                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-700 dark:text-amber-300 hover:bg-amber-500/25'
+                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+              )}
+              title="เปิดหน้าต่างตั้งค่าเลือกติ๊กสิทธิที่ต้องการตรวจ / ยกเว้นสิทธิที่ไม่ต้องการแสดง"
+            >
+              <Settings2 className="size-4" />
+            </button>
           </div>
 
           {/* 5. Service / Procedure Type Dropdown */}
@@ -1662,6 +1850,40 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
           </div>
         </div>
       </section>
+
+      {/* Active Exclusion Notice Banner */}
+      {excludedPttypes.length > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2.5 px-4 py-2.5 rounded-2xl bg-amber-500/10 dark:bg-amber-950/25 border border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs shadow-2xs animate-in fade-in duration-150">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <span className="size-2 rounded-full bg-amber-500 shrink-0 animate-pulse" />
+            <div className="truncate text-xs">
+              <strong className="font-bold text-amber-800 dark:text-amber-300">
+                ยกเว้นการแสดงผลและตรวจ {excludedPttypes.length} สิทธิ ({rawRecords.length - activeRecords.length} ราย):
+              </strong>{' '}
+              <span className="text-slate-600 dark:text-slate-300 font-medium">
+                {excludedPttypes.join(', ')}
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowPttypeConfigModal(true)}
+              className="inline-flex items-center gap-1 font-bold underline hover:text-amber-700 dark:hover:text-amber-300 cursor-pointer transition text-xs"
+            >
+              <Settings2 className="size-3" />
+              <span>ปรับแต่งสิทธิ</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleSetExcludedPttypes([])}
+              className="px-2.5 py-1 rounded-xl bg-amber-500/20 hover:bg-amber-500/30 text-amber-950 dark:text-amber-100 font-bold cursor-pointer transition text-[11px] border border-amber-500/30"
+            >
+              คืนค่า (แสดงทั้งหมด)
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Main DataTable Container */}
       <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-themed-card shadow-xs overflow-hidden">
@@ -2158,6 +2380,209 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               >
                 ปิดหน้าต่าง
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Treatment Rights Configuration Modal (เลือกติ๊กสิทธิที่ไม่ต้องการแสดงในตารางและ KPI) */}
+      {showPttypeConfigModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setShowPttypeConfigModal(false)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white dark:bg-[#121826] border border-slate-200/90 dark:border-white/10 shadow-2xl overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3 p-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
+              <div className="flex items-center gap-2.5">
+                <div className="size-9 rounded-xl bg-indigo-500/15 text-indigo-500 dark:text-indigo-400 grid place-items-center shrink-0">
+                  <Settings2 className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+                    <span>ตั้งค่าสิทธิการรักษาที่ต้องการตรวจ</span>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border border-indigo-500/30">
+                      รวม {filterOptions.allPttypes.length} สิทธิ
+                    </span>
+                  </h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                    ติ๊กเลือกสิทธิที่ต้องการให้ตรวจและแสดงในตาราง (สิทธิที่ยกเว้นจะไม่นำมานับใน KPI และตาราง)
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowPttypeConfigModal(false)}
+                className="size-8 rounded-xl grid place-items-center text-slate-400 hover:text-slate-700 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/10 transition cursor-pointer"
+                aria-label="ปิดหน้าต่าง"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Quick Action Presets */}
+            <div className="p-3 border-b border-slate-200 dark:border-white/10 bg-slate-100/50 dark:bg-white/2 space-y-2">
+              <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
+                <Filter className="size-3 text-indigo-500" />
+                <span>ตัวเลือกด่วน (Quick Presets):</span>
+              </div>
+              <div className="flex flex-wrap items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={handlePresetIncludeAll}
+                  className={cn(
+                    'px-2.5 py-1 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs border',
+                    excludedPttypes.length === 0
+                      ? 'bg-teal-500/20 text-teal-800 dark:text-teal-200 border-teal-500/40 font-bold'
+                      : 'bg-white dark:bg-[#1a2333] hover:bg-slate-50 dark:hover:bg-[#222d42] text-slate-700 dark:text-slate-200 border-slate-200/90 dark:border-white/10'
+                  )}
+                >
+                  ✓ แสดงทุกสิทธิ ({filterOptions.allPttypes.length})
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePresetExcludeGov}
+                  className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-amber-500/10 hover:bg-amber-500/20 text-amber-800 dark:text-amber-300 border border-amber-500/30 transition cursor-pointer shadow-2xs"
+                  title="ยกเว้นสิทธิเบิกกรมบัญชีกลาง, เบิกตรง อปท., ข้าราชการ กทม."
+                >
+                  🚫 ยกเว้นสิทธิเบิกตรง/กรมบัญชีกลาง
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePresetExcludeSso}
+                  className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-slate-200/60 hover:bg-slate-200 dark:bg-white/10 dark:hover:bg-white/15 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-white/10 transition cursor-pointer shadow-2xs"
+                  title="ยกเว้นสิทธิประกันสังคมทุกโรงพยาบาล"
+                >
+                  🚫 ยกเว้นประกันสังคม
+                </button>
+                <button
+                  type="button"
+                  onClick={handlePresetOnlyUc}
+                  className="px-2.5 py-1 rounded-xl text-xs font-semibold bg-teal-500/10 hover:bg-teal-500/20 text-teal-700 dark:text-teal-300 border border-teal-500/30 transition cursor-pointer shadow-2xs"
+                  title="แสดงเฉพาะสิทธิบัตรทอง / UC / ประกันสุขภาพ"
+                >
+                  🎯 เฉพาะสิทธิ UC / บัตรทอง
+                </button>
+              </div>
+            </div>
+
+            {/* Search Input inside Modal */}
+            <div className="p-3 border-b border-slate-200 dark:border-white/10">
+              <div className="relative">
+                <Search className="size-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                <input
+                  type="text"
+                  value={pttypeModalSearch}
+                  onChange={(e) => setPttypeModalSearch(e.target.value)}
+                  placeholder="ค้นหาชื่อสิทธิการรักษา..."
+                  className="w-full h-8.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 shadow-2xs transition"
+                />
+                {pttypeModalSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setPttypeModalSearch('')}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 dark:hover:text-white cursor-pointer"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Checklist of Rights */}
+            <div className="flex-1 overflow-y-auto p-3 space-y-1.5 max-h-[50vh]">
+              {filterOptions.allPttypes
+                .filter(([name]) => !pttypeModalSearch.trim() || name.toLowerCase().includes(pttypeModalSearch.toLowerCase()))
+                .map(([name, count]) => {
+                  const isExcluded = excludedPttypes.includes(name)
+                  const isIncluded = !isExcluded
+                  return (
+                    <div
+                      key={name}
+                      onClick={() => handleToggleExcludePttype(name)}
+                      className={cn(
+                        'flex items-center justify-between gap-3 p-2.5 rounded-xl border text-xs cursor-pointer transition select-none',
+                        isIncluded
+                          ? 'bg-white dark:bg-[#151b2d] border-slate-200/80 dark:border-white/10 hover:border-indigo-500/40 hover:bg-slate-50 dark:hover:bg-[#1a2338]'
+                          : 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/25 opacity-80 hover:opacity-100 hover:bg-rose-500/10'
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <div
+                          className={cn(
+                            'size-5 rounded-md grid place-items-center shrink-0 border transition',
+                            isIncluded
+                              ? 'bg-teal-600 border-teal-600 text-white'
+                              : 'bg-transparent border-slate-300 dark:border-slate-600 text-transparent'
+                          )}
+                        >
+                          <Check className="size-3.5 stroke-[3]" />
+                        </div>
+                        <span
+                          className={cn(
+                            'font-semibold truncate',
+                            isIncluded ? 'text-slate-800 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400 line-through'
+                          )}
+                        >
+                          {name}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                          {count} ราย
+                        </span>
+                        {isIncluded ? (
+                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-teal-500/15 text-teal-700 dark:text-teal-300 border border-teal-500/30">
+                            ✓ ตรวจ/แสดง
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full text-[10.5px] font-bold bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                            ✕ ยกเว้น (ซ่อน)
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+            </div>
+
+            {/* Footer Summary & Action */}
+            <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 border-t border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
+              <div className="text-xs text-slate-500 dark:text-slate-400">
+                <span>
+                  กำลังตรวจ:{' '}
+                  <strong className="text-teal-600 dark:text-teal-400 font-bold">
+                    {filterOptions.allPttypes.length - excludedPttypes.length} สิทธิ ({activeRecords.length} ราย)
+                  </strong>
+                </span>
+                {excludedPttypes.length > 0 && (
+                  <span className="ml-2 text-rose-600 dark:text-rose-400 font-bold">
+                    • ยกเว้น {excludedPttypes.length} สิทธิ ({rawRecords.length - activeRecords.length} ราย)
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {excludedPttypes.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handlePresetIncludeAll}
+                    className="px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-200/50 dark:hover:bg-white/10 cursor-pointer transition"
+                  >
+                    ล้างการยกเว้น
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setShowPttypeConfigModal(false)}
+                  className="px-4 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white cursor-pointer shadow-xs transition"
+                >
+                  เสร็จสิ้น / ดูตาราง
+                </button>
+              </div>
             </div>
           </div>
         </div>
