@@ -380,11 +380,11 @@ const readRange = (q) => {
   const endDate = isValidDate(q.endDate) ? q.endDate : def.endDate
   const days = (Date.parse(endDate) - Date.parse(startDate)) / 86_400_000
   if (days < 0) throw badRequest('วันที่เริ่มต้นต้องไม่เกินวันที่สิ้นสุด')
-  if (days >= MAX_RANGE_DAYS) throw badRequest(`ช่วงวันที่ต้องไม่เกิน ${MAX_RANGE_DAYS} วัน (1 ปีงบประมาณ)`)
+  if (days > MAX_RANGE_DAYS) throw badRequest(`ช่วงวันที่ต้องไม่เกิน ${MAX_RANGE_DAYS} วัน (1 ปีงบประมาณ)`)
   return { startDate, endDate }
 }
 // One fiscal year (incl. leap years). Longer ranges pull every row into memory and the browser.
-const MAX_RANGE_DAYS = 366
+const MAX_RANGE_DAYS = 370
 // DATE_RE alone accepts '2026-13-45'; round-trip through Date to reject impossible dates
 const isValidDate = (v) => {
   if (typeof v !== 'string' || !DATE_RE.test(v)) return false
