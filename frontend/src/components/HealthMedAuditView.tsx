@@ -2577,10 +2577,15 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 )}
                 <button
                   type="button"
-                  onClick={() => setShowPttypeConfigModal(false)}
-                  className="px-4 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white cursor-pointer shadow-xs transition"
+                  onClick={() => {
+                    localStorage.setItem('hd_healthmed_excluded_pttypes', JSON.stringify(excludedPttypes))
+                    setShowPttypeConfigModal(false)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-1.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-500 text-white cursor-pointer shadow-xs transition"
+                  title="บันทึกการตั้งค่าสิทธิลงระบบและปิดหน้าต่าง"
                 >
-                  เสร็จสิ้น / ดูตาราง
+                  <Check className="size-3.5 stroke-[3]" />
+                  <span>บันทึกและนำไปใช้</span>
                 </button>
               </div>
             </div>
