@@ -453,6 +453,23 @@ test('HealthMed - UC patient fails if both compress and steam are billed in the 
     operation_codes: ['900-78-11', '900-78-20', '900-78-00'],
   })
   assert.ok(!r6.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
+
+  // 7. บริบาลหญิงหลังคลอด (Postpartum M6260+U506) สิทธิ UC ที่มี 58131 (นวดประคบหลังคลอด) + 58301 (อบสมุนไพร) + 58220 (ทับหม้อเกลือ)
+  // ได้รับการยกเว้นให้ผ่านได้ ไม่ติดกฎห้ามประคบ+อบร่วมกัน เพราะ สปสช. ให้ทำเป็นชุดบริการหลังคลอด
+  const r7 = evaluateHealthMedAudit({
+    pttype_name: 'UC30บาท(UCS) 12-59 ปีในเขต',
+    pttype_hipdata: 'UCS',
+    pdx: 'M6260',
+    dx0: 'U506',
+    service_codes: '58131,58220,58301',
+    count_58131: 1,
+    count_58220: 1,
+    count_58301: 1,
+    operation_codes: ['900-77-12', '900-77-13', '900-77-14', '900-77-16', '900-77-30'],
+    labor_date: '2026-09-14',
+  })
+  assert.equal(r7.audit_result, 'PASS')
+  assert.ok(!r7.failures.some((f) => f.includes('ห้ามทำประคบสมุนไพร')))
 })
 
 

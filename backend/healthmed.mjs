@@ -243,8 +243,16 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     }
   }
 
+  // ตรวจจับกรณีบริบาลหญิงหลังคลอด (Postpartum Care)
+  const hasM6260 = uniqueDx.includes('M6260')
+  const hasU506 = uniqueDx.includes('U506')
+  const hasAnyPostpartumOp = REQUIRED_POSTPARTUM_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
+  const isPostpartumService = count58220 > 0 || count58131 > 0 || hasAnyPostpartumOp
+  const isPostpartumCase = hasU506 || isPostpartumService
+
   // 5. สิทธิ UC: ประคบสมุนไพร และ อบสมุนไพร ไม่ให้ทำใน visit เดียวกัน
   // เช่น [58130] ค่านวดและประคบสมุนไพร หรือ [58201] ค่าประคบสมุนไพร ร่วมกับ [58301] ค่าอบไอน้ำสมุนไพร
+  // ยกเว้นกรณีบริบาลหญิงหลังคลอด (M6260 + U506 / บริบาลมารดาหลังคลอด 58131, 58220, 58301) ซึ่ง สปสช. กำหนดเป็นชุดบริการร่วมกันได้
   const blockCompressSteamUc = duplicateRuleConfig?.block_compress_steam_uc !== false
   const serviceCodes = String(row.service_codes ?? '')
   const hasCompress =
@@ -260,8 +268,8 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
     serviceCodes.includes('58301') ||
     opCodesList.some((c) => c.startsWith('900-78-3'))
 
-  if (blockCompressSteamUc && isUc && hasCompress && hasSteam) {
-    failures.push('คิดค่าบริการซ้ำ: ผู้ป่วยสิทธิ UC ห้ามทำประคบสมุนไพร (58201/58130) ร่วมกับอบสมุนไพร (58301) ใน Visit เดียวกัน (สปสช. ไม่อนุญาตให้เบิกจ่ายร่วมกัน)')
+  if (blockCompressSteamUc && isUc && !isPostpartumCase && hasCompress && hasSteam) {
+    failures.push('คิดค่าบริการซ้ำ: ผู้ป่วยสิทธิ UC ห้ามทำประคบสมุนไพร (58201/58130) ร่วมกับอบสมุนไพร (58301) ใน Visit เดียวกัน (สปสช. ไม่อนุญาตให้เบิกจ่ายร่วมกัน ยกเว้นชุดบริบาลหลังคลอด)')
   }
 
   // -------------------------------------------------------------
@@ -305,13 +313,8 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   //    เชื่อมกับ วันคลอด ในระบบงานบัญชี 2 ถ้าไม่มีวันคลอด ไม่ผ่าน
   // 5. รหัส M6260 + U อื่นๆ จับคู่หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ถือว่าเป็น โรคกล้ามเนื้ออื่นๆ ผ่านเกณฑ์
   // -------------------------------------------------------------
-  const hasM6260 = uniqueDx.includes('M6260')
-  const hasU506 = uniqueDx.includes('U506')
-  const hasAnyPostpartumOp = REQUIRED_POSTPARTUM_OPS.some((req) => normalizedOpSet.has(normalizeOpCode(req)))
-  const isPostpartumService = count58220 > 0 || count58131 > 0 || hasAnyPostpartumOp
-
   // กรณีบริบาลหญิงหลังคลอด: มี U506 หรือ มีหัตถการ/ค่าบริการบริบาลหลังคลอด
-  if (hasU506 || isPostpartumService) {
+  if (isPostpartumCase) {
     if (!hasM6260) failures.push('บริบาลหญิงหลังคลอด ขาดรหัส M6260')
     if (!hasU506) failures.push('บริบาลหญิงหลังคลอด ขาดรหัส U506')
 
@@ -349,7 +352,6 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   // กฎข้อที่ 5 (ข้อ 2 จากผู้ใช้): โรคกล้ามเนื้อทั่วไป (M... + U...)
   // เอาเฉพาะ รหัส M... U... ที่มีรหัส หัตถการ 872-78-11, 873-78-11, 874-78-11, 873-78-35, 900-78-11, 900-78-20, 900-78-00 ร่วมด้วยเท่านั้น
   // -------------------------------------------------------------
-  const isPostpartumCase = hasU506 || isPostpartumService
   const isM6260Handled = hasM6260 && !hasU506
 
   if (!isKneeCase && !isPostpartumCase && !isM6260Handled) {
