@@ -33,15 +33,15 @@ export function DataTableViewOptions<TData>({
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[#45415d] bg-white dark:bg-[#292440] px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-100 shadow-sm hover:bg-slate-50 dark:hover:bg-[#383250] cursor-pointer"
+        className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-border)] px-3 py-1.5 text-xs font-medium text-slate-700 dark:text-slate-100 shadow-sm hover:bg-slate-50 dark:hover:bg-[var(--input-border)] cursor-pointer"
       >
         <SlidersHorizontal className="size-3.5 text-slate-500" />
         <span>เลือกคอลัมน์</span>
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 z-50 mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-[#45415d] bg-white dark:bg-[#1d2035] p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in-50 zoom-in-95">
-          <div className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase px-2 py-1 border-b border-slate-100 dark:border-[#383250] mb-1">
+        <div className="absolute right-0 z-50 mt-1.5 w-52 rounded-xl border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-header)] p-2 shadow-xl ring-1 ring-black/5 animate-in fade-in-50 zoom-in-95">
+          <div className="text-xs font-bold text-slate-500 dark:text-slate-300 uppercase px-2 py-1 border-b border-slate-100 dark:border-[var(--input-border)] mb-1">
             ซ่อน / แสดง คอลัมน์
           </div>
           <div className="max-h-60 overflow-y-auto space-y-0.5">
@@ -58,7 +58,7 @@ export function DataTableViewOptions<TData>({
                     type="checkbox"
                     checked={isVisible}
                     onChange={(e) => column.toggleVisibility(!!e.target.checked)}
-                    className="rounded border-slate-300 dark:border-[#74688b] size-3.5"
+                    className="rounded border-slate-300 dark:border-[var(--input-border)] size-3.5"
                     style={{ accentColor: 'var(--accent-hex)' }}
                   />
                   <span className="truncate flex-1">{label}</span>

@@ -328,7 +328,7 @@ export const HerbAuditDetailModal: FC<HerbAuditDetailModalProps> = ({ record, on
             )}
 
             {aiAdvice && (
-              <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[#0d1627] dark:via-[#0c1424] dark:to-[#141226] border border-teal-500/30 space-y-2.5 animate-in fade-in duration-200">
+              <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[var(--card-sub)] dark:via-[var(--card-sub)] dark:to-[var(--card-bg)] border border-teal-500/30 space-y-2.5 animate-in fade-in duration-200">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <span className="text-xs font-bold text-teal-700 dark:text-teal-400 flex items-center gap-1">

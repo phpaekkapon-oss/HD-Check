@@ -395,7 +395,7 @@ const DashboardView: FC = () => {
           ) : null}
 
           {/* Desktop Unified Audit Card (Filter Toolbar + Table) */}
-          <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
+          <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
             <AuditFilterBar
               range={range}
               onRangeChange={handleRangeChange}
@@ -518,7 +518,7 @@ const DashboardView: FC = () => {
 export const App: FC = () => {
   const { isAuthenticated, isLoading } = useAuth()
   if (isLoading) {
-    return <div className="min-h-screen grid place-items-center bg-[#070b14] text-sm text-slate-300">กำลังตรวจสอบเซสชัน…</div>
+    return <div className="min-h-screen grid place-items-center bg-[var(--app-bg)] text-sm text-[var(--text-main)]">กำลังตรวจสอบเซสชัน…</div>
   }
   return isAuthenticated ? (
     <PinLockProvider>

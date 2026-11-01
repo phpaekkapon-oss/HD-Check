@@ -573,12 +573,12 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
     <div
       className={cn(
         'space-y-0 transition-colors overflow-hidden',
-        expanded && 'fixed inset-2 z-[70] flex flex-col rounded-2xl border border-slate-200 bg-themed-card shadow-2xl dark:border-[#292440] sm:inset-4',
-        !embedded && 'rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm'
+        expanded && 'fixed inset-2 z-[70] flex flex-col rounded-2xl border border-slate-200 bg-themed-card shadow-2xl dark:border-[var(--card-border)] sm:inset-4',
+        !embedded && 'rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm'
       )}
     >
       {/* Table Toolbar Header with Column Toggle */}
-      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/80 dark:bg-[#1d2035]/80 border-b border-slate-200 dark:border-[#292440]">
+      <div className="flex items-center justify-between gap-3 px-4 py-2.5 bg-slate-50/80 dark:bg-[var(--card-header)]/80 border-b border-slate-200 dark:border-[var(--card-border)]">
         <div className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-2">
           <span className="font-semibold text-slate-900 dark:text-white">ตารางข้อมูล</span>
           <span className="text-slate-400 dark:text-slate-400">•</span>
@@ -601,7 +601,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
       <Table className={expanded ? 'min-w-max' : undefined} containerClassName={expanded ? 'min-h-0 flex-1 overflow-auto' : 'max-h-[68vh] min-h-[420px] overflow-auto'}>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] bg-slate-50 dark:bg-[#1d2035]">
+            <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[var(--card-border)] bg-slate-50 dark:bg-[var(--card-header)]">
               {headerGroup.headers.map((header) => (
                 <TableHead key={header.id} className="text-slate-700 dark:text-slate-300 font-semibold">
                   {header.isPlaceholder
@@ -632,7 +632,7 @@ export const AuditTable: FC<AuditTableProps> = ({ records, embedded = false, onC
               const isPass = row.original.audit_result === 'PASS'
 
               const rowClass = cn(
-                'transition-colors border-slate-100 dark:border-[#292440]/70 text-slate-800 dark:text-slate-200',
+                'transition-colors border-slate-100 dark:border-[var(--card-border)]/70 text-slate-800 dark:text-slate-200',
                 isNoDx && 'bg-rose-50/70 hover:bg-rose-100/70 dark:bg-rose-950/20 dark:hover:bg-rose-950/40 border-l-4 border-l-rose-600',
                 isFail && 'bg-rose-50/50 hover:bg-rose-100/50 dark:bg-rose-950/15 dark:hover:bg-rose-950/30 border-l-4 border-l-rose-500',
                 isNoMap && 'bg-amber-50/60 hover:bg-amber-100/60 dark:bg-amber-950/15 dark:hover:bg-amber-950/30 border-l-4 border-l-amber-500 dark:border-l-amber-400',

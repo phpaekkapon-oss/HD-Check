@@ -45,7 +45,7 @@ export function PaginationBar({
   const paginationRange = pageCount > 0 ? getPaginationRange(currentPage, pageCount) : []
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-[#15182a] border-t border-slate-200 dark:border-[#292440] text-xs text-slate-600 dark:text-slate-200 select-none">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3 bg-slate-50 dark:bg-[var(--card-bg)] border-t border-slate-200 dark:border-[var(--card-border)] text-xs text-slate-600 dark:text-slate-200 select-none">
       {/* Left: Total Records Info & Page Size */}
       <div className="flex flex-wrap items-center gap-3 sm:gap-4 w-full sm:w-auto justify-between sm:justify-start">
         <span className="font-mono text-slate-500 dark:text-slate-400 text-xs">
@@ -59,7 +59,7 @@ export function PaginationBar({
           <select
             value={pageSize}
             onChange={(e) => onPageSizeChange(Number(e.target.value))}
-            className="rounded-lg border border-slate-300 dark:border-[#383350] bg-white dark:bg-[#101326] px-2 py-1 text-xs font-mono font-medium text-slate-700 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 cursor-pointer"
+            className="rounded-lg border border-slate-300 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-sub)] px-2 py-1 text-xs font-mono font-medium text-slate-700 dark:text-slate-200 shadow-2xs focus:outline-none focus:ring-1 cursor-pointer"
             aria-label="จำนวนรายการต่อหน้า"
           >
             {pageSizeOptions.map((size) => (
@@ -78,7 +78,7 @@ export function PaginationBar({
           type="button"
           onClick={() => onPageChange(0)}
           disabled={!canPrev}
-          className="size-8 rounded-lg border border-slate-200 dark:border-[#383350] bg-white dark:bg-[#1a1d32] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#282a46] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
+          className="size-8 rounded-lg border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-border)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
           title="หน้าแรกสุด"
           aria-label="หน้าแรกสุด"
         >
@@ -90,7 +90,7 @@ export function PaginationBar({
           type="button"
           onClick={() => onPageChange(pageIndex - 1)}
           disabled={!canPrev}
-          className="size-8 rounded-lg border border-slate-200 dark:border-[#383350] bg-white dark:bg-[#1a1d32] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#282a46] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
+          className="size-8 rounded-lg border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-border)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
           title="หน้าก่อนหน้า"
           aria-label="หน้าก่อนหน้า"
         >
@@ -126,7 +126,7 @@ export function PaginationBar({
                   'size-8 rounded-lg font-mono text-xs font-bold transition flex items-center justify-center cursor-pointer',
                   isCurrent
                     ? 'btn-pill-action text-white shadow-xs scale-105 z-10'
-                    : 'border border-slate-200 dark:border-[#383350] bg-white dark:bg-[#1a1d32] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#282a46] hover:text-slate-900 dark:hover:text-white shadow-2xs active:scale-95'
+                    : 'border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-border)] hover:text-slate-900 dark:hover:text-white shadow-2xs active:scale-95'
                 )}
                 aria-label={`ไปที่หน้า ${p}`}
                 aria-current={isCurrent ? 'page' : undefined}
@@ -142,7 +142,7 @@ export function PaginationBar({
           type="button"
           onClick={() => onPageChange(pageIndex + 1)}
           disabled={!canNext}
-          className="size-8 rounded-lg border border-slate-200 dark:border-[#383350] bg-white dark:bg-[#1a1d32] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#282a46] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
+          className="size-8 rounded-lg border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-border)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
           title="หน้าถัดไป"
           aria-label="หน้าถัดไป"
         >
@@ -154,7 +154,7 @@ export function PaginationBar({
           type="button"
           onClick={() => onPageChange(pageCount - 1)}
           disabled={!canNext}
-          className="size-8 rounded-lg border border-slate-200 dark:border-[#383350] bg-white dark:bg-[#1a1d32] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#282a46] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
+          className="size-8 rounded-lg border border-slate-200 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-border)] disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer shadow-2xs flex items-center justify-center transition active:scale-95"
           title="หน้าสุดท้าย"
           aria-label="หน้าสุดท้าย"
         >

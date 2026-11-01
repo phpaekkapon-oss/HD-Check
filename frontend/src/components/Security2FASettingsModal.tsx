@@ -838,7 +838,7 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
 
   // Role categorization helpers
   const isUserAdmin = (u: User2FAAdminItem) => {
-    return Boolean(u.admin_enabled || u.effective_role === 'it' || isAdminUser(u as any))
+    return Boolean(u.admin_enabled || u.effective_role === 'it' || isAdminUser(u))
   }
   const isUserThaiMed = (u: User2FAAdminItem) => {
     if (isUserAdmin(u)) return false
@@ -869,7 +869,8 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     return pos.includes('แพทย์') || pos.includes('ทันต') || group.includes('doctor')
   }
 
-  const [roleFilter, setRoleFilter] = useState<'all' | 'admin' | 'thaimed' | 'pharmacist' | 'doctor' | 'general' | 'disabled'>('all')
+  type StaffRoleFilter = 'all' | 'admin' | 'thaimed' | 'pharmacist' | 'doctor' | 'general' | 'disabled'
+  const [roleFilter, setRoleFilter] = useState<StaffRoleFilter>('all')
   const [selectedLogins, setSelectedLogins] = useState<Set<string>>(new Set())
   const [isBatchProcessing, setIsBatchProcessing] = useState(false)
 
@@ -1925,20 +1926,20 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                   }}
                 >
                   {[
-                    { id: 'all', label: 'ทั้งหมด', count: roleCounts.all, icon: Users, color: 'text-slate-300' },
-                    { id: 'admin', label: 'ผู้ดูแลระบบ (Admin)', count: roleCounts.admin, icon: ShieldCheck, color: 'text-violet-400' },
-                    { id: 'thaimed', label: 'แพทย์แผนไทย', count: roleCounts.thaimed, icon: Activity, color: 'text-emerald-400' },
-                    { id: 'pharmacist', label: 'เภสัชกรรม', count: roleCounts.pharmacist, icon: Pill, color: 'text-sky-400' },
-                    { id: 'doctor', label: 'แพทย์ / ทันตแพทย์', count: roleCounts.doctor, icon: UserIcon, color: 'text-indigo-400' },
-                    { id: 'general', label: 'บุคลากรทั่วไป', count: roleCounts.general, icon: Users, color: 'text-slate-400' },
-                    ...(roleCounts.disabled > 0 ? [{ id: 'disabled', label: 'ปิดใช้งานใน HOSxP', count: roleCounts.disabled, icon: AlertCircle, color: 'text-rose-400' }] : []),
+                    { id: 'all' as const, label: 'ทั้งหมด', count: roleCounts.all, icon: Users, color: 'text-slate-300' },
+                    { id: 'admin' as const, label: 'ผู้ดูแลระบบ (Admin)', count: roleCounts.admin, icon: ShieldCheck, color: 'text-violet-400' },
+                    { id: 'thaimed' as const, label: 'แพทย์แผนไทย', count: roleCounts.thaimed, icon: Activity, color: 'text-emerald-400' },
+                    { id: 'pharmacist' as const, label: 'เภสัชกรรม', count: roleCounts.pharmacist, icon: Pill, color: 'text-sky-400' },
+                    { id: 'doctor' as const, label: 'แพทย์ / ทันตแพทย์', count: roleCounts.doctor, icon: UserIcon, color: 'text-indigo-400' },
+                    { id: 'general' as const, label: 'บุคลากรทั่วไป', count: roleCounts.general, icon: Users, color: 'text-slate-400' },
+                    ...(roleCounts.disabled > 0 ? [{ id: 'disabled' as const, label: 'ปิดใช้งานใน HOSxP', count: roleCounts.disabled, icon: AlertCircle, color: 'text-rose-400' }] : []),
                   ].map((tab) => {
                     const isActive = roleFilter === tab.id
                     return (
                       <button
                         key={tab.id}
                         type="button"
-                        onClick={() => setRoleFilter(tab.id as any)}
+                        onClick={() => setRoleFilter(tab.id)}
                         className={cn(
                           'inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl font-medium text-xs whitespace-nowrap transition cursor-pointer border',
                           isActive

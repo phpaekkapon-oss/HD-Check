@@ -164,7 +164,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs animate-in fade-in"
     >
-      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-white dark:bg-[#111425] border border-slate-200 dark:border-[#2b2746] shadow-2xl overflow-hidden">
+      <div className="relative w-full max-w-4xl max-h-[92vh] flex flex-col rounded-2xl bg-white dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--card-border)] shadow-2xl overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-200 dark:border-white/10 bg-slate-50/70 dark:bg-white/5">
           <div className="flex items-center gap-3">
@@ -222,7 +222,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
                   'flex flex-col items-center justify-center p-8 sm:p-12 border-2 border-dashed rounded-2xl cursor-pointer transition-all',
                   isDragging
                     ? 'border-violet-500 bg-violet-500/10'
-                    : 'border-slate-300 dark:border-[#383354] hover:border-violet-400 dark:hover:border-violet-500/50 bg-slate-50/50 dark:bg-[#16192e]/60'
+                    : 'border-slate-300 dark:border-[var(--input-border)] hover:border-violet-400 dark:hover:border-violet-500/50 bg-slate-50/50 dark:bg-[var(--card-bg)]/60'
                 )}
               >
                 <input
@@ -263,7 +263,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
               )}
 
               {/* Instructions & Template download option */}
-              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[#161a30] border border-slate-200 dark:border-white/5 space-y-3">
+              <div className="p-4 rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] border border-slate-200 dark:border-white/5 space-y-3">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <div className="space-y-0.5">
                     <h3 className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -288,7 +288,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
             /* STEP 2: Preview & Diff */
             <div className="space-y-4">
               {/* File Info Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[#161a30] border border-slate-200 dark:border-white/5">
+              <div className="flex flex-wrap items-center justify-between gap-2 p-3 rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] border border-slate-200 dark:border-white/5">
                 <div className="flex items-center gap-2">
                   <FileSpreadsheet className="size-4 text-emerald-600 dark:text-emerald-400" />
                   <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
@@ -309,7 +309,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
 
               {/* KPI Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                <div className="p-3 rounded-xl bg-slate-50 dark:bg-[#161a30] border border-slate-200 dark:border-white/5 text-center">
+                <div className="p-3 rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] border border-slate-200 dark:border-white/5 text-center">
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">ทั้งหมดในไฟล์</p>
                   <p className="text-lg font-bold text-slate-800 dark:text-slate-100">
                     {parsedResult.totalRows}
@@ -322,7 +322,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
                     'p-3 rounded-xl border text-center cursor-pointer transition-all',
                     activeFilter === 'changed'
                       ? 'bg-violet-500/15 border-violet-500/50 shadow-xs ring-1 ring-violet-500'
-                      : 'bg-slate-50 dark:bg-[#161a30] border-slate-200 dark:border-white/5 hover:border-violet-400'
+                      : 'bg-slate-50 dark:bg-[var(--card-bg)] border-slate-200 dark:border-white/5 hover:border-violet-400'
                   )}
                 >
                   <p className="text-[11px] text-violet-600 dark:text-violet-400 font-medium">
@@ -339,7 +339,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
                     'p-3 rounded-xl border text-center cursor-pointer transition-all',
                     activeFilter === 'all'
                       ? 'bg-slate-200/80 dark:bg-white/15 border-slate-400 dark:border-white/30 shadow-xs'
-                      : 'bg-slate-50 dark:bg-[#161a30] border-slate-200 dark:border-white/5 hover:border-slate-300'
+                      : 'bg-slate-50 dark:bg-[var(--card-bg)] border-slate-200 dark:border-white/5 hover:border-slate-300'
                   )}
                 >
                   <p className="text-[11px] text-slate-500 dark:text-slate-400">รหัสคงเดิม</p>
@@ -356,7 +356,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
                       ? activeFilter === 'invalid'
                         ? 'bg-amber-500/15 border-amber-500/50 shadow-xs ring-1 ring-amber-500 cursor-pointer'
                         : 'bg-amber-50 dark:bg-amber-950/20 border-amber-300 dark:border-amber-800/40 cursor-pointer'
-                      : 'bg-slate-50 dark:bg-[#161a30] border-slate-200 dark:border-white/5 opacity-50'
+                      : 'bg-slate-50 dark:bg-[var(--card-bg)] border-slate-200 dark:border-white/5 opacity-50'
                   )}
                 >
                   <p className="text-[11px] text-amber-600 dark:text-amber-400 font-medium">
@@ -417,7 +417,7 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
                     value={tableSearch}
                     onChange={(e) => setTableSearch(e.target.value)}
                     placeholder="ค้นหารหัสยา, ชื่อยา หรือรหัสโรค..."
-                    className="w-full pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-300 dark:border-[#383354] bg-white dark:bg-[#161a30] text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                    className="w-full pl-8 pr-3 py-1 text-xs rounded-lg border border-slate-300 dark:border-[var(--input-border)] bg-white dark:bg-[var(--card-bg)] text-slate-800 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500"
                   />
                 </div>
                 <span className="text-xs text-slate-400">
@@ -426,9 +426,9 @@ export const DxMapImportModal: FC<DxMapImportModalProps> = ({
               </div>
 
               {/* Preview Diff Table */}
-              <div className="border border-slate-200 dark:border-[#2b2746] rounded-xl overflow-hidden max-h-72 overflow-y-auto">
+              <div className="border border-slate-200 dark:border-[var(--card-border)] rounded-xl overflow-hidden max-h-72 overflow-y-auto">
                 <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-100 dark:bg-[#181c35] text-slate-600 dark:text-slate-300 sticky top-0 border-b border-slate-200 dark:border-white/10 z-10">
+                  <thead className="bg-slate-100 dark:bg-[var(--card-bg)] text-slate-600 dark:text-slate-300 sticky top-0 border-b border-slate-200 dark:border-white/10 z-10">
                     <tr>
                       <th className="py-2 px-3 font-semibold w-12 text-center">แถว</th>
                       <th className="py-2 px-3 font-semibold min-w-[160px]">รายการยาสมุนไพร</th>

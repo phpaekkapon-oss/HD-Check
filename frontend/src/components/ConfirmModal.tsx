@@ -104,7 +104,7 @@ export const ConfirmModal: FC<ConfirmModalProps> = ({
         aria-labelledby="confirm-modal-title"
         className={cn(
           'relative w-full max-w-md overflow-hidden rounded-2xl border shadow-2xl z-10 text-white animate-scale-in p-6',
-          'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 dark:from-[#161226] dark:via-[#130f21] dark:to-[#0c0916]',
+          'bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 dark:from-[var(--card-sub)] dark:via-[var(--card-sub)] dark:to-[var(--app-bg)]',
           isDanger && 'border-rose-500/30 shadow-rose-950/40',
           isWarning && 'border-amber-500/30 shadow-amber-950/40',
           isPrimary && 'border-teal-500/30 shadow-teal-950/40'

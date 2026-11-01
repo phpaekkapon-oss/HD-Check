@@ -339,7 +339,7 @@ export const AiChatCopilot: FC = () => {
           </div>
 
           {/* Chat Messages Body with Visible Scrollbar */}
-          <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-slate-50/60 dark:bg-[#121624]/60 backdrop-blur-xs min-h-[260px] chat-scrollbar">
+          <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5 bg-slate-50/60 dark:bg-[var(--card-sub)]/60 backdrop-blur-xs min-h-[260px] chat-scrollbar">
             {messages.map((m) => {
               const isUser = m.role === 'user'
               return (
@@ -364,7 +364,7 @@ export const AiChatCopilot: FC = () => {
                         'p-3 rounded-2xl shadow-xs text-xs sm:text-[13px]',
                         isUser
                           ? 'bg-violet-600 text-white rounded-tr-none'
-                          : 'bg-white dark:bg-[#1a2035] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-white/10 rounded-tl-none shadow-sm'
+                          : 'bg-white dark:bg-[var(--card-bg)] text-slate-800 dark:text-slate-100 border border-slate-200/80 dark:border-white/10 rounded-tl-none shadow-sm'
                       )}
                     >
                       {isUser ? (
@@ -397,7 +397,7 @@ export const AiChatCopilot: FC = () => {
                 <div className="size-7 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-amber-200 flex items-center justify-center shrink-0 mt-0.5">
                   <Bot className="size-3.5 animate-spin" />
                 </div>
-                <div className="p-3 rounded-2xl rounded-tl-none bg-white dark:bg-[#1a2035] border border-slate-200/80 dark:border-white/10 shadow-sm flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+                <div className="p-3 rounded-2xl rounded-tl-none bg-white dark:bg-[var(--card-bg)] border border-slate-200/80 dark:border-white/10 shadow-sm flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
                   <Loader2 className="size-3.5 animate-spin text-violet-600 dark:text-violet-400" />
                   <span>AI กำลังวิเคราะห์และพิมพ์คำตอบ...</span>
                 </div>
@@ -408,7 +408,7 @@ export const AiChatCopilot: FC = () => {
           </div>
 
           {/* Quick Prompts Chips with Interactive Left/Right Controls and Wheel Scroll */}
-          <div className="px-2 py-1.5 bg-slate-100/90 dark:bg-[#15192b] border-t border-slate-200/60 dark:border-white/5 flex items-center gap-1 shrink-0">
+          <div className="px-2 py-1.5 bg-slate-100/90 dark:bg-[var(--card-bg)] border-t border-slate-200/60 dark:border-white/5 flex items-center gap-1 shrink-0">
             <button
               type="button"
               onClick={() => scrollPrompts('left')}
@@ -453,8 +453,8 @@ export const AiChatCopilot: FC = () => {
           </div>
 
           {/* Input Box: Spacious & Comfortable Design */}
-          <div className="p-3 sm:p-3.5 bg-white dark:bg-[#1a2035] border-t border-themed shrink-0">
-            <div className="flex items-end gap-2.5 bg-slate-50 dark:bg-[#121624] border border-slate-300 dark:border-white/15 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-500 transition shadow-inner">
+          <div className="p-3 sm:p-3.5 bg-white dark:bg-[var(--card-bg)] border-t border-themed shrink-0">
+            <div className="flex items-end gap-2.5 bg-slate-50 dark:bg-[var(--card-sub)] border border-slate-300 dark:border-white/15 rounded-2xl p-2 focus-within:ring-2 focus-within:ring-violet-500/30 focus-within:border-violet-500 transition shadow-inner">
               <textarea
                 ref={inputRef}
                 value={input}

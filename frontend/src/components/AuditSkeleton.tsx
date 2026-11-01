@@ -5,7 +5,7 @@ const Bar: FC<{ className: string }> = ({ className }) => <div className={`round
 export const AuditKpiSkeleton: FC = () => (
   <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3 animate-pulse">
     {Array.from({ length: 5 }, (_, i) => (
-      <div key={i} className="h-[118px] rounded-2xl bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#292440] p-4 space-y-3">
+      <div key={i} className="h-[118px] rounded-2xl bg-white dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--card-border)] p-4 space-y-3">
         <Bar className="h-3 w-24" />
         <Bar className="h-7 w-16" />
         <Bar className="h-2.5 w-28" />
@@ -15,10 +15,10 @@ export const AuditKpiSkeleton: FC = () => (
 )
 
 export const AuditTableSkeleton: FC<{ rows?: number; embedded?: boolean }> = ({ rows = 12, embedded = false }) => (
-  <div className={`overflow-hidden animate-pulse ${embedded ? '' : 'rounded-2xl bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#292440]'}`}>
-    <div className="h-10 bg-slate-100 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440]" />
+  <div className={`overflow-hidden animate-pulse ${embedded ? '' : 'rounded-2xl bg-white dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--card-border)]'}`}>
+    <div className="h-10 bg-slate-100 dark:bg-[var(--card-header)] border-b border-slate-200 dark:border-[var(--card-border)]" />
     {Array.from({ length: rows }, (_, i) => (
-      <div key={i} className="h-10 flex items-center gap-4 px-4 border-b border-slate-100 dark:border-[#292440]">
+      <div key={i} className="h-10 flex items-center gap-4 px-4 border-b border-slate-100 dark:border-[var(--card-border)]">
         <Bar className="h-3 w-6" />
         <Bar className="h-3 w-20" />
         <Bar className="h-3 w-24" />
@@ -33,7 +33,7 @@ export const AuditTableSkeleton: FC<{ rows?: number; embedded?: boolean }> = ({ 
 export const AuditCardListSkeleton: FC = () => (
   <div className="space-y-3 animate-pulse">
     {Array.from({ length: 4 }, (_, i) => (
-      <div key={i} className="h-40 rounded-2xl bg-white dark:bg-[#14172a] ring-1 ring-slate-200 dark:ring-[#292440] p-4 space-y-3">
+      <div key={i} className="h-40 rounded-2xl bg-white dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--card-border)] p-4 space-y-3">
         <Bar className="h-4 w-32" />
         <Bar className="h-4 w-48" />
         <Bar className="h-10 w-full" />

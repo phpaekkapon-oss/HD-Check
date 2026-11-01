@@ -29,6 +29,12 @@ import { useMenuPermissions } from '@/hooks/useHerbDx'
 import { canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
 import { cn } from '@/lib/utils'
 
+// แท็บที่เปิดได้จาก modal จัดการความปลอดภัย (ต้องตรงกับ initialTab ของ Security2FASettingsModal)
+const SECURITY_MODAL_TABS = ['my_profile', 'my_2fa', 'my_pin', 'admin_policy', 'admin_system', 'admin_sso', 'admin_menus'] as const
+type SecurityModalTab = (typeof SECURITY_MODAL_TABS)[number]
+const isSecurityModalTab = (v: unknown): v is SecurityModalTab =>
+  (SECURITY_MODAL_TABS as readonly unknown[]).includes(v)
+
 export interface NavItem {
   readonly id: ActivePage
   readonly label: string
@@ -118,16 +124,11 @@ export const Sidebar: FC<SidebarProps> = ({
       return false
     }
   })
-  const [securityInitialTab, setSecurityInitialTab] = useState<
-    'my_profile' | 'my_2fa' | 'my_pin' | 'admin_policy' | 'admin_system' | 'admin_sso' | 'admin_menus'
-  >(() => {
+  const [securityInitialTab, setSecurityInitialTab] = useState<SecurityModalTab>(() => {
     try {
       const saved = sessionStorage.getItem('hd_check_security_modal_tab')
-      if (
-        saved &&
-        ['my_profile', 'my_2fa', 'my_pin', 'admin_policy', 'admin_system', 'admin_sso', 'admin_menus'].includes(saved)
-      ) {
-        return saved as any
+      if (isSecurityModalTab(saved)) {
+        return saved
       }
     } catch {}
     return 'admin_policy'

@@ -349,8 +349,8 @@ export const SqlInspectorView: FC = () => {
       </div>
 
       {/* Query 1: ตรวจสอบเวชระเบียนยาสมุนไพรและรหัสวินิจฉัยโรค */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
-        <div className="p-3.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440] flex flex-wrap items-center justify-between gap-2">
+      <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
+        <div className="p-3.5 bg-slate-50 dark:bg-[var(--card-header)] border-b border-slate-200 dark:border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="grid place-items-center size-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300">
               <Database className="size-4" />
@@ -369,7 +369,7 @@ export const SqlInspectorView: FC = () => {
             <button
               type="button"
               onClick={() => copy(QUERY_1, 'q1')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] hover:border-violet-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] hover:border-violet-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
             >
               {copied === 'q1' ? (
                 <>
@@ -404,8 +404,8 @@ export const SqlInspectorView: FC = () => {
       </div>
 
       {/* Query 2: สรุปยอดจ่ายยาสมุนไพร OPD / IPD */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
-        <div className="p-3.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440] flex flex-wrap items-center justify-between gap-2">
+      <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
+        <div className="p-3.5 bg-slate-50 dark:bg-[var(--card-header)] border-b border-slate-200 dark:border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="grid place-items-center size-7 rounded-lg bg-violet-100 dark:bg-violet-500/15 text-violet-700 dark:text-violet-300">
               <Code className="size-4" />
@@ -424,7 +424,7 @@ export const SqlInspectorView: FC = () => {
             <button
               type="button"
               onClick={() => copy(QUERY_2, 'q2')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] hover:border-violet-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] hover:border-violet-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
             >
               {copied === 'q2' ? (
                 <>
@@ -459,8 +459,8 @@ export const SqlInspectorView: FC = () => {
       </div>
 
       {/* Query 3: ตรวจสอบหัตถการ ค่าบริการแพทย์แผนไทย และการคิดค่าบริการซ้ำซ้อน */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
-        <div className="p-3.5 bg-slate-50 dark:bg-[#1d2035] border-b border-slate-200 dark:border-[#292440] flex flex-wrap items-center justify-between gap-2">
+      <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
+        <div className="p-3.5 bg-slate-50 dark:bg-[var(--card-header)] border-b border-slate-200 dark:border-[var(--card-border)] flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2.5">
             <div className="grid place-items-center size-7 rounded-lg bg-teal-100 dark:bg-teal-500/15 text-teal-700 dark:text-teal-300">
               <Database className="size-4" />
@@ -479,7 +479,7 @@ export const SqlInspectorView: FC = () => {
             <button
               type="button"
               onClick={() => copy(QUERY_3, 'q3')}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] hover:border-teal-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] hover:border-teal-400 hover:text-accent text-slate-700 dark:text-slate-200 cursor-pointer shadow-xs active:scale-95 transition"
             >
               {copied === 'q3' ? (
                 <>

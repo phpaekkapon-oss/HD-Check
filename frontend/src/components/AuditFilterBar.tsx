@@ -72,8 +72,8 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
       className={cn(
         'p-3 sm:p-3.5 space-y-3 transition-colors',
         embedded
-          ? 'bg-slate-50/70 dark:bg-[#181b30]/70 border-b border-slate-200 dark:border-[#292440]'
-          : 'rounded-2xl bg-white dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] shadow-xs'
+          ? 'bg-slate-50/70 dark:bg-[var(--card-bg)]/70 border-b border-slate-200 dark:border-[var(--card-border)]'
+          : 'rounded-2xl bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] shadow-xs'
       )}
     >
       {/* Tier 1: Time Navigation & Presets (Full Width, Never Wraps Unexpectedly) + Export Action */}
@@ -102,14 +102,14 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2.5">
         {/* Left: Patient Type Scope Tabs */}
         {onPatientTypeChange ? (
-          <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] text-xs self-start md:self-auto shrink-0 shadow-2xs">
+          <div className="inline-flex items-center p-1 rounded-xl bg-slate-100 dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--input-border)] text-xs self-start md:self-auto shrink-0 shadow-2xs">
             <button
               type="button"
               onClick={() => onPatientTypeChange('ALL')}
               className={cn(
                 'px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer text-xs flex items-center gap-1.5',
                 patientType === 'ALL'
-                  ? 'bg-white dark:bg-[#20253f] text-slate-900 dark:text-white shadow-xs'
+                  ? 'bg-white dark:bg-[var(--card-header)] text-slate-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
               )}
             >
@@ -164,7 +164,7 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
         {/* Right: HN Specific Filter + Search Query Input + Clear Button */}
         <div className="flex items-center gap-2 flex-1 md:max-w-md justify-end">
           {/* HN Box */}
-          <div className="flex items-center gap-1.5 h-8.5 rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] px-2.5 shadow-2xs shrink-0">
+          <div className="flex items-center gap-1.5 h-8.5 rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--input-border)] px-2.5 shadow-2xs shrink-0">
             <label htmlFor="filter-hn" className="text-xs font-bold text-slate-500 dark:text-slate-400">
               HN
             </label>
@@ -196,7 +196,7 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder="ค้นหาชื่อ, ยา, แพทย์, แผนก, ICD..."
-              className="w-full h-8.5 rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-8 pr-7 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs transition-all"
+              className="w-full h-8.5 rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--input-border)] pl-8 pr-7 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs transition-all"
               style={{
                 borderColor: search ? accent.hex : undefined,
               }}
@@ -229,7 +229,7 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
       </div>
 
       {/* Tier 3: Audit Result Status Filter Pills */}
-      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none pt-1 border-t border-slate-100 dark:border-[#20253f]">
+      <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 scrollbar-none pt-1 border-t border-slate-100 dark:border-[var(--card-border)]">
         <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 shrink-0 mr-1 select-none">
           ผลการตรวจ:
         </span>
@@ -247,7 +247,7 @@ export const AuditFilterBar: FC<AuditFilterBarProps> = ({
                 isSelected && isAll ? 'btn-pill-action font-bold' : '',
                 isSelected && !isAll ? t.activeClass : '',
                 !isSelected
-                  ? 'bg-slate-100 dark:bg-[#101326] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[#34304a] hover:bg-slate-200 dark:hover:bg-white/5'
+                  ? 'bg-slate-100 dark:bg-[var(--card-sub)] text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-[var(--input-border)] hover:bg-slate-200 dark:hover:bg-white/5'
                   : ''
               )}
             >

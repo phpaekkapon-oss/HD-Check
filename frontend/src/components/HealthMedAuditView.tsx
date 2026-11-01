@@ -1010,7 +1010,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
         id: 'diagnoses',
         header: 'รหัสโรค (DX)',
         cell: ({ row }) => {
-          const allExtra = Array.isArray((row.original as any).all_dx) ? ((row.original as any).all_dx as string[]) : []
+          const allExtra = Array.isArray(row.original.all_dx) ? row.original.all_dx : []
           const rawDxs = [
             row.original.pdx ? { code: row.original.pdx, isPdx: true } : null,
             row.original.dx0 ? { code: row.original.dx0, isPdx: false } : null,
@@ -1392,7 +1392,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
           {/* Right Actions: Real-time Auto-Sync + Manual Sync + Export Excel + Collapse/Expand KPI Cards */}
           <div className="flex flex-wrap items-center gap-2">
             {/* 1. Real-Time Auto-Sync Toggle & Interval Selector */}
-            <div className="inline-flex items-center h-8.5 rounded-xl bg-slate-100/90 dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] p-0.5 shadow-2xs">
+            <div className="inline-flex items-center h-8.5 rounded-xl bg-slate-100/90 dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] p-0.5 shadow-2xs">
               <button
                 type="button"
                 onClick={handleToggleAutoSync}
@@ -1488,7 +1488,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                     isSelected
                       ? cn(card.activeBorder, card.activeBg, card.activeShadow, 'ring-1')
                       : cn(
-                          'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 hover:shadow-xs',
+                          'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 hover:shadow-xs',
                           card.hoverBorder
                         )
                   )}
@@ -1533,7 +1533,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                     isSelected
                       ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5 ring-1')
                       : cn(
-                          'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-sm hover:-translate-y-0.5',
+                          'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-sm hover:-translate-y-0.5',
                           card.hoverBorder
                         )
                   )}
@@ -1606,7 +1606,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl border text-xs font-semibold transition shadow-2xs cursor-pointer shrink-0',
                 excludedPttypes.length > 0
                   ? 'bg-amber-500/15 border-amber-500/40 text-amber-800 dark:text-amber-200 font-bold'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
               title="ตั้งค่าติ๊กเลือกสิทธิการรักษาที่ต้องการตรวจ หรือยกเว้นไม่นำมาแสดงในตาราง"
             >
@@ -1627,7 +1627,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
             <button
               type="button"
               onClick={() => setDensity((d) => (d === 'compact' ? 'normal' : 'compact'))}
-              className="inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d] transition shadow-2xs cursor-pointer shrink-0"
+              className="inline-flex items-center gap-1.5 h-8.5 px-3 rounded-xl border border-slate-200/90 dark:border-[var(--card-border)] bg-white dark:bg-[var(--card-bg)] text-xs font-semibold text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)] transition shadow-2xs cursor-pointer shrink-0"
               title={density === 'compact' ? 'เปลี่ยนเป็นโหมดแถวปกติ' : 'เปลี่ยนเป็นโหมดแถวกะทัดรัด (ประหยัดพื้นที่)'}
             >
               <SlidersHorizontal className="size-3.5 text-teal-500" />
@@ -1651,7 +1651,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
         {/* Tier 2: Search Bar + HN Filter + Clear Filters */}
         <div className="flex flex-col sm:flex-row items-center gap-2">
           {/* HN Filter Box */}
-          <div className="flex items-center gap-1.5 h-9 w-full sm:w-36 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] px-3 shadow-2xs shrink-0 focus-within:ring-2 focus-within:ring-teal-500/40 focus-within:border-teal-500/50 transition">
+          <div className="flex items-center gap-1.5 h-9 w-full sm:w-36 rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] px-3 shadow-2xs shrink-0 focus-within:ring-2 focus-within:ring-teal-500/40 focus-within:border-teal-500/50 transition">
             <label htmlFor="healthmed-filter-hn" className="text-xs font-bold text-slate-400 dark:text-slate-400 select-none">
               HN
             </label>
@@ -1683,7 +1683,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหาชื่อ-สกุล, HN, แพทย์, เลขปิดสิทธิ EP / PP, รหัสหัตถการ..."
-              className="w-full h-9 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 shadow-2xs transition"
+              className="w-full h-9 rounded-xl border border-slate-200/90 dark:border-[var(--card-border)] bg-white dark:bg-[var(--card-bg)] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-teal-500/40 focus:border-teal-500/50 shadow-2xs transition"
             />
             {search && (
               <button
@@ -1724,7 +1724,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
                 claimStatusFilter !== 'ALL'
                   ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
             >
               <option value="ALL">ทุกสถานะสิทธิ ({activeRecords.length} ราย)</option>
@@ -1748,7 +1748,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
                 visitDateFilter !== 'ALL'
                   ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
             >
               <option value="ALL">ทุกวันที่ในช่วง ({filterOptions.dates.length} วัน)</option>
@@ -1772,7 +1772,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
                 doctorFilter !== 'ALL'
                   ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
             >
               <option value="ALL">ผู้ให้บริการทั้งหมด ({filterOptions.doctors.length})</option>
@@ -1796,7 +1796,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
                 pttypeFilter !== 'ALL'
                   ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
             >
               <option value="ALL">
@@ -1824,7 +1824,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 'w-full h-9 appearance-none rounded-xl border pl-8.5 pr-7 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs truncate transition',
                 serviceFilter !== 'ALL'
                   ? 'bg-teal-500/10 dark:bg-teal-950/50 border-teal-500/50 text-teal-700 dark:text-teal-200'
-                  : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[#1e263d]'
+                  : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-[var(--card-header)]'
               )}
             >
               <option value="ALL">ทุกหัตถการ / บริการ</option>
@@ -2053,7 +2053,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 <FileText className="size-3.5 text-teal-500" /> รหัสการวินิจฉัยโรคทางการแพทย์แผนไทย (รหัสหลัก / รหัสรอง)
               </h4>
               {(() => {
-                const allExtra = Array.isArray((selectedRecord as any).all_dx) ? ((selectedRecord as any).all_dx as string[]) : []
+                const allExtra = Array.isArray(selectedRecord.all_dx) ? selectedRecord.all_dx : []
                 const allDxs = [
                   ...new Set([
                     selectedRecord.pdx,
@@ -2273,7 +2273,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
               )}
 
               {aiAdvice && (
-                <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[#0d1627] dark:via-[#0c1424] dark:to-[#141226] border border-teal-500/30 dark:border-teal-500/40 shadow-sm space-y-2.5 animate-in fade-in duration-200">
+                <div className="p-3.5 rounded-xl bg-gradient-to-br from-teal-50/90 via-slate-50/90 to-violet-50/80 dark:from-[var(--card-sub)] dark:via-[var(--card-sub)] dark:to-[var(--card-bg)] border border-teal-500/30 dark:border-teal-500/40 shadow-sm space-y-2.5 animate-in fade-in duration-200">
                   <div className="flex items-start justify-between gap-2">
                     <div>
                       <span className="text-xs font-bold text-teal-700 dark:text-teal-400 flex items-center gap-1">
@@ -2348,7 +2348,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
           onClick={() => setShowPttypeConfigModal(false)}
         >
           <div
-            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white dark:bg-[#121826] border border-slate-200/90 dark:border-white/10 shadow-2xl overflow-hidden"
+            className="w-full max-w-2xl max-h-[90vh] flex flex-col rounded-2xl bg-white dark:bg-[var(--card-sub)] border border-slate-200/90 dark:border-white/10 shadow-2xl overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header */}
@@ -2393,7 +2393,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                     'px-2.5 py-1 rounded-xl text-xs font-semibold transition cursor-pointer shadow-2xs border',
                     excludedPttypes.length === 0
                       ? 'bg-teal-500/20 text-teal-800 dark:text-teal-200 border-teal-500/40 font-bold'
-                      : 'bg-white dark:bg-[#1a2333] hover:bg-slate-50 dark:hover:bg-[#222d42] text-slate-700 dark:text-slate-200 border-slate-200/90 dark:border-white/10'
+                      : 'bg-white dark:bg-[var(--card-bg)] hover:bg-slate-50 dark:hover:bg-[var(--card-border)] text-slate-700 dark:text-slate-200 border-slate-200/90 dark:border-white/10'
                   )}
                 >
                   ✓ แสดงทุกสิทธิ ({filterOptions.allPttypes.length})
@@ -2434,7 +2434,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                   value={pttypeModalSearch}
                   onChange={(e) => setPttypeModalSearch(e.target.value)}
                   placeholder="ค้นหาชื่อสิทธิการรักษา..."
-                  className="w-full h-8.5 rounded-xl border border-slate-200/90 dark:border-[#2a334d] bg-white dark:bg-[#151b2d] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 shadow-2xs transition"
+                  className="w-full h-8.5 rounded-xl border border-slate-200/90 dark:border-[var(--card-border)] bg-white dark:bg-[var(--card-bg)] pl-8.5 pr-7 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/40 shadow-2xs transition"
                 />
                 {pttypeModalSearch && (
                   <button
@@ -2462,7 +2462,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                       className={cn(
                         'flex items-center justify-between gap-3 p-2.5 rounded-xl border text-xs cursor-pointer transition select-none',
                         isIncluded
-                          ? 'bg-white dark:bg-[#151b2d] border-slate-200/80 dark:border-white/10 hover:border-indigo-500/40 hover:bg-slate-50 dark:hover:bg-[#1a2338]'
+                          ? 'bg-white dark:bg-[var(--card-bg)] border-slate-200/80 dark:border-white/10 hover:border-indigo-500/40 hover:bg-slate-50 dark:hover:bg-[var(--card-bg)]'
                           : 'bg-rose-500/5 dark:bg-rose-950/20 border-rose-500/25 opacity-80 hover:opacity-100 hover:bg-rose-500/10'
                       )}
                     >

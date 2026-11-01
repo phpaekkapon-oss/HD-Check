@@ -55,7 +55,7 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
 
   return (
     <section className="space-y-3" aria-labelledby="code-review-title">
-      <div className="rounded-2xl border border-teal-200/70 bg-white/80 p-3.5 shadow-xs dark:border-teal-900/70 dark:bg-[#0d2028] sm:p-4">
+      <div className="rounded-2xl border border-teal-200/70 bg-white/80 p-3.5 shadow-xs dark:border-teal-900/70 dark:bg-[var(--card-header)] sm:p-4">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-teal-700 text-white dark:bg-teal-500 dark:text-slate-950"><ScanLine className="size-5" /></span>
@@ -71,7 +71,7 @@ export const CodeReviewQueue: FC<CodeReviewQueueProps> = ({ drugs, dxMap, mismat
         </div>
       </div>
 
-      <div className="grid grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-xl border border-themed bg-themed-card shadow-xs dark:divide-[#292440]">
+      <div className="grid grid-cols-3 divide-x divide-slate-200 overflow-hidden rounded-xl border border-themed bg-themed-card shadow-xs dark:divide-[var(--card-border)]">
         <Metric
           icon={ClipboardList}
           label={mode === 'mismatch' ? 'รายการ DX ไม่ตรง (FAIL)' : 'รายการยาทั้งหมด'}

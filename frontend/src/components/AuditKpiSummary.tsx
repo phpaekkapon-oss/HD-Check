@@ -120,7 +120,7 @@ export const AuditKpiSummary: FC<AuditKpiSummaryProps> = ({ kpi, activeResult, o
               isSelected
                 ? cn(card.activeBorder, card.activeShadow, card.activeBg, '-translate-y-0.5')
                 : cn(
-                    'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:-translate-y-0.5',
+                    'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:-translate-y-0.5',
                     card.hoverBorder
                   ),
               // Mobile layout balance

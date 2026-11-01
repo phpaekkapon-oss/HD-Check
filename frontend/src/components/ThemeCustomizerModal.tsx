@@ -38,10 +38,10 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
   return (
     <div
       ref={popoverRef}
-      className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-1.5rem)] sm:w-[26rem] rounded-2xl bg-themed-card text-slate-800 dark:text-slate-100 p-4 border border-slate-200 dark:border-[#292440] shadow-2xl shadow-slate-900/15 dark:shadow-black/80 space-y-4 animate-in fade-in zoom-in-95 duration-150 select-none"
+      className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[calc(100vw-1.5rem)] sm:w-[26rem] rounded-2xl bg-themed-card text-slate-800 dark:text-slate-100 p-4 border border-slate-200 dark:border-[var(--card-border)] shadow-2xl shadow-slate-900/15 dark:shadow-black/80 space-y-4 animate-in fade-in zoom-in-95 duration-150 select-none"
     >
       {/* 1. Mode Switcher (สว่าง / มืด) */}
-      <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 dark:bg-[#09151e] border border-slate-200 dark:border-white/5 text-xs font-semibold">
+      <div className="grid grid-cols-2 p-1 rounded-xl bg-slate-100 dark:bg-[var(--card-sub)] border border-slate-200 dark:border-white/5 text-xs font-semibold">
         <button
           type="button"
           onClick={() => setMode('light')}
@@ -62,7 +62,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
           className={cn(
             'flex items-center justify-center gap-2 py-2 rounded-lg transition-all cursor-pointer',
             mode === 'dark'
-              ? 'bg-white dark:bg-[#1b2f3d] text-slate-900 dark:text-white shadow-md font-bold ring-1 ring-white/10'
+              ? 'bg-white dark:bg-[var(--card-header)] text-slate-900 dark:text-white shadow-md font-bold ring-1 ring-white/10'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
           )}
         >
@@ -89,7 +89,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
                   'flex items-start gap-2.5 p-2.5 rounded-xl text-left border transition-all cursor-pointer text-xs',
                   isSelected
                     ? 'bg-[var(--sidebar-active-bg)] text-slate-900 dark:text-white shadow-sm'
-                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[#0a1622] text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-900 dark:hover:text-white'
+                    : 'border-slate-200 dark:border-white/10 bg-slate-50 dark:bg-[var(--card-sub)] text-slate-700 dark:text-slate-300 hover:border-slate-300 dark:hover:border-white/20 hover:text-slate-900 dark:hover:text-white'
                 )}
                 style={isSelected ? { borderColor: accent.hex, boxShadow: `0 0 0 1px ${accent.hex}55` } : undefined}
               >
@@ -127,7 +127,7 @@ export const ThemeCustomizerPopover: FC<ThemeCustomizerPopoverProps> = ({ isOpen
                 className={cn(
                   'size-9 rounded-full transition-transform cursor-pointer relative grid place-items-center active:scale-90',
                   isSelected
-                    ? 'scale-110 ring-2 ring-slate-800 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[#14172a] shadow-lg'
+                    ? 'scale-110 ring-2 ring-slate-800 dark:ring-white ring-offset-2 ring-offset-white dark:ring-offset-[var(--card-bg)] shadow-lg'
                     : 'hover:scale-105 opacity-90 hover:opacity-100'
                 )}
                 style={{

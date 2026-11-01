@@ -61,7 +61,7 @@ interface ThemeContextType {
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 
-const DEFAULT_ACCENT: AccentColorDef = ACCENT_COLORS[0]! // Emerald (#10b981)
+const DEFAULT_ACCENT: AccentColorDef = ACCENT_COLORS[0]! // Violet (#9333ea) — accent เริ่มต้น
 
 export const ThemeProvider = ({ children }: { children: ReactNode }) => {
   const [mode, setModeState] = useState<ThemeMode>(() => {

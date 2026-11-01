@@ -140,7 +140,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
         </div>
       )}
 
-      <nav className={cn("lg:hidden fixed bottom-0 inset-x-0 z-50 bg-themed-header backdrop-blur-md border-t border-slate-200 dark:border-[#30364b] py-1 px-2 flex items-stretch justify-around shadow-2xl select-none safe-bottom", mobileMenuOpen && "hidden")}>
+      <nav className={cn("lg:hidden fixed bottom-0 inset-x-0 z-50 bg-themed-header backdrop-blur-md border-t border-slate-200 dark:border-[var(--header-border)] py-1 px-2 flex items-stretch justify-around shadow-2xl select-none safe-bottom", mobileMenuOpen && "hidden")}>
         {navItems.filter((n) => PRIMARY_NAV_IDS.includes(n.id)).map(({ id, icon: Icon, shortLabel }) => {
           const isActive = activePage === id
           return (

@@ -172,9 +172,9 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-950/75 backdrop-blur-xs animate-in fade-in duration-200"
     >
-      <div className="relative w-full max-w-5xl rounded-3xl bg-white dark:bg-[#12152b] border border-slate-200 dark:border-[#292440] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+      <div className="relative w-full max-w-5xl rounded-3xl bg-white dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--card-border)] shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
         {/* Header */}
-        <div className="px-6 py-4.5 border-b border-slate-200 dark:border-[#292440] bg-slate-50/70 dark:bg-[#161a33]/70 flex items-center justify-between gap-3 shrink-0">
+        <div className="px-6 py-4.5 border-b border-slate-200 dark:border-[var(--card-border)] bg-slate-50/70 dark:bg-[var(--card-bg)]/70 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3">
             <div className="size-10 rounded-2xl bg-amber-500/15 border border-amber-500/25 grid place-items-center text-amber-700 dark:text-amber-400">
               <Upload className="size-5" />
@@ -230,7 +230,7 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
                   'border-2 border-dashed rounded-3xl p-8 sm:p-12 text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-3',
                   isDragging
                     ? 'border-amber-500 bg-amber-50/50 dark:bg-amber-950/20 scale-[0.99]'
-                    : 'border-slate-300 dark:border-[#34304a] hover:border-amber-400 hover:bg-slate-50 dark:hover:bg-white/5'
+                    : 'border-slate-300 dark:border-[var(--input-border)] hover:border-amber-400 hover:bg-slate-50 dark:hover:bg-white/5'
                 )}
               >
                 <input
@@ -305,7 +305,7 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
           {parsedResult && (
             <div className="space-y-4">
               {/* File details & Stats bar */}
-              <div className="rounded-2xl bg-slate-100/70 dark:bg-[#161a33] border border-slate-200 dark:border-[#292440] p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+              <div className="rounded-2xl bg-slate-100/70 dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] p-4 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <div className="size-10 rounded-2xl bg-amber-500/15 border border-amber-500/25 grid place-items-center text-amber-700 dark:text-amber-400 shrink-0">
                     <FileSpreadsheet className="size-5" />
@@ -416,16 +416,16 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
                     value={tableSearch}
                     onChange={(e) => setTableSearch(e.target.value)}
                     placeholder="ค้นหาในตารางตัวอย่าง…"
-                    className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-8.5 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2"
+                    className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] pl-8.5 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2"
                   />
                 </div>
               </div>
 
               {/* Preview Table */}
-              <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card overflow-hidden shadow-xs">
+              <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card overflow-hidden shadow-xs">
                 <div className="overflow-x-auto max-h-[46vh]">
                   <table className="w-full text-left text-xs">
-                    <thead className="bg-slate-100/90 dark:bg-[#161a33] text-slate-700 dark:text-slate-200 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-[#292440]">
+                    <thead className="bg-slate-100/90 dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 font-bold sticky top-0 z-10 border-b border-slate-200 dark:border-[var(--card-border)]">
                       <tr>
                         <th className="py-2.5 px-3 text-center w-14">แถว</th>
                         <th className="py-2.5 px-3 text-center w-24">รหัสยา</th>
@@ -435,7 +435,7 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
                         <th className="py-2.5 px-3 text-center w-28">สถานะ</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100 dark:divide-[#292440]/60">
+                    <tbody className="divide-y divide-slate-100 dark:divide-[var(--card-border)]/60">
                       {filteredItems.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="py-8 text-center text-slate-400 text-xs">
@@ -553,7 +553,7 @@ export const DispensingRulesImportModal: FC<DispensingRulesImportModalProps> = (
         </div>
 
         {/* Modal Footer */}
-        <div className="px-6 py-4 border-t border-slate-200 dark:border-[#292440] bg-slate-50/80 dark:bg-[#161a33]/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
+        <div className="px-6 py-4 border-t border-slate-200 dark:border-[var(--card-border)] bg-slate-50/80 dark:bg-[var(--card-bg)]/80 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shrink-0">
           <div className="text-xs text-slate-500 dark:text-slate-400">
             {parsedResult ? (
               <span>

@@ -115,11 +115,11 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-5xl h-[88vh] max-h-[750px] flex flex-col rounded-3xl bg-white dark:bg-[#131627] border border-slate-200 dark:border-[#292440] shadow-2xl overflow-hidden"
+        className="relative w-full max-w-5xl h-[88vh] max-h-[750px] flex flex-col rounded-3xl bg-white dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--card-border)] shadow-2xl overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Top Header Bar */}
-        <div className="relative p-4 sm:p-5 bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-indigo-500/10 dark:from-teal-500/15 dark:via-cyan-500/15 dark:to-indigo-500/15 border-b border-slate-200 dark:border-[#26233d] flex items-center justify-between gap-3">
+        <div className="relative p-4 sm:p-5 bg-gradient-to-r from-teal-500/10 via-cyan-500/10 to-indigo-500/10 dark:from-teal-500/15 dark:via-cyan-500/15 dark:to-indigo-500/15 border-b border-slate-200 dark:border-[var(--card-border)] flex items-center justify-between gap-3">
           <div className="flex items-center gap-3">
             <div className="size-10 sm:size-11 rounded-2xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center shadow-lg shadow-teal-500/25 text-white shrink-0">
               <History className="size-5 sm:size-6" />
@@ -147,7 +147,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                 'flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-colors cursor-pointer border',
                 showSettings
                   ? 'bg-teal-600 text-white border-teal-600'
-                  : 'bg-white/80 dark:bg-[#1a1e36] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[#34304a] hover:bg-slate-100 dark:hover:bg-white/10'
+                  : 'bg-white/80 dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-300 border-slate-200 dark:border-[var(--input-border)] hover:bg-slate-100 dark:hover:bg-white/10'
               )}
               title="ตั้งค่าการแจ้งเตือน"
             >
@@ -168,7 +168,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
 
         {/* Collapsible Settings Panel */}
         {showSettings && (
-          <div className="p-4 bg-slate-50 dark:bg-[#101325] border-b border-slate-200 dark:border-[#26233d] flex flex-wrap items-center justify-between gap-3 text-xs animate-in slide-in-from-top-2 duration-200">
+          <div className="p-4 bg-slate-50 dark:bg-[var(--card-sub)] border-b border-slate-200 dark:border-[var(--card-border)] flex flex-wrap items-center justify-between gap-3 text-xs animate-in slide-in-from-top-2 duration-200">
             <div className="flex items-center gap-4 flex-wrap">
               {/* Notification Toggle */}
               <label className="flex items-center gap-2 cursor-pointer select-none">
@@ -202,7 +202,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                 type="button"
                 onClick={handleCheckUpdate}
                 disabled={checkingUpdate}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold bg-white dark:bg-[#1a1e36] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#34304a] hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold bg-white dark:bg-[var(--card-bg)] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[var(--input-border)] hover:bg-slate-100 dark:hover:bg-white/10 transition cursor-pointer"
               >
                 <RefreshCw className={cn('size-3 text-teal-500', checkingUpdate && 'animate-spin')} />
                 <span>ตรวจสอบเวอร์ชันใหม่</span>
@@ -220,16 +220,16 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
         {/* Master-Detail Body: Split View Left Timeline + Right Content */}
         <div className="flex-1 flex flex-col md:flex-row min-h-0 overflow-hidden">
           {/* Left Panel: Search & Version Timeline (Scales to 100+ versions cleanly) */}
-          <div className="w-full md:w-72 lg:w-80 border-b md:border-b-0 md:border-r border-slate-200 dark:border-[#26233d] flex flex-col bg-slate-50/50 dark:bg-[#111425]/50 shrink-0">
+          <div className="w-full md:w-72 lg:w-80 border-b md:border-b-0 md:border-r border-slate-200 dark:border-[var(--card-border)] flex flex-col bg-slate-50/50 dark:bg-[var(--card-sub)]/50 shrink-0">
             {/* Search Box & Type Filter */}
-            <div className="p-3 space-y-2 border-b border-slate-200 dark:border-[#26233d]">
+            <div className="p-3 space-y-2 border-b border-slate-200 dark:border-[var(--card-border)]">
               <div className="relative">
                 <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="ค้นหาเวอร์ชัน, ฟีเจอร์, บั๊ก..."
-                  className="w-full rounded-xl bg-white dark:bg-[#181c33] border border-slate-200 dark:border-[#2f3555] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 transition"
+                  className="w-full rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--input-border)] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500 transition"
                 />
                 {searchQuery && (
                   <button
@@ -279,7 +279,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                     className={cn(
                       'w-full text-left p-2.5 rounded-xl transition-all cursor-pointer flex flex-col gap-1',
                       isSelected
-                        ? 'bg-white dark:bg-[#1e233d] border border-teal-500/40 dark:border-teal-500/50 shadow-sm'
+                        ? 'bg-white dark:bg-[var(--card-header)] border border-teal-500/40 dark:border-teal-500/50 shadow-sm'
                         : 'hover:bg-white/60 dark:hover:bg-white/5 border border-transparent'
                     )}
                   >
@@ -323,7 +323,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
             {activeRelease ? (
               <>
                 {/* Release Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-[#22263d]">
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pb-3 border-b border-slate-100 dark:border-[var(--card-border)]">
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="px-2 py-0.5 rounded-lg text-xs font-mono font-bold bg-teal-500/15 text-teal-600 dark:text-teal-400 border border-teal-500/30">
@@ -348,7 +348,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                     href={`https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${activeRelease.version}`}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[#1a1e36] hover:bg-slate-200 dark:hover:bg-[#252a48] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[#34304a] transition-colors self-start sm:self-auto cursor-pointer shrink-0"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-slate-100 dark:bg-[var(--card-bg)] hover:bg-slate-200 dark:hover:bg-[var(--card-border)] text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-[var(--input-border)] transition-colors self-start sm:self-auto cursor-pointer shrink-0"
                     title={`เปิดดู Release v${activeRelease.version} และ Commit History บน GitHub`}
                   >
                     <ExternalLink className="size-3.5 text-teal-500" />
@@ -366,7 +366,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
                     {activeRelease.highlights.map((h, i) => (
                       <div
                         key={i}
-                        className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-[#171b30] border border-slate-200/80 dark:border-[#282d49]"
+                        className="flex items-start gap-2.5 p-3 rounded-2xl bg-slate-50 dark:bg-[var(--card-bg)] border border-slate-200/80 dark:border-[var(--card-border)]"
                       >
                         <CheckCircle2 className="size-4 text-teal-500 shrink-0 mt-0.5" />
                         <span className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed font-medium">
@@ -452,7 +452,7 @@ export const VersionChangelogModal: FC<VersionChangelogModalProps> = ({
         </div>
 
         {/* Footer Actions */}
-        <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-[#111425] border-t border-slate-200 dark:border-[#26233d] flex items-center justify-between gap-3">
+        <div className="p-3.5 sm:p-4 bg-slate-50 dark:bg-[var(--card-sub)] border-t border-slate-200 dark:border-[var(--card-border)] flex items-center justify-between gap-3">
           <div className="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2">
             <span className="size-2 rounded-full bg-emerald-500 inline-block animate-pulse" />
             <span className="hidden sm:inline">เชื่อมต่อประวัติ Release กับ GitHub Repository อัตโนมัติ</span>

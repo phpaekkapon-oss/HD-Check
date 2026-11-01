@@ -304,6 +304,8 @@ export interface HealthMedRecord {
   readonly dx3?: string
   readonly dx4?: string
   readonly dx5?: string
+  /** รหัสโรคทั้งหมดของ visit ในวันนั้น (คอลัมน์ pdx/dx0-dx5 รวมกับ day diagnoses แล้วตัดซ้ำ) ส่งจาก /api/healthmed/audit */
+  readonly all_dx?: readonly string[]
   readonly service_items_raw?: string
   readonly service_codes?: string
   readonly operations?: readonly HealthMedOperationItem[]

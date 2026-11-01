@@ -61,8 +61,18 @@ export interface PinPolicy {
   readonly default_auto_lock_minutes: number
 }
 
+/** รูปร่างขั้นต่ำที่ฟังก์ชันตรวจสิทธิ์ต้องการ (รับได้ทั้ง User, User2FAAdminItem หรือข้อมูลบางส่วนจาก API) */
+export interface RoleCheckUser {
+  readonly loginname?: string
+  readonly groupname?: string
+  readonly position?: string
+  readonly entryposition?: string
+  readonly admin_enabled?: boolean | number
+  readonly thaimed_admin_enabled?: boolean | number
+}
+
 /** Check if user has administrative or IT privileges */
-export function isAdminUser(user?: Partial<User> | null): boolean {
+export function isAdminUser(user?: RoleCheckUser | null): boolean {
   if (!user) return false
   const login = (user.loginname || '').toLowerCase()
   const group = (user.groupname || '').toLowerCase()
@@ -79,13 +89,13 @@ export function isAdminUser(user?: Partial<User> | null): boolean {
 }
 
 /** เห็นการ์ดมูลค่าบริการแผนไทย: IT/ผู้ดูแลระบบ หรือผู้ดูแลแผนไทยที่ IT เปิดสวิตช์ให้ (ต้องตรงกับ canViewThaiMedValue ใน backend) */
-export function canViewThaiMedValue(user?: Partial<User> | null): boolean {
+export function canViewThaiMedValue(user?: RoleCheckUser | null): boolean {
   if (!user) return false
   return isAdminUser(user) || user.thaimed_admin_enabled === true || Number(user.thaimed_admin_enabled) === 1
 }
 
 /** Check if user has permission to manage herbal drug ICD-10 criteria (Admin/IT, Thai Traditional Medicine, Pharmacist) */
-export function canManageHerbDx(user?: Partial<User> | null): boolean {
+export function canManageHerbDx(user?: RoleCheckUser | null): boolean {
   if (!user) return false
   if (isAdminUser(user)) return true
 

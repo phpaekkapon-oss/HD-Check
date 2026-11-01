@@ -459,14 +459,14 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       )}
 
       {/* Toolbar / Search Header */}
-      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[#292440] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-xs dark:shadow-sm">
+      <div className="rounded-2xl bg-themed-card ring-1 ring-slate-200 dark:ring-[var(--card-border)] p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 shadow-xs dark:shadow-sm">
         <div className="relative w-full sm:flex-1 sm:max-w-md">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="ค้นหารหัสยา, รายการยา, สิทธิการรักษา, เงื่อนไขรอบวัน…"
-            className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] ring-1 ring-slate-200 dark:ring-[#34304a] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
+            className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] pl-9 pr-3 py-1.5 text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-2"
           />
         </div>
         <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
@@ -520,10 +520,10 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       </div>
 
       {/* Table of Dispensing Rules */}
-      <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
+      <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-700 dark:text-slate-300">
-            <thead className="bg-slate-100/80 dark:bg-[#1a1e36] border-b border-slate-200 dark:border-[#292440] text-slate-700 dark:text-slate-200 font-bold">
+            <thead className="bg-slate-100/80 dark:bg-[var(--card-bg)] border-b border-slate-200 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 font-bold">
               <tr>
                 <th className="py-3 px-3 text-center w-12">ลำดับ</th>
                 <th className="py-3 px-3 text-center w-24">รหัสยา</th>
@@ -535,7 +535,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                 {canEdit && <th className="py-3 px-3 text-center w-24">จัดการ</th>}
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100 dark:divide-[#292440]/60">
+            <tbody className="divide-y divide-slate-100 dark:divide-[var(--card-border)]/60">
               {isLoading ? (
                 <tr>
                   <td colSpan={canEdit ? 8 : 7}>
@@ -750,8 +750,8 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
       {/* Add / Edit Rule Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[#292440] bg-white dark:bg-[#121629] p-6 shadow-2xl space-y-4 max-h-[94vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[#292440] pb-3">
+          <div className="w-full max-w-6xl rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-white dark:bg-[var(--card-sub)] p-6 shadow-2xl space-y-4 max-h-[94vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-[var(--card-border)] pb-3">
               <div className="flex items-center gap-2.5">
                 <div className="grid place-items-center size-9 rounded-xl bg-amber-500/15 text-amber-700 dark:text-amber-400">
                   <Clock className="size-5" />
@@ -815,7 +815,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                         {selectedDrugs.map((d) => (
                           <span
                             key={d.icode}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-white dark:bg-[#1a2035] text-slate-800 dark:text-slate-200 border border-emerald-500/30 shadow-2xs"
+                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-white dark:bg-[var(--card-bg)] text-slate-800 dark:text-slate-200 border border-emerald-500/30 shadow-2xs"
                           >
                             <span>{d.drug_name}</span>
                             <code className="text-xs font-mono text-slate-400">({d.icode})</code>
@@ -842,7 +842,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                         value={drugSearchQuery}
                         onChange={(e) => setDrugSearchQuery(e.target.value)}
                         placeholder="ค้นหายาสมุนไพร (ชื่อยา หรือ รหัสยา)…"
-                        className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                        className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                       />
                     </div>
                     {filteredDrugs.length > 0 && (
@@ -866,7 +866,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                   </div>
 
                   {/* Drug Checkbox List with Synced ICD-10 Badges */}
-                  <div className="max-h-[55vh] min-h-[20rem] overflow-y-auto rounded-xl border border-slate-200 dark:border-[#34304a] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[#101326] flex-1">
+                  <div className="max-h-[55vh] min-h-[20rem] overflow-y-auto rounded-xl border border-slate-200 dark:border-[var(--input-border)] divide-y divide-slate-100 dark:divide-white/5 bg-slate-50/50 dark:bg-[var(--card-sub)] flex-1">
                     {filteredDrugs.length === 0 ? (
                       <div className="p-4 text-center text-xs text-slate-400">
                         ไม่พบยาสมุนไพรที่ตรงกับคำค้นหา
@@ -958,7 +958,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                     </div>
 
                     {/* HOSxP Pttype Search & Multi-select Box */}
-                    <div className="rounded-xl border border-slate-200 dark:border-[#34304a] bg-slate-50/50 dark:bg-[#101326] p-2.5 space-y-2">
+                    <div className="rounded-xl border border-slate-200 dark:border-[var(--input-border)] bg-slate-50/50 dark:bg-[var(--card-sub)] p-2.5 space-y-2">
                       <div className="flex items-center gap-2">
                         <div className="relative flex-1">
                           <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -967,7 +967,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                             value={pttypeSearchQuery}
                             onChange={(e) => setPttypeSearchQuery(e.target.value)}
                             placeholder="ค้นหารหัสสิทธิ หรือชื่อสิทธิการรักษา..."
-                            className="w-full rounded-lg bg-white dark:bg-[#181c30] ring-1 border-0 ring-slate-200 dark:ring-[#34304a] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                            className="w-full rounded-lg bg-white dark:bg-[var(--card-bg)] ring-1 border-0 ring-slate-200 dark:ring-[var(--input-border)] pl-8 pr-2.5 py-1.5 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500"
                           />
                         </div>
                         {filteredPttypes.length > 0 && (
@@ -991,7 +991,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       </div>
 
                       {/* Scrollable list of pttypes */}
-                      <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[#14182b]">
+                      <div className="max-h-60 overflow-y-auto rounded-lg border border-slate-200/80 dark:border-white/5 divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-[var(--card-bg)]">
                         {isLoadingPttypes ? (
                           <div className="py-4 text-center text-xs text-slate-400 flex items-center justify-center gap-2">
                             <Loader2 className="size-4 animate-spin text-emerald-500" />
@@ -1059,7 +1059,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           value={formPttypeLabel}
                           onChange={(e) => setFormPttypeLabel(e.target.value)}
                           placeholder="เช่น สิทธิ UC / บัตรทอง หรือ [89] UC ทั่วไป"
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white"
                           required
                         />
                       </div>
@@ -1070,7 +1070,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           value={formPttypeFilter}
                           onChange={(e) => setFormPttypeFilter(e.target.value)}
                           placeholder="เช่น 89, 02, UC, บัตรทอง"
-                          className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
+                          className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] px-2.5 py-1.5 text-xs text-slate-900 dark:text-white font-mono"
                           required
                         />
                       </div>
@@ -1105,7 +1105,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                           max={365}
                           value={formIntervalDays}
                           onChange={(e) => handleSelectDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
-                          className="w-16 rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-2 py-1 text-center font-mono text-xs text-slate-900 dark:text-white"
+                          className="w-16 rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] px-2 py-1 text-center font-mono text-xs text-slate-900 dark:text-white"
                         />
                         <span className="text-xs text-slate-500">วัน</span>
                       </div>
@@ -1125,7 +1125,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
                       value={formDescription}
                       onChange={(e) => setFormDescription(e.target.value)}
                       placeholder="เช่น เงื่อนไขสิทธิ UC ตัดการจ่าย 7 วัน ถ้าไม่ครบ 7 วันไม่ผ่าน"
-                      className="w-full rounded-xl bg-slate-50 dark:bg-[#1a1f36] ring-1 ring-slate-200 dark:ring-[#34304a] px-3 py-1.5 text-xs text-slate-900 dark:text-white"
+                      className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-bg)] ring-1 ring-slate-200 dark:ring-[var(--input-border)] px-3 py-1.5 text-xs text-slate-900 dark:text-white"
                     />
                   </div>
 
@@ -1153,7 +1153,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
               </div>
 
               {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[#292440]">
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-[var(--card-border)]">
                 <button
                   type="button"
                   onClick={() => setIsModalOpen(false)}
@@ -1202,7 +1202,7 @@ export const DispensingRulesTab: FC<DispensingRulesTabProps> = ({ dxMap, canEdit
           onClick={() => setViewingDxDrug(null)}
         >
           <div
-            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[#181528] border border-slate-200 dark:border-[#2d2845] p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-150"
+            className="w-full max-w-lg rounded-2xl bg-white dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] p-5 shadow-2xl space-y-4 max-h-[85vh] flex flex-col animate-in zoom-in-95 duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

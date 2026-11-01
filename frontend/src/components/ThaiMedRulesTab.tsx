@@ -110,7 +110,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
       {/* Rules Config List */}
       <div className="grid grid-cols-1 gap-4">
         {/* Rule 1: Coexistence of 3 categories */}
-        <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-5 shadow-xs space-y-4">
+        <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card p-5 shadow-xs space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -177,7 +177,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
         </div>
 
         {/* Rule 2: Massage and Compress >= 2 times */}
-        <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-5 shadow-xs space-y-3">
+        <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card p-5 shadow-xs space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -209,7 +209,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
         </div>
 
         {/* Rule 3: Single massage or compress >= 2 times */}
-        <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-5 shadow-xs space-y-3">
+        <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card p-5 shadow-xs space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
@@ -241,7 +241,7 @@ export const ThaiMedRulesTab: FC<ThaiMedRulesTabProps> = ({ canEdit }) => {
         </div>
 
         {/* Rule 4: Visit 2 Claim Code Verification (Thai Traditional Medicine) */}
-        <div className="rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card p-5 shadow-xs space-y-3">
+        <div className="rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card p-5 shadow-xs space-y-3">
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1.5 flex-1">
               <div className="flex items-center gap-2 flex-wrap">

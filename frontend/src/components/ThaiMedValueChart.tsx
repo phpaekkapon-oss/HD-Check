@@ -104,7 +104,7 @@ interface ThaiMedValueChartProps {
 
 /** โครงกราฟระหว่างโหลด: แท่งกะพริบเบาๆ พร้อมข้อความ ไม่ให้เข้าใจผิดว่าไม่มีข้อมูล */
 const ChartSkeleton: FC = () => (
-  <div role="status" aria-live="polite" className="rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[#070b14]/50 p-4">
+  <div role="status" aria-live="polite" className="rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[var(--app-bg)]/50 p-4">
     <div className="flex h-44 items-end gap-3 px-6">
       {[45, 70, 55, 85, 60, 75, 50, 90, 65, 80, 55, 70].map((h, i) => (
         <div key={i} className="skeleton flex-1 rounded-b-none rounded-t-md" style={{ height: `${h}%` }} />
@@ -205,7 +205,7 @@ export const ThaiMedValueChart: FC<ThaiMedValueChartProps> = ({ daily, startDate
       ) : points.length === 0 ? (
         <p className="py-10 text-center text-xs text-slate-500 dark:text-slate-400">ไม่มีข้อมูลในช่วงวันที่เลือก</p>
       ) : (
-        <div className="relative rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[#070b14]/50 p-2">
+        <div className="relative rounded-xl border border-slate-200/70 dark:border-white/5 bg-slate-50/70 dark:bg-[var(--app-bg)]/50 p-2">
           <svg
             key={`${startDate}-${endDate}-${is3D}`}
             viewBox={`0 0 ${W} ${H}`}

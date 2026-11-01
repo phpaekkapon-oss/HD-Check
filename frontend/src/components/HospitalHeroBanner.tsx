@@ -26,7 +26,7 @@ export const HospitalHeroBanner: FC<HospitalHeroBannerProps> = ({ status, onSync
 
   return (
     <div
-      className="rounded-2xl bg-themed-card text-slate-900 dark:text-white p-4 sm:p-5 shadow-xs dark:shadow-sm border border-slate-200 dark:border-[#292440] flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors"
+      className="rounded-2xl bg-themed-card text-slate-900 dark:text-white p-4 sm:p-5 shadow-xs dark:shadow-sm border border-slate-200 dark:border-[var(--card-border)] flex flex-col xl:flex-row xl:items-center justify-between gap-4 transition-colors"
     >
       {/* Welcome Title & Hospital Details */}
       <div className="space-y-1.5 min-w-0">

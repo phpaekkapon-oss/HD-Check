@@ -348,7 +348,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
   return (
     <div className="flex items-center gap-1.5 flex-wrap py-0.5 relative">
       {/* Year Mode Toggle: [ ปี พ.ศ. | ปีงบประมาณ ] */}
-      <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] shrink-0">
+      <div className="inline-flex items-center p-0.5 rounded-xl bg-slate-100 dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] shrink-0">
         <button
           type="button"
           onClick={() => {
@@ -358,7 +358,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           className={cn(
             'px-2.5 py-1 text-xs font-semibold rounded-lg transition cursor-pointer',
             yearMode === 'calendar'
-              ? 'bg-white dark:bg-[#28324e] text-slate-900 dark:text-white shadow-xs font-bold'
+              ? 'bg-white dark:bg-[var(--card-border)] text-slate-900 dark:text-white shadow-xs font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           )}
         >
@@ -373,7 +373,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           className={cn(
             'px-2.5 py-1 text-xs font-semibold rounded-lg transition cursor-pointer',
             yearMode === 'fiscal'
-              ? 'bg-white dark:bg-[#28324e] text-slate-900 dark:text-white shadow-xs font-bold'
+              ? 'bg-white dark:bg-[var(--card-border)] text-slate-900 dark:text-white shadow-xs font-bold'
               : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
           )}
         >
@@ -388,7 +388,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
             value={activeFiscalYear}
             onChange={(e) => applyFiscalYear(Number(e.target.value))}
             aria-label="เลือกปีงบประมาณ"
-            className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#1e263d] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
+            className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[var(--card-header)] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
           >
             {fiscalYearOptions.map((fy) => (
               <option key={fy} value={fy}>
@@ -406,7 +406,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           <button
             type="button"
             onClick={handleInlinePrevMonth}
-            className="inline-flex items-center justify-center h-8.5 w-8.5 shrink-0 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e263d] hover:border-slate-300 dark:hover:border-slate-600 active:scale-95 transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center justify-center h-8.5 w-8.5 shrink-0 rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[var(--card-header)] hover:border-slate-300 dark:hover:border-slate-600 active:scale-95 transition cursor-pointer shadow-2xs"
             title="เดือนก่อนหน้า"
             aria-label="เดือนก่อนหน้า"
           >
@@ -418,7 +418,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
               value={activeYear}
               onChange={(e) => applyMonthRange(Number(e.target.value), activeMonth)}
               aria-label="เลือกปี พ.ศ."
-              className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#1e263d] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
+              className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[var(--card-header)] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
             >
               {inlineYears.map((y) => (
                 <option key={y} value={y}>
@@ -436,7 +436,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
               value={activeMonth}
               onChange={(e) => applyMonthRange(activeYear, Number(e.target.value))}
               aria-label="เลือกเดือน"
-              className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[#1e263d] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
+              className="h-8.5 appearance-none rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] pl-3 pr-7 text-xs font-semibold text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-[var(--card-header)] hover:border-slate-300 dark:hover:border-slate-600 focus:outline-none focus:ring-2 focus:ring-teal-500/40 cursor-pointer shadow-2xs transition"
             >
               {THAI_MONTHS_SHORT.map((mLabel, idx) => (
                 <option key={mLabel} value={idx}>
@@ -452,7 +452,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           <button
             type="button"
             onClick={handleInlineNextMonth}
-            className="inline-flex items-center justify-center h-8.5 w-8.5 shrink-0 rounded-xl bg-white dark:bg-[#151b2d] border border-slate-200/90 dark:border-[#2a334d] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[#1e263d] hover:border-slate-300 dark:hover:border-slate-600 active:scale-95 transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center justify-center h-8.5 w-8.5 shrink-0 rounded-xl bg-white dark:bg-[var(--card-bg)] border border-slate-200/90 dark:border-[var(--card-border)] text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-[var(--card-header)] hover:border-slate-300 dark:hover:border-slate-600 active:scale-95 transition cursor-pointer shadow-2xs"
             title="เดือนถัดไป"
             aria-label="เดือนถัดไป"
           >
@@ -462,7 +462,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
       )}
 
       {/* Subtle Visual Divider */}
-      <div className="h-5 w-px bg-slate-200/80 dark:bg-[#2a334d] mx-1 shrink-0 hidden sm:block" />
+      <div className="h-5 w-px bg-slate-200/80 dark:bg-[var(--card-border)] mx-1 shrink-0 hidden sm:block" />
 
       {/* Start Date Button with anchored Popover */}
       <div className="relative shrink-0">
@@ -471,10 +471,10 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           type="button"
           onClick={() => handleTogglePopover('start')}
           className={cn(
-            'inline-flex items-center gap-1.5 h-8.5 shrink-0 rounded-xl bg-white dark:bg-[#151b2d] border px-3 text-xs font-semibold text-slate-800 dark:text-slate-100 transition shadow-2xs cursor-pointer group',
+            'inline-flex items-center gap-1.5 h-8.5 shrink-0 rounded-xl bg-white dark:bg-[var(--card-bg)] border px-3 text-xs font-semibold text-slate-800 dark:text-slate-100 transition shadow-2xs cursor-pointer group',
             openPopover === 'start'
-              ? 'border-cyan-500 ring-2 ring-cyan-500/30 dark:bg-[#1e263d]'
-              : 'border-slate-200/90 dark:border-[#2a334d] hover:bg-slate-50 dark:hover:bg-[#1e263d] hover:border-cyan-500/40'
+              ? 'border-cyan-500 ring-2 ring-cyan-500/30 dark:bg-[var(--card-header)]'
+              : 'border-slate-200/90 dark:border-[var(--card-border)] hover:bg-slate-50 dark:hover:bg-[var(--card-header)] hover:border-cyan-500/40'
           )}
           title="คลิกเพื่อเปิดปฏิทินเลือกวันเริ่มต้น"
         >
@@ -494,10 +494,10 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           type="button"
           onClick={() => handleTogglePopover('end')}
           className={cn(
-            'inline-flex items-center gap-1.5 h-8.5 shrink-0 rounded-xl bg-white dark:bg-[#151b2d] border px-3 text-xs font-semibold text-slate-800 dark:text-slate-100 transition shadow-2xs cursor-pointer group',
+            'inline-flex items-center gap-1.5 h-8.5 shrink-0 rounded-xl bg-white dark:bg-[var(--card-bg)] border px-3 text-xs font-semibold text-slate-800 dark:text-slate-100 transition shadow-2xs cursor-pointer group',
             openPopover === 'end'
-              ? 'border-cyan-500 ring-2 ring-cyan-500/30 dark:bg-[#1e263d]'
-              : 'border-slate-200/90 dark:border-[#2a334d] hover:bg-slate-50 dark:hover:bg-[#1e263d] hover:border-cyan-500/40'
+              ? 'border-cyan-500 ring-2 ring-cyan-500/30 dark:bg-[var(--card-header)]'
+              : 'border-slate-200/90 dark:border-[var(--card-border)] hover:bg-slate-50 dark:hover:bg-[var(--card-header)] hover:border-cyan-500/40'
           )}
           title="คลิกเพื่อเปิดปฏิทินเลือกวันสิ้นสุด"
         >
@@ -509,7 +509,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
       </div>
 
       {/* Subtle Visual Divider */}
-      <div className="h-5 w-px bg-slate-200/80 dark:bg-[#2a334d] mx-1 shrink-0 hidden sm:block" />
+      <div className="h-5 w-px bg-slate-200/80 dark:bg-[var(--card-border)] mx-1 shrink-0 hidden sm:block" />
 
       {/* Quick Presets */}
       <button
@@ -519,7 +519,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           'h-8.5 px-3 shrink-0 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap',
           isFullActiveMonth && !isThisMonthSelected && !isPrevMonthSelected
             ? 'bg-teal-600 text-white border-teal-500 shadow-sm shadow-teal-500/20'
-            : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e263d]'
+            : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-header)]'
         )}
         title="เลือกทั้งเดือนของเดือนที่แสดงอยู่"
       >
@@ -533,7 +533,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           'h-8.5 px-2.5 shrink-0 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap',
           isTodaySelected
             ? 'bg-teal-600 text-white border-teal-500 shadow-sm shadow-teal-500/20'
-            : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e263d]'
+            : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-header)]'
         )}
         title="ดูข้อมูลเฉพาะวันนี้"
       >
@@ -547,7 +547,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           'h-8.5 px-2.5 shrink-0 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap',
           isYesterdaySelected
             ? 'bg-teal-600 text-white border-teal-500 shadow-sm shadow-teal-500/20'
-            : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e263d]'
+            : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-header)]'
         )}
         title="ดูข้อมูลเฉพาะเมื่อวานนี้"
       >
@@ -561,7 +561,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           'h-8.5 px-3 shrink-0 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap',
           isThisMonthSelected
             ? 'bg-teal-600 text-white border-teal-500 shadow-sm shadow-teal-500/20'
-            : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e263d]'
+            : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-header)]'
         )}
         title="ดูข้อมูลทั้งเดือนปัจจุบัน"
       >
@@ -575,7 +575,7 @@ export const ThaiDatePickerModal: FC<ThaiDatePickerModalProps> = ({ range, onCha
           'h-8.5 px-3 shrink-0 rounded-xl text-xs font-semibold border transition cursor-pointer active:scale-95 shadow-2xs whitespace-nowrap',
           isPrevMonthSelected
             ? 'bg-teal-600 text-white border-teal-500 shadow-sm shadow-teal-500/20'
-            : 'bg-white dark:bg-[#151b2d] border-slate-200/90 dark:border-[#2a334d] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[#1e263d]'
+            : 'bg-white dark:bg-[var(--card-bg)] border-slate-200/90 dark:border-[var(--card-border)] text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-[var(--card-header)]'
         )}
         title="ดูข้อมูลเดือนที่แล้ว"
       >

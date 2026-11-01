@@ -160,7 +160,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
   if (isStuck) {
     return (
       <ToastShell autoCloseMs={0} onAutoClose={handleDismiss}>
-        <div className="relative flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-white/95 p-3 shadow-2xl shadow-amber-500/20 backdrop-blur-md dark:bg-[#161a2f]/95 lg:p-4">
+        <div className="relative flex items-start gap-3 rounded-2xl border border-amber-500/40 bg-white/95 p-3 shadow-2xl shadow-amber-500/20 backdrop-blur-md dark:bg-[var(--card-bg)]/95 lg:p-4">
           <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-300">
             <RefreshCw className="size-4" />
           </div>
@@ -191,7 +191,7 @@ export const VersionUpdateNotice: FC<VersionUpdateNoticeProps> = ({
 
   return (
     <ToastShell autoCloseMs={autoCloseMs} onAutoClose={() => handleDismiss()}>
-      <div className={`relative p-3 lg:p-4 rounded-2xl bg-white/95 dark:bg-[#161a2f]/95 backdrop-blur-md border border-teal-500/40 dark:border-teal-500/50 shadow-2xl shadow-teal-500/20 flex ${notesOpen ? 'items-start' : 'items-center'} lg:items-start gap-3`}>
+      <div className={`relative p-3 lg:p-4 rounded-2xl bg-white/95 dark:bg-[var(--card-bg)]/95 backdrop-blur-md border border-teal-500/40 dark:border-teal-500/50 shadow-2xl shadow-teal-500/20 flex ${notesOpen ? 'items-start' : 'items-center'} lg:items-start gap-3`}>
         <div className="size-9 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-500 flex items-center justify-center text-white shrink-0 shadow-md shadow-teal-500/25">
           {isServerUpgradePending ? <Zap className="size-4.5" /> : <Tag className="size-4" />}
         </div>

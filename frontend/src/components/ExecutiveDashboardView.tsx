@@ -712,7 +712,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('PASS')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-emerald-400 dark:hover:border-emerald-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูรายชื่อผู้รับบริการและรายการสั่งยาที่ผ่านเกณฑ์"
         >
           <div>
@@ -762,7 +762,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('TOTAL')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-indigo-400 dark:hover:border-indigo-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูประวัติการสั่งใช้ยาสมุนไพรทั้งหมด"
         >
           <div>
@@ -804,7 +804,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
         <button
           type="button"
           onClick={() => openDrillDown('PATIENTS')}
-          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 active:scale-[0.99]"
+          className="rounded-2xl p-4 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border flex flex-col justify-between min-h-[132px] backdrop-blur-md bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-lg hover:border-teal-400 dark:hover:border-teal-500 hover:-translate-y-1 active:scale-[0.99]"
           title="คลิกเพื่อดูรายชื่อผู้รับบริการสั่งใช้สมุนไพรทุกคน"
         >
           <div>
@@ -959,7 +959,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
           </div>
 
           {/* SVG Chart Container */}
-          <div className="relative w-full flex-1 flex flex-col justify-center rounded-xl bg-slate-50/70 dark:bg-[#070b14]/50 border border-slate-200/60 dark:border-white/5 p-2 overflow-hidden">
+          <div className="relative w-full flex-1 flex flex-col justify-center rounded-xl bg-slate-50/70 dark:bg-[var(--app-bg)]/50 border border-slate-200/60 dark:border-white/5 p-2 overflow-hidden">
             {dailyTrends.length === 0 ? (
               <div className="h-44 grid place-items-center text-xs text-slate-400">
                 ไม่พบข้อมูลการสั่งจ่ายยาในช่วงเวลานี้
@@ -1549,7 +1549,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
       {/* ========================================================================= */}
       {activeDrillDown && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
-          <div className="w-full max-w-5xl rounded-2xl bg-white dark:bg-[#0c1424] border border-slate-200/90 dark:border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+          <div className="w-full max-w-5xl rounded-2xl bg-white dark:bg-[var(--card-sub)] border border-slate-200/90 dark:border-white/10 shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
             {/* Modal Header */}
             <div className="p-4 sm:p-5 border-b border-slate-200/80 dark:border-white/10 flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-white/[0.02]">
               <div className="flex items-center gap-3 min-w-0">
@@ -1624,7 +1624,7 @@ export const ExecutiveDashboardView: FC<ExecutiveDashboardViewProps> = ({
             </div>
 
             {/* Toolbar: Search & Scope Filter */}
-            <div className="p-3 sm:px-5 border-b border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[#0c1424]">
+            <div className="p-3 sm:px-5 border-b border-slate-200/80 dark:border-white/10 flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-[var(--card-sub)]">
               {/* Search */}
               <div className="relative flex-1 min-w-[240px] max-w-md">
                 <Search className="size-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />

@@ -97,7 +97,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
           <DataTableColumnHeader column={column} title="รหัสยา" />
         ),
         cell: ({ row }) => (
-          <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#101326] text-slate-800 dark:text-slate-100">
+          <span className="font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[var(--card-sub)] text-slate-800 dark:text-slate-100">
             {row.original.icode}
           </span>
         ),
@@ -161,7 +161,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         cell: ({ row }) => {
           const shortUnit = cleanDrugUnit(row.original.units)
           return (
-            <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50/60 dark:bg-[#1d2035] px-2 py-0.5 rounded whitespace-nowrap">
+            <div className="text-right font-mono font-bold text-slate-900 dark:text-slate-100 bg-slate-50/60 dark:bg-[var(--card-header)] px-2 py-0.5 rounded whitespace-nowrap">
               <span>{fmtNum(row.original.total_qty)}</span>
               {shortUnit ? (
                 <span className="text-xs font-normal font-sans text-slate-500 dark:text-slate-400 ml-1.5">
@@ -289,7 +289,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
             'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
             filterType === 'OPD'
               ? 'border-cyan-500 dark:border-cyan-400 shadow-[0_0_20px_rgba(6,182,212,0.3)] bg-cyan-500/[0.06] dark:bg-cyan-950/40 -translate-y-0.5'
-              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-cyan-400/60 dark:hover:border-cyan-500/40 hover:-translate-y-0.5'
+              : 'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-cyan-400/60 dark:hover:border-cyan-500/40 hover:-translate-y-0.5'
           )}
         >
           <div>
@@ -331,7 +331,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
             'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
             filterType === 'IPD'
               ? 'border-indigo-500 dark:border-indigo-400 shadow-[0_0_20px_rgba(99,102,241,0.3)] bg-indigo-500/[0.06] dark:bg-indigo-950/40 -translate-y-0.5'
-              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-indigo-400/60 dark:hover:border-indigo-500/40 hover:-translate-y-0.5'
+              : 'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-indigo-400/60 dark:hover:border-indigo-500/40 hover:-translate-y-0.5'
           )}
         >
           <div>
@@ -373,7 +373,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
             'rounded-2xl p-3.5 text-left transition-all duration-200 cursor-pointer relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md',
             filterType === 'ALL'
               ? 'border-teal-500 dark:border-teal-400 shadow-[0_0_20px_rgba(20,184,166,0.3)] bg-teal-500/[0.06] dark:bg-teal-950/40 -translate-y-0.5'
-              : 'bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-teal-400/60 dark:hover:border-teal-500/40 hover:-translate-y-0.5'
+              : 'bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-teal-400/60 dark:hover:border-teal-500/40 hover:-translate-y-0.5'
           )}
         >
           <div>
@@ -408,7 +408,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         </button>
 
         {/* Card 4: Cost */}
-        <div className="rounded-2xl p-3.5 text-left transition-all duration-200 relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[#0c1424]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-amber-400/60 dark:hover:border-amber-500/40 hover:-translate-y-0.5">
+        <div className="rounded-2xl p-3.5 text-left transition-all duration-200 relative overflow-hidden group border-2 flex flex-col justify-between min-h-[120px] backdrop-blur-md bg-white/95 dark:bg-[var(--card-sub)]/90 border-slate-200/90 dark:border-white/10 shadow-2xs hover:shadow-md hover:border-amber-400/60 dark:hover:border-amber-500/40 hover:-translate-y-0.5">
           <div>
             <div className="flex items-center justify-between gap-1 mb-2">
               <span className="text-xs font-bold text-slate-700 dark:text-slate-200 truncate">
@@ -434,7 +434,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
       </div>
 
       {filterType !== 'ALL' && (
-        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[#14172a] border border-slate-200 dark:border-[#292440] text-xs">
+        <div className="flex items-center justify-between px-3.5 py-2 rounded-xl bg-slate-100 dark:bg-[var(--card-bg)] border border-slate-200 dark:border-[var(--card-border)] text-xs">
           <div className="flex items-center gap-2">
             <span className="font-semibold text-slate-700 dark:text-slate-300">
               กำลังกรองตาราง: {filterType === 'OPD' ? '💊 เฉพาะยาที่มีการจ่ายผู้ป่วยนอก (OPD)' : '🏥 เฉพาะยาที่มีการจ่ายผู้ป่วยใน (IPD)'}
@@ -466,9 +466,9 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
       )}
 
       {/* Main Shadcn Data Table (Desktop View - Unified Card) */}
-      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[#292440] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
+      <div className="hidden md:block rounded-2xl border border-slate-200 dark:border-[var(--card-border)] bg-themed-card shadow-xs dark:shadow-sm overflow-hidden transition-colors">
         {/* Integrated Table Toolbar Header */}
-        <div className="p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-[#1d2035]/70 border-b border-slate-200 dark:border-[#292440]">
+        <div className="p-3 sm:p-3.5 flex flex-wrap items-center justify-between gap-3 bg-slate-50/70 dark:bg-[var(--card-header)]/70 border-b border-slate-200 dark:border-[var(--card-border)]">
           <div className="flex flex-wrap items-center gap-3 flex-1 min-w-0">
             <DateRangeFields range={range} onChange={onRangeChange} />
 
@@ -478,7 +478,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="ค้นหารหัสยา, ชื่อยา, รหัส 24 หลัก…"
-                className="w-full rounded-xl bg-white dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs"
+                className="w-full rounded-xl bg-white dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--input-border)] pl-9 pr-3 py-2 text-xs sm:text-sm text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1 shadow-2xs"
               />
             </div>
           </div>
@@ -496,9 +496,9 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
         </div>
 
         <Table containerClassName="max-h-[68vh] min-h-[420px] overflow-auto">
-          <TableHeader className="bg-slate-50 dark:bg-[#1d2035]">
+          <TableHeader className="bg-slate-50 dark:bg-[var(--card-header)]">
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[#292440] hover:bg-transparent">
+              <TableRow key={headerGroup.id} className="border-slate-200 dark:border-[var(--card-border)] hover:bg-transparent">
                 {headerGroup.headers.map((header) => (
                   <TableHead key={header.id} className="text-slate-700 dark:text-slate-300 font-bold text-xs py-3">
                     {header.isPlaceholder
@@ -519,7 +519,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               </TableRow>
             ) : (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} className="border-slate-100 dark:border-[#292440]/70 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-800 dark:text-slate-200">
+                <TableRow key={row.id} className="border-slate-100 dark:border-[var(--card-border)]/70 hover:bg-slate-50 dark:hover:bg-white/5 transition-colors text-slate-800 dark:text-slate-200">
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id} className="py-2.5">
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -546,7 +546,7 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="ค้นหารหัสยา, ชื่อยา, รหัส 24 หลัก…"
-              className="w-full rounded-xl bg-slate-50 dark:bg-[#101326] border border-slate-200 dark:border-[#34304a] pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1"
+              className="w-full rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] border border-slate-200 dark:border-[var(--input-border)] pl-9 pr-3 py-2 text-xs text-slate-900 dark:text-white placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:ring-1"
             />
           </div>
           <button
@@ -581,18 +581,18 @@ export const DrugSummaryView: FC<DrugSummaryViewProps> = ({ drugs, range, onRang
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[#292440] text-xs">
-                  <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-[var(--card-border)] text-xs">
+                  <div className="rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] p-2">
                     <span className="text-xs text-slate-500 dark:text-slate-400 block">ผู้ป่วยนอก (OPD)</span>
                     <span className="font-mono font-semibold text-cyan-700 dark:text-cyan-400">{fmtNum(d.opd_qty)} หน่วย</span>
                   </div>
-                  <div className="rounded-xl bg-slate-50 dark:bg-[#101326] p-2">
+                  <div className="rounded-xl bg-slate-50 dark:bg-[var(--card-sub)] p-2">
                     <span className="text-xs text-slate-500 dark:text-slate-400 block">ผู้ป่วยใน (IPD)</span>
                     <span className="font-mono font-semibold text-indigo-700 dark:text-indigo-400">{fmtNum(d.ipd_qty)} หน่วย</span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-[#292440] text-slate-600 dark:text-slate-300">
+                <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-100 dark:border-[var(--card-border)] text-slate-600 dark:text-slate-300">
                   <span>ต้นทุน: <strong className="font-mono text-slate-800 dark:text-slate-200">฿{fmtNum(d.unitcost, 2)}</strong></span>
                   <span>รวมต้นทุน: <strong className="font-mono text-amber-700 dark:text-amber-400 font-bold">฿{fmtNum(d.total_cost, 2)}</strong></span>
                 </div>

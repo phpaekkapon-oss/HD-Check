@@ -193,7 +193,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
   const cleanVersion = appVersion.replace(/^v/, '')
 
   return (
-    <header className="sticky top-0 z-30 bg-themed-header text-slate-900 dark:text-white border-b border-slate-200 dark:border-[#30364b] select-none shadow-sm dark:shadow-md transition-colors">
+    <header className="safe-top sticky top-0 z-30 bg-themed-header text-slate-900 dark:text-white border-b border-slate-200 dark:border-[var(--header-border)] select-none shadow-sm dark:shadow-md transition-colors">
       <div className="flex items-center justify-between gap-2.5 px-3.5 sm:px-5 min-h-16 py-2">
         {/* Left Section: Sidebar Toggle, Standardized Clean Title & Metadata */}
         <div className="flex items-center gap-3 min-w-0 mr-auto">
@@ -655,7 +655,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
 
       {/* PWA Install Tip Banner */}
       {showPwaTip && (
-        <div className="bg-teal-700 dark:bg-[#124259] text-white px-4 py-2 text-xs flex items-center justify-between gap-3 animate-fade-in border-t border-teal-400/20">
+        <div className="bg-teal-700 dark:bg-[var(--card-header)] text-white px-4 py-2 text-xs flex items-center justify-between gap-3 animate-fade-in border-t border-teal-400/20">
           <div className="flex items-center gap-2">
             <Download className="size-4 text-emerald-300 shrink-0" />
             <span>

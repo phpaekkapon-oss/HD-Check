@@ -383,10 +383,10 @@ select {
   scrollbar-width: none;
 }
 
-/* High-Visibility Custom Scrollbar for Chat & Dialogs */
+/* High-Visibility Custom Scrollbar for Chat & Dialogs (ไล่สีตาม accent ที่ผู้ใช้เลือก) */
 .chat-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: #7c3aed transparent;
+  scrollbar-color: var(--accent-hex) transparent;
 }
 .chat-scrollbar::-webkit-scrollbar {
   width: 6px;
@@ -401,18 +401,18 @@ select {
   border-radius: 9999px;
 }
 .chat-scrollbar::-webkit-scrollbar-thumb {
-  background: #a78bfa;
+  background: color-mix(in srgb, var(--accent-hex) 55%, white);
   border-radius: 9999px;
 }
 .dark .chat-scrollbar::-webkit-scrollbar-thumb {
-  background: #7c3aed;
+  background: color-mix(in srgb, var(--accent-hex) 85%, black);
   border-radius: 9999px;
 }
 .chat-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #8b5cf6;
+  background: color-mix(in srgb, var(--accent-hex) 75%, white);
 }
 .dark .chat-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: #9333ea;
+  background: var(--accent-hex);
 }
 
 /* 3D Living Floating Animation for Floating Action Buttons */
