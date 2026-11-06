@@ -20,6 +20,7 @@ import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate
 import { useAuth } from '@/context/AuthContext'
 import { canManageHerbDx, canViewThaiMedValue, isAdminUser } from '@/types/auth.types'
 import { ThaiMedValueView } from '@/components/ThaiMedValueView'
+import { ThaiMedDailyView } from '@/components/ThaiMedDailyView'
 import { RangeLoadingNotice } from '@/components/RangeLoadingNotice'
 import { ShieldAlert } from 'lucide-react'
 
@@ -59,6 +60,7 @@ const VALID_PAGES: readonly ActivePage[] = [
   'dxwriteback',
   'dxmap',
   'thaimedvalue',
+  'thaimeddaily',
   'sql',
 ]
 
@@ -205,7 +207,7 @@ const DashboardView: FC = () => {
 
   // หน้าที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (IT ตั้งค่าใน จัดการระบบ > สิทธิ์เมนู) แสดงข้อความแทน แม้พิมพ์ URL ตรง
   const { data: menuPerms } = useMenuPermissions()
-  const isBlocked = activePage === 'thaimedvalue'
+  const isBlocked = activePage === 'thaimedvalue' || activePage === 'thaimeddaily'
     ? !canViewThaiMedValue(user)
     : activePage !== 'dashboard' && (menuPerms ? !menuPerms.myMenus.includes(activePage) : activePage === 'sql' && !isAdminUser(user))
   const shownPage: ActivePage | 'blocked' = isBlocked ? 'blocked' : activePage
@@ -499,6 +501,7 @@ const DashboardView: FC = () => {
 
       {/* Page: รายได้แผนไทย (เฉพาะ IT / ผู้ดูแลแผนไทย) */}
       {shownPage === 'thaimedvalue' && <ThaiMedValueView range={range} onRangeChange={handleRangeChange} />}
+      {shownPage === 'thaimeddaily' && <ThaiMedDailyView />}
 
       {/* Page 4: ตั้งค่ายาสมุนไพร ↔ ICD-10 */}
       {shownPage === 'dxmap' && (

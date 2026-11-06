@@ -228,7 +228,7 @@ export interface SyncResult extends DateRange {
   readonly timestamp: string
 }
 
-export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'claims' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'thaimedvalue' | 'sql'
+export type ActivePage = 'dashboard' | 'audit' | 'healthmed' | 'claims' | 'drugs' | 'mapping' | 'dxwriteback' | 'dxmap' | 'thaimedvalue' | 'thaimeddaily' | 'sql'
 
 /** ตรวจการเบิก สปสช. (/api/claims/check) */
 export type ClaimState = 'not_nhso' | 'no_result' | 'pending' | 'settled' | 'rejected'

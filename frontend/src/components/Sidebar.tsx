@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Activity,
   Banknote,
+  CalendarDays,
   BadgeCheck,
   ChevronRight,
   ChevronDown,
@@ -57,6 +58,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
   { id: 'dxwriteback', label: 'ทบทวนรหัสโรค (DX)', shortLabel: 'ทบทวน DX', hint: 'เตรียมตรวจการส่งกลับ HOSxP', icon: Send },
   { id: 'dxmap', label: 'ตั้งค่ายา ↔ ICD-10', shortLabel: 'เกณฑ์ ICD-10', hint: 'เกณฑ์การตรวจสอบ', icon: Settings2 },
   { id: 'thaimedvalue', label: 'รายได้แผนไทย', shortLabel: 'รายได้แผนไทย', hint: 'มูลค่าบริการ (ประมาณการ)', icon: Banknote, perUser: true },
+  { id: 'thaimeddaily', label: 'สรุปรายวันแผนไทย', shortLabel: 'สรุปรายวัน', hint: 'ผู้รับบริการ/รายได้แยกตามสิทธิ', icon: CalendarDays, perUser: true },
   { id: 'sql', label: 'SQL Query', shortLabel: 'SQL Query', hint: 'คำสั่งต้นฉบับ (เฉพาะผู้ดูแลระบบ)', icon: TerminalSquare, adminOnly: true },
 ]
 

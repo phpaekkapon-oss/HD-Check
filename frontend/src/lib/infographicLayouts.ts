@@ -1,0 +1,499 @@
+import { fmtNum } from '@/lib/format'
+import {
+  SOURCE_LABEL,
+  WHITE,
+  box,
+  chip,
+  drawIcon,
+  groupIcon,
+  money,
+  pct,
+  text,
+  vGradient,
+  wrappedText,
+  type IconName,
+  type Scene,
+} from '@/lib/infographicKit'
+import type { ThaiMedDailyGroup } from '@/api/herbdx.api'
+
+type HeaderVariant = 'wide' | 'compact' | 'portrait'
+
+function drawBackground(sc: Scene) {
+  const { ctx, t } = sc
+  ctx.fillStyle = vGradient(ctx, 0, t.h, t.bg)
+  ctx.fillRect(0, 0, t.w, t.h)
+}
+
+/** ส่วนหัวภาพ: ชื่อโรงพยาบาล หัวเรื่อง กลุ่มงาน และกล่องวันที่/เดือน คืนค่า y ล่างสุดของส่วนหัว */
+function drawHeader(sc: Scene, variant: HeaderVariant): number {
+  const { ctx, t, period, hospital } = sc
+  const banner = t.header === 'banner'
+  const hh = variant === 'wide' ? 230 : variant === 'compact' ? 190 : 300
+  const ink = banner ? t.headInk : t.ink
+  const sub = banner ? t.headSub : t.inkSoft
+  const accent = banner ? t.accent : t.chipInk
+
+  if (banner) {
+    ctx.fillStyle = vGradient(ctx, 0, hh, t.head)
+    ctx.fillRect(0, 0, t.w, hh)
+    ctx.globalAlpha = 0.08
+    drawIcon(sc, t.mark[0], t.headInk, t.w * 0.53, hh / 2, hh * 0.95)
+    drawIcon(sc, t.mark[1], t.headInk, t.w * 0.61, hh * 0.65, hh * 0.72)
+    ctx.globalAlpha = 1
+  }
+  const logoBg = banner ? WHITE : vGradient(ctx, 0, 100, t.chipGrad)
+  const logoFg = banner ? t.chipInk : WHITE
+
+  if (variant === 'portrait') {
+    chip(sc, 'hospital', 82, 62, 76, logoBg, logoFg)
+    text(ctx, hospital, 134, 50, 'left', ink, 700, 38, 880)
+    text(ctx, 'SMART-HOSCHECK · ระบบตรวจสอบข้อมูลการแพทย์แผนไทย', 134, 92, 'left', sub, 400, 20, 880)
+    text(ctx, period.title, 48, 148, 'left', ink, 700, 54, 984)
+    text(ctx, 'กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก', 48, 200, 'left', accent, 600, 30, 984)
+    box(ctx, 48, 226, 984, 58, 29, t.surface, t.edge)
+    chip(sc, 'calendar', 84, 255, 42, t.accent, t.onAccent)
+    text(ctx, `${period.lead} ${period.big}`, 566, 255, 'center', t.ink, 700, 30, 860)
+    return hh
+  }
+
+  const compact = variant === 'compact'
+  const chipY = compact ? 52 : 66
+  chip(sc, 'hospital', compact ? 90 : 98, chipY, compact ? 66 : 80, logoBg, logoFg)
+  text(ctx, hospital, compact ? 140 : 156, compact ? 40 : 52, 'left', ink, 700, compact ? 36 : 44, 700)
+  text(ctx, 'SMART-HOSCHECK · ระบบตรวจสอบข้อมูลการแพทย์แผนไทย', compact ? 140 : 156, compact ? 80 : 100, 'left', sub, 400, compact ? 20 : 24, 760)
+  text(ctx, period.title, 60, compact ? 128 : 156, 'left', ink, 700, compact ? 50 : 58, 1060)
+  text(ctx, 'กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก', 60, compact ? 168 : 208, 'left', accent, 600, compact ? 28 : 34, 1060)
+
+  const bx = t.w - 630
+  const by = compact ? 22 : 36
+  const bh = compact ? 142 : 150
+  box(ctx, bx, by, 590, bh, 28, t.surface, t.edge)
+  chip(sc, 'calendar', bx + 72, by + bh / 2, 90, t.accent, t.onAccent)
+  text(ctx, period.lead, bx + 340, by + bh * 0.33, 'center', t.inkSoft, 500, 28, 440)
+  text(ctx, period.big, bx + 340, by + bh * 0.72, 'center', t.ink, 700, 44, 440)
+  return hh
+}
+
+const SERVICES: readonly { icon: IconName; lines: readonly [string, string] }[] = [
+  { icon: 'leaf', lines: ['นวดไทย', 'ประคบสมุนไพร'] },
+  { icon: 'sprout', lines: ['อบสมุนไพร', 'พอกเข่า'] },
+  { icon: 'baby', lines: ['ดูแลมารดา', 'หลังคลอด'] },
+  { icon: 'heart', lines: ['ส่งเสริมสุขภาพด้วย', 'ภูมิปัญญาการแพทย์แผนไทย'] },
+]
+
+function drawFooter(sc: Scene, y: number) {
+  const { ctx, t, hospital } = sc
+  const bandH = t.h - y
+  ctx.fillStyle = vGradient(ctx, y, t.h, t.foot)
+  ctx.fillRect(0, y, t.w, bandH)
+  if (t.w >= 1400) {
+    text(ctx, 'กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก', 60, y + 30, 'left', t.footInk, 600, 28, 620)
+    text(ctx, hospital, 60, y + 64, 'left', t.footSoft, 400, 22, 620)
+    SERVICES.forEach((item, i) => {
+      const cx = 735 + i * 285
+      chip(sc, item.icon, cx, y + 45, 56, t.accent, t.onAccent)
+      text(ctx, item.lines[0], cx + 40, y + 31, 'left', t.footInk, 600, 21, 225)
+      text(ctx, item.lines[1], cx + 40, y + 59, 'left', t.footSoft, 400, 21, 225)
+    })
+    return
+  }
+  text(ctx, `กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · ${hospital}`, t.w / 2, y + 34, 'center', t.footInk, 600, 24, t.w - 80)
+  const cell = t.w / SERVICES.length
+  SERVICES.forEach((item, i) => {
+    const cx = cell * i + 38
+    const cy = y + bandH - 48
+    chip(sc, item.icon, cx, cy, 44, t.accent, t.onAccent)
+    text(ctx, item.lines[0], cx + 32, cy - 12, 'left', t.footInk, 600, 18, cell - 90)
+    text(ctx, item.lines[1], cx + 32, cy + 12, 'left', t.footSoft, 400, 18, cell - 90)
+  })
+}
+
+interface TableOpts {
+  readonly x: number
+  readonly y: number
+  readonly cols: readonly { readonly w: number; readonly head: string }[]
+  readonly headH: number
+  readonly maxRowH: number
+  readonly opdH: number
+  readonly totalH: number
+  readonly bottomLimit: number
+  readonly withTop: boolean
+  readonly labelSize: number
+  readonly valueSize: number
+}
+
+/** ตารางสรุปตามสิทธิ + แถวรวมทั้งสิ้น คืนค่า y ล่างสุดของแถวรวม */
+function drawTable(sc: Scene, o: TableOpts): number {
+  const { ctx, t, s } = sc
+  const tw = o.cols.reduce((n, c) => n + c.w, 0)
+  const rows = s.groups.length + (o.withTop ? 2 : 0)
+  const rowH = Math.min(o.maxRowH, Math.floor((o.bottomLimit - o.y - o.headH - o.opdH - o.totalH - 30) / rows))
+  const lastIdx = o.cols.length - 1
+  const lastW = o.cols[lastIdx]?.w ?? 0
+  const cellX = (i: number) => o.x + o.cols.slice(0, i).reduce((n, c) => n + c.w, 0)
+  const colRight = (i: number) => cellX(i) + (o.cols[i]?.w ?? 0)
+  const tableH = o.headH + rowH * rows + o.opdH
+  const chipD = Math.min(48, rowH - 12)
+  const labelX = cellX(0) + chipD + 30
+  const labelW = (o.cols[0]?.w ?? 0) - chipD - 44
+
+  box(ctx, o.x, o.y, tw, tableH, 18, t.surface, t.edge)
+  ctx.save()
+  ctx.beginPath()
+  ctx.roundRect(o.x, o.y, tw, tableH, 18)
+  ctx.clip()
+
+  ctx.fillStyle = vGradient(ctx, o.y, o.y + o.headH, t.tableHead)
+  ctx.fillRect(o.x, o.y, tw, o.headH)
+  o.cols.forEach((c, i) => {
+    wrappedText(ctx, c.head, cellX(i) + c.w / 2, o.y + o.headH / 2, c.w - 24, t.tableHeadInk, 700, i === 0 ? o.labelSize + 6 : o.valueSize - 6, 30)
+  })
+
+  const row = (y: number, h: number, icon: IconName, label: string, sub: string | null, vals: readonly string[], opts: { fill: string; bold?: boolean; lastStrong?: boolean; dim?: boolean }) => {
+    ctx.fillStyle = opts.fill
+    ctx.fillRect(o.x, y, tw, h)
+    if (opts.lastStrong) {
+      ctx.fillStyle = t.strong
+      ctx.fillRect(cellX(lastIdx), y, lastW, h)
+    }
+    const ink = opts.dim ? t.inkSoft : t.ink
+    chip(sc, icon, cellX(0) + 14 + chipD / 2, y + h / 2, chipD, opts.fill === t.hilite ? t.surface : t.chipBg, t.chipInk)
+    text(ctx, label, labelX, y + h / 2 - (sub ? 9 : 0), 'left', ink, opts.bold ? 700 : 600, o.labelSize, labelW)
+    if (sub) text(ctx, sub, labelX, y + h / 2 + 17, 'left', t.inkSoft, 400, 18, labelW)
+    vals.forEach((v, i) => {
+      const last = i === vals.length - 1
+      const onStrong = last && opts.lastStrong
+      text(ctx, v, colRight(i + 1) - 24, y + h / 2, 'right', onStrong ? t.strongInk : ink, last || opts.bold ? 700 : 500, o.valueSize, (o.cols[i + 1]?.w ?? 100) - 36)
+    })
+    ctx.fillStyle = t.edge
+    ctx.globalAlpha = 0.5
+    ctx.fillRect(o.x, y + h - 1, tw, 1)
+    ctx.globalAlpha = 1
+  }
+
+  let y = o.y + o.headH
+  if (o.withTop) {
+    row(y, rowH, 'users', 'ผู้รับบริการทั้งหมด', null, [`${fmtNum(s.totals.persons)} คน`, `${fmtNum(s.totals.servicePersons)} คน`, `${fmtNum(s.totals.drugPersons)} คน`, '–'], { fill: t.hilite, bold: true })
+    y += rowH
+    row(y, rowH, 'house', 'ออกชุมชน', null, [`${fmtNum(s.outreach.count)} คน`, '–', '–', '–'], { fill: t.hilite, bold: true })
+    y += rowH
+  }
+  s.groups.forEach((g, i) => {
+    row(y, rowH, groupIcon(g.id), g.label, null, [fmtNum(g.persons), money(g.serviceValue), money(g.drugValue), money(g.total)], {
+      fill: i % 2 ? t.surfaceAlt : t.surface,
+      lastStrong: true,
+      dim: g.persons === 0,
+    })
+    y += rowH
+  })
+  row(
+    y,
+    o.opdH,
+    'clinic',
+    'ค่าบริการผู้ป่วยนอก 50 บาท',
+    `ในเวลา ${money(s.totals.opdFeeInHours)} · นอกเวลา ${money(s.totals.opdFeeOutHours)}`,
+    ['–', '–', '–', money(s.totals.opdFee)],
+    { fill: t.hilite, bold: true }
+  )
+  ctx.restore()
+
+  const ty = o.y + tableH + 10
+  box(ctx, o.x, ty, tw, o.totalH, 18, vGradient(ctx, ty, ty + o.totalH, t.total))
+  chip(sc, 'coins', cellX(0) + 14 + (o.totalH - 20) / 2, ty + o.totalH / 2, o.totalH - 20, t.accent, t.onAccent)
+  text(ctx, 'รวมทั้งสิ้น', cellX(0) + o.totalH + 14, ty + o.totalH / 2, 'left', t.totalInk, 700, o.labelSize + 6, labelW)
+  ;[fmtNum(s.totals.persons), money(s.totals.serviceValue), money(s.totals.drugValue)].forEach((v, i) =>
+    text(ctx, v, colRight(i + 1) - 24, ty + o.totalH / 2, 'right', t.totalInk, 700, o.valueSize, (o.cols[i + 1]?.w ?? 100) - 36)
+  )
+  box(ctx, cellX(lastIdx) + 8, ty + 8, lastW - 16, o.totalH - 16, 12, t.accent)
+  text(ctx, money(s.totals.grandTotal), colRight(lastIdx) - 28, ty + o.totalH / 2, 'right', t.onAccent, 800, o.valueSize + 6, lastW - 44)
+  text(ctx, 'ยอดเงินเป็นประมาณการจากข้อมูล HOSxP', o.x + 6, ty + o.totalH + 16, 'left', t.inkSoft, 400, 16)
+  return ty + o.totalH
+}
+
+/* ───────────── แบบที่ 1: ตาราง + การ์ดสรุปด้านขวา ───────────── */
+export function layoutTable(sc: Scene) {
+  const { ctx, t, s } = sc
+  drawBackground(sc)
+  drawHeader(sc, 'wide')
+  const ty = 262
+  const bottom = drawTable(sc, {
+    x: 40,
+    y: ty,
+    cols: [
+      { w: 440, head: 'สิทธิการรักษา' },
+      { w: 170, head: 'จำนวนคน (ราย)' },
+      { w: 270, head: 'ค่านวด ประคบ อบ พอกเข่า หัตถการอื่นๆ (บาท)' },
+      { w: 230, head: 'ค่ายาสมุนไพร (บาท)' },
+      { w: 230, head: 'รวมค่าบริการทั้งหมด (บาท)' },
+    ],
+    headH: 104,
+    maxRowH: 62,
+    opdH: 70,
+    totalH: 76,
+    bottomLimit: 975,
+    withTop: true,
+    labelSize: 28,
+    valueSize: 30,
+  })
+
+  const px = 1400
+  const pw = 480
+  box(ctx, px, ty, pw, 76, 38, vGradient(ctx, ty, ty + 76, t.head))
+  text(ctx, sc.period.panel, px + pw / 2, ty + 38, 'center', t.headInk, 700, 30, pw - 40)
+
+  const cards: readonly { icon: IconName; label: string; value: string; unit: string; gold?: boolean }[] = [
+    { icon: 'users', label: 'ผู้รับบริการทั้งหมด', value: fmtNum(s.totals.persons), unit: 'ราย' },
+    { icon: 'house', label: 'ออกชุมชน', value: fmtNum(s.outreach.count), unit: 'ราย' },
+    { icon: 'massage', label: 'ค่านวด ประคบ อบ พอกเข่า หัตถการอื่นๆ', value: money(s.totals.serviceValue), unit: 'บาท' },
+    { icon: 'herb', label: 'ค่ายาสมุนไพร', value: money(s.totals.drugValue), unit: 'บาท' },
+    { icon: 'clinic', label: 'ค่าบริการผู้ป่วยนอก (50 บาท)', value: money(s.totals.opdFee), unit: 'บาท' },
+    { icon: 'coins', label: 'รวมค่าบริการทั้งหมด', value: money(s.totals.grandTotal), unit: 'บาท', gold: true },
+  ]
+  const top = ty + 90
+  const gap = 10
+  const cardH = Math.floor((bottom - top - gap * (cards.length - 1)) / cards.length)
+  cards.forEach((c, i) => {
+    const cy = top + i * (cardH + gap)
+    box(ctx, px, cy, pw, cardH, 22, c.gold ? t.accent : t.surface, c.gold ? t.accent : t.edge)
+    const d = Math.min(64, cardH - 20)
+    chip(sc, c.icon, px + 20 + d / 2, cy + cardH / 2, d, c.gold ? t.onAccent : vGradient(ctx, cy, cy + cardH, t.chipGrad), c.gold ? t.accent : WHITE)
+    const lx = px + 20 + d + 16
+    const mw = pw - (lx - px) - 18
+    text(ctx, c.label, lx, cy + cardH * 0.3, 'left', c.gold ? t.onAccent : t.ink, 600, 22, mw)
+    text(ctx, `${c.value} ${c.unit}`, lx, cy + cardH * 0.7, 'left', c.gold ? t.onAccent : t.value, 800, 40, mw)
+  })
+  drawFooter(sc, 990)
+}
+
+/* ───────────── แบบที่ 2: แดชบอร์ด การ์ดตัวชี้วัด + ตาราง + กราฟสัดส่วน ───────────── */
+export function layoutDashboard(sc: Scene) {
+  const { ctx, t, s } = sc
+  drawBackground(sc)
+  const hh = drawHeader(sc, 'compact')
+
+  const kpiY = hh + 20
+  const kpiH = 130
+  const kpiW = (t.w - 80 - 60) / 4
+  const kpis: readonly { icon: IconName; label: string; value: string; sub: string; hot?: boolean }[] = [
+    { icon: 'users', label: 'ผู้รับบริการทั้งหมด', value: `${fmtNum(s.totals.persons)} ราย`, sub: `นวด/หัตถการ ${fmtNum(s.totals.servicePersons)} · รับยา ${fmtNum(s.totals.drugPersons)}` },
+    { icon: 'house', label: 'ออกชุมชน', value: `${fmtNum(s.outreach.count)} ราย`, sub: SOURCE_LABEL[s.outreach.source] },
+    { icon: 'coins', label: 'รวมค่าบริการทั้งหมด', value: `${money(s.totals.grandTotal)} บาท`, sub: `รวมค่าบริการผู้ป่วยนอก ${money(s.totals.opdFee)}`, hot: true },
+    { icon: 'clinic', label: 'เฉลี่ยต่อผู้รับบริการ', value: `${money(s.totals.persons > 0 ? s.totals.grandTotal / s.totals.persons : 0)} บาท`, sub: 'ค่าบริการรวม ÷ ผู้รับบริการ' },
+  ]
+  kpis.forEach((k, i) => {
+    const x = 40 + i * (kpiW + 20)
+    box(ctx, x, kpiY, kpiW, kpiH, 22, k.hot ? t.accent : t.surface, k.hot ? t.accent : t.edge)
+    chip(sc, k.icon, x + 24 + 36, kpiY + kpiH / 2, 72, k.hot ? t.onAccent : vGradient(ctx, kpiY, kpiY + kpiH, t.chipGrad), k.hot ? t.accent : WHITE)
+    const lx = x + 120
+    const mw = kpiW - 138
+    text(ctx, k.label, lx, kpiY + 30, 'left', k.hot ? t.onAccent : t.inkSoft, 600, 22, mw)
+    text(ctx, k.value, lx, kpiY + 72, 'left', k.hot ? t.onAccent : t.ink, 800, 44, mw)
+    text(ctx, k.sub, lx, kpiY + 108, 'left', k.hot ? t.onAccent : t.inkSoft, 400, 18, mw)
+  })
+
+  const ty = kpiY + kpiH + 20
+  const bottom = drawTable(sc, {
+    x: 40,
+    y: ty,
+    cols: [
+      { w: 380, head: 'สิทธิการรักษา' },
+      { w: 140, head: 'จำนวนคน (ราย)' },
+      { w: 220, head: 'ค่านวด ประคบ อบ พอกเข่า หัตถการอื่นๆ (บาท)' },
+      { w: 220, head: 'ค่ายาสมุนไพร (บาท)' },
+      { w: 220, head: 'รวมค่าบริการ (บาท)' },
+    ],
+    headH: 100,
+    maxRowH: 66,
+    opdH: 64,
+    totalH: 66,
+    bottomLimit: 960,
+    withTop: false,
+    labelSize: 26,
+    valueSize: 26,
+  })
+
+  // กราฟสัดส่วนรายได้ตามสิทธิ
+  const px = 1260
+  const pw = t.w - 40 - px
+  const ph = bottom - ty
+  box(ctx, px, ty, pw, ph, 18, t.surface, t.edge)
+  text(ctx, 'สัดส่วนรายได้ตามสิทธิ', px + 24, ty + 34, 'left', t.ink, 700, 28, pw - 48)
+  box(ctx, px + 24, ty + 66, 18, 18, 4, t.bar[0])
+  text(ctx, 'ค่านวด/หัตถการ', px + 50, ty + 75, 'left', t.inkSoft, 500, 20)
+  box(ctx, px + 250, ty + 66, 18, 18, 4, t.bar[1])
+  text(ctx, 'ค่ายาสมุนไพร', px + 276, ty + 75, 'left', t.inkSoft, 500, 20)
+
+  const shown = s.groups.filter((g) => g.total > 0)
+  const maxTotal = Math.max(0, ...shown.map((g) => g.total))
+  if (maxTotal === 0) {
+    text(ctx, 'ไม่มีรายการค่าบริการ', px + pw / 2, ty + ph / 2, 'center', t.inkSoft, 500, 26)
+  } else {
+    const barArea = ph - 120 - 130
+    const step = Math.min(78, barArea / shown.length)
+    shown.forEach((g, i) => {
+      const by = ty + 112 + i * step
+      text(ctx, g.label, px + 24, by, 'left', t.ink, 600, 22, pw * 0.5)
+      text(ctx, `${money(g.total)} บาท`, px + pw - 24, by, 'right', t.inkSoft, 500, 21, pw * 0.42)
+      const bw = pw - 48
+      box(ctx, px + 24, by + 18, bw, 20, 10, t.surfaceAlt)
+      const filled = (bw * g.total) / maxTotal
+      const sv = pct(g.serviceValue, g.total) / 100
+      ctx.save()
+      ctx.beginPath()
+      ctx.roundRect(px + 24, by + 18, filled, 20, 10)
+      ctx.clip()
+      ctx.fillStyle = t.bar[0]
+      ctx.fillRect(px + 24, by + 18, filled * sv, 20)
+      ctx.fillStyle = t.bar[1]
+      ctx.fillRect(px + 24 + filled * sv, by + 18, filled * (1 - sv), 20)
+      ctx.restore()
+    })
+    const sy = ty + ph - 100
+    const sum = s.totals.serviceValue + s.totals.drugValue
+    text(ctx, 'สัดส่วนค่านวด/หัตถการ : ค่ายา', px + 24, sy, 'left', t.ink, 600, 22, pw - 48)
+    const bw = pw - 48
+    box(ctx, px + 24, sy + 20, bw, 24, 12, t.surfaceAlt)
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(px + 24, sy + 20, bw, 24, 12)
+    ctx.clip()
+    ctx.fillStyle = t.bar[0]
+    ctx.fillRect(px + 24, sy + 20, (bw * pct(s.totals.serviceValue, sum)) / 100, 24)
+    ctx.fillStyle = t.bar[1]
+    ctx.fillRect(px + 24 + (bw * pct(s.totals.serviceValue, sum)) / 100, sy + 20, (bw * pct(s.totals.drugValue, sum)) / 100, 24)
+    ctx.restore()
+    text(ctx, `${pct(s.totals.serviceValue, sum).toFixed(1)}% · ${money(s.totals.serviceValue)}`, px + 24, sy + 66, 'left', t.inkSoft, 500, 19, bw / 2)
+    text(ctx, `${pct(s.totals.drugValue, sum).toFixed(1)}% · ${money(s.totals.drugValue)}`, px + pw - 24, sy + 66, 'right', t.inkSoft, 500, 19, bw / 2)
+  }
+  drawFooter(sc, 990)
+}
+
+/* ───────────── แบบที่ 3: การ์ดแยกตามสิทธิ (แนวนอน / แนวตั้งสำหรับส่งไลน์) ───────────── */
+function drawGroupCard(sc: Scene, g: ThaiMedDailyGroup, x: number, y: number, w: number, h: number, tall: boolean) {
+  const { ctx, t } = sc
+  box(ctx, x, y, w, h, 24, t.surface, t.edge)
+  ctx.globalAlpha = g.persons === 0 ? 0.55 : 1
+  const barX = x + 20
+  const barW = w - 40
+  const drawBar = (by: number, bh: number) => {
+    box(ctx, barX, by, barW, bh, bh / 2, t.surfaceAlt)
+    const sv = pct(g.serviceValue, g.total) / 100
+    ctx.save()
+    ctx.beginPath()
+    ctx.roundRect(barX, by, barW, bh, bh / 2)
+    ctx.clip()
+    ctx.fillStyle = t.bar[0]
+    ctx.fillRect(barX, by, g.total > 0 ? barW * sv : 0, bh)
+    ctx.fillStyle = t.bar[1]
+    ctx.fillRect(barX + barW * sv, by, g.total > 0 ? barW * (1 - sv) : 0, bh)
+    ctx.restore()
+  }
+  if (tall) {
+    chip(sc, groupIcon(g.id), x + 20 + 29, y + 20 + 29, 58, vGradient(ctx, y, y + 80, t.chipGrad), WHITE)
+    text(ctx, g.label, x + 94, y + 49, 'left', t.ink, 700, 26, w - 114)
+    text(ctx, 'ผู้รับบริการ', x + 22, y + 108, 'left', t.inkSoft, 500, 18)
+    text(ctx, `${fmtNum(g.persons)} ราย`, x + 22, y + 148, 'left', t.value, 800, 52, w - 44)
+    text(ctx, 'ค่านวด/หัตถการ', x + 22, y + 204, 'left', t.inkSoft, 500, 20, w * 0.5)
+    text(ctx, money(g.serviceValue), x + w - 22, y + 204, 'right', t.ink, 600, 24, w * 0.45)
+    text(ctx, 'ค่ายาสมุนไพร', x + 22, y + 238, 'left', t.inkSoft, 500, 20, w * 0.5)
+    text(ctx, money(g.drugValue), x + w - 22, y + 238, 'right', t.ink, 600, 24, w * 0.45)
+    ctx.fillStyle = t.edge
+    ctx.fillRect(x + 20, y + 258, w - 40, 1)
+    text(ctx, 'รวม', x + 22, y + 292, 'left', t.inkSoft, 600, 22)
+    text(ctx, `${money(g.total)} บาท`, x + w - 22, y + 292, 'right', t.ink, 800, 34, w - 110)
+    drawBar(y + h - 26, 12)
+  } else {
+    chip(sc, groupIcon(g.id), x + 16 + 28, y + h / 2 - 8, 56, vGradient(ctx, y, y + h, t.chipGrad), WHITE)
+    text(ctx, g.label, x + 86, y + 34, 'left', t.ink, 700, 24, w * 0.5 - 70)
+    text(ctx, `${fmtNum(g.persons)} ราย`, x + 86, y + 70, 'left', t.value, 800, 30, w * 0.5 - 70)
+    text(ctx, `${money(g.total)}`, x + w - 20, y + 42, 'right', t.ink, 800, 38, w * 0.45)
+    text(ctx, `นวด ${money(g.serviceValue)} · ยา ${money(g.drugValue)}`, x + w - 20, y + 82, 'right', t.inkSoft, 400, 18, w * 0.5)
+    drawBar(y + h - 28, 12)
+  }
+  ctx.globalAlpha = 1
+}
+
+export function layoutCards(sc: Scene) {
+  const { ctx, t, s } = sc
+  const portrait = t.w < t.h
+  drawBackground(sc)
+  const hh = drawHeader(sc, portrait ? 'portrait' : 'wide')
+  const footY = portrait ? t.h - 150 : 990
+  const stats: readonly { icon: IconName; label: string; value: string }[] = [
+    { icon: 'users', label: 'ผู้รับบริการทั้งหมด', value: `${fmtNum(s.totals.persons)} ราย` },
+    { icon: 'house', label: 'ออกชุมชน', value: `${fmtNum(s.outreach.count)} ราย` },
+    { icon: 'massage', label: 'ค่านวด/หัตถการ', value: `${money(s.totals.serviceValue)} บาท` },
+    { icon: 'herb', label: 'ค่ายาสมุนไพร', value: `${money(s.totals.drugValue)} บาท` },
+    { icon: 'clinic', label: 'ค่าบริการผู้ป่วยนอก 50 บาท', value: `${money(s.totals.opdFee)} บาท` },
+  ]
+
+  if (!portrait) {
+    const hx = 40
+    const hy = hh + 20
+    const hw = 560
+    const hHeight = footY - 20 - hy
+    box(ctx, hx, hy, hw, hHeight, 28, vGradient(ctx, hy, hy + hHeight, t.total))
+    chip(sc, 'coins', hx + 56, hy + 58, 72, t.accent, t.onAccent)
+    text(ctx, 'รวมค่าบริการทั้งหมด', hx + 110, hy + 58, 'left', t.totalInk, 700, 30, hw - 130)
+    text(ctx, money(s.totals.grandTotal), hx + hw / 2, hy + 158, 'center', t.accent, 800, 74, hw - 50)
+    text(ctx, 'บาท', hx + hw / 2, hy + 214, 'center', t.totalInk, 600, 30)
+    ctx.fillStyle = t.totalInk
+    ctx.globalAlpha = 0.25
+    ctx.fillRect(hx + 30, hy + 248, hw - 60, 2)
+    ctx.globalAlpha = 1
+    const step = Math.floor((hHeight - 270) / stats.length)
+    stats.forEach((st, i) => {
+      const cy = hy + 270 + i * step + step / 2
+      chip(sc, st.icon, hx + 48, cy, 52, t.accent, t.onAccent)
+      text(ctx, st.label, hx + 90, cy, 'left', t.totalInk, 500, 22, 240)
+      text(ctx, st.value, hx + hw - 26, cy, 'right', t.totalInk, 800, 27, 190)
+    })
+
+    const gx = hx + hw + 20
+    const gw = t.w - 40 - gx
+    const cols = 3
+    const rows = Math.ceil(s.groups.length / cols)
+    const gap = 20
+    const cw = (gw - gap * (cols - 1)) / cols
+    const ch = (hHeight - gap * (rows - 1)) / rows
+    s.groups.forEach((g, i) => drawGroupCard(sc, g, gx + (i % cols) * (cw + gap), hy + Math.floor(i / cols) * (ch + gap), cw, ch, ch >= 300))
+    drawFooter(sc, footY)
+    return
+  }
+
+  // แนวตั้ง 1080×1350: การ์ดรวมด้านบน + การ์ดสิทธิ 2 คอลัมน์
+  const hx = 40
+  const hy = hh + 20
+  const hw = t.w - 80
+  const hHeight = 372
+  box(ctx, hx, hy, hw, hHeight, 28, vGradient(ctx, hy, hy + hHeight, t.total))
+  chip(sc, 'coins', hx + 50, hy + 50, 60, t.accent, t.onAccent)
+  text(ctx, 'รวมค่าบริการทั้งหมด', hx + 94, hy + 50, 'left', t.totalInk, 700, 28, hw - 130)
+  text(ctx, `${money(s.totals.grandTotal)} บาท`, hx + hw / 2, hy + 126, 'center', t.accent, 800, 76, hw - 60)
+  const cellW = (hw - 40 - 16 * 2) / 3
+  stats.forEach((st, i) => {
+    const col = i < 3 ? i : i - 3
+    const row = i < 3 ? 0 : 1
+    const bx = hx + 20 + col * (cellW + 16) + (row === 1 ? (cellW + 16) / 2 : 0)
+    const by = hy + 184 + row * 92
+    ctx.fillStyle = t.totalInk
+    ctx.globalAlpha = 0.12
+    ctx.beginPath()
+    ctx.roundRect(bx, by, cellW, 80, 16)
+    ctx.fill()
+    ctx.globalAlpha = 1
+    chip(sc, st.icon, bx + 34, by + 40, 46, t.accent, t.onAccent)
+    text(ctx, st.label, bx + 66, by + 24, 'left', t.totalInk, 500, 17, cellW - 74)
+    text(ctx, st.value, bx + 66, by + 56, 'left', t.totalInk, 800, 24, cellW - 74)
+  })
+
+  const gy = hy + hHeight + 16
+  const gap = 14
+  const cols = 2
+  const rows = Math.ceil(s.groups.length / cols)
+  const cw = (hw - gap) / cols
+  const ch = (footY - 16 - gy - gap * (rows - 1)) / rows
+  s.groups.forEach((g, i) => drawGroupCard(sc, g, hx + (i % cols) * (cw + gap), gy + Math.floor(i / cols) * (ch + gap), cw, ch, false))
+  drawFooter(sc, footY)
+}
+

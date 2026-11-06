@@ -1,5 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { herbDxApi } from '@/api/herbdx.api'
+import { herbDxApi, type OutreachUpdate } from '@/api/herbdx.api'
 import type { AuditFilterParams, DateRange, DxMapUpdate, DxMapBatchItem, DispensingRule, MenuPermissionMatrix, ThaiMedDuplicateRules } from '@/types/herbdx.types'
 
 export const herbDxKeys = {
@@ -13,6 +13,7 @@ export const herbDxKeys = {
   pttypes: () => [...herbDxKeys.all, 'pttypes'] as const,
   menuPermissions: () => [...herbDxKeys.all, 'menu-permissions'] as const,
   thaiMedValue: (r: DateRange) => [...herbDxKeys.all, 'thaimed-value', r] as const,
+  thaiMedDaily: (r: DateRange) => [...herbDxKeys.all, 'thaimed-daily', r] as const,
   claims: (r: DateRange) => [...herbDxKeys.all, 'claims', r] as const,
 }
 
@@ -243,5 +244,24 @@ export function useThaiMedValue(range: DateRange, enabled: boolean) {
     queryFn: () => herbDxApi.thaiMedValue(range),
     staleTime: 60_000,
     retry: false,
+  })
+}
+
+/** สรุปผลการดำเนินงานรายวันของกลุ่มงานแพทย์แผนไทย (เฉพาะผู้มีสิทธิ์ดูมูลค่าบริการแผนไทย) */
+export function useThaiMedDaily(range: DateRange, enabled: boolean) {
+  return useQuery({
+    enabled,
+    queryKey: herbDxKeys.thaiMedDaily(range),
+    queryFn: () => herbDxApi.thaiMedDailySummary(range),
+    staleTime: 60_000,
+    retry: false,
+  })
+}
+
+export function useSaveThaiMedOutreach() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (u: OutreachUpdate) => herbDxApi.saveThaiMedOutreach(u),
+    onSuccess: () => qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'thaimed-daily'] }),
   })
 }

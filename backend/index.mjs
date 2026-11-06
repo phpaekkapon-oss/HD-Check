@@ -14,6 +14,7 @@ import {
 import { evaluate } from './audit-rules.mjs'
 import { analyzeHerbRecord } from './herb-advice.mjs'
 import { checkVisitIcd, claimState, loadIcdReference, fetchClaimVisits, fdhLastChecked } from './claims.mjs'
+import { buildDailySummary, mergeOutreach, parseOutreachCount, OPD_FEE_ICODES } from './thaimed-daily.mjs'
 import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, canViewThaiMedValue as canViewThaiMedValueRule, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
 import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
 import {
@@ -784,6 +785,168 @@ app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
         return { date: d.date, visits: Number(d.visits), value, drugValue, serviceValue: Math.round((value - drugValue) * 100) / 100 }
       }),
     })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+/* ---------- สรุปผลการดำเนินงานรายวัน กลุ่มงานแพทย์แผนไทย ---------- */
+let outreachTablesReady = null
+function ensureOutreachTables() {
+  outreachTablesReady ??= (async () => {
+    await dwPool.query(`
+      CREATE TABLE IF NOT EXISTS dw_hd_check_thaimed_outreach (
+        outreach_date DATE PRIMARY KEY,
+        person_count INT NOT NULL,
+        reason VARCHAR(255) NOT NULL,
+        updated_by VARCHAR(50) NOT NULL,
+        updated_by_name VARCHAR(200) NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=tis620
+    `)
+    await dwPool.query(`
+      CREATE TABLE IF NOT EXISTS dw_hd_check_thaimed_outreach_log (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        outreach_date DATE NOT NULL,
+        old_count INT NULL,
+        new_count INT NULL,
+        reason VARCHAR(255) NOT NULL,
+        changed_by VARCHAR(50) NOT NULL,
+        changed_by_name VARCHAR(200) NULL,
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_outreach_date (outreach_date)
+      ) ENGINE=InnoDB DEFAULT CHARSET=tis620
+    `)
+  })().catch((err) => {
+    outreachTablesReady = null
+    throw err
+  })
+  return outreachTablesReady
+}
+
+const DAILY_DRUG_SQL = `i.name LIKE 'ค่ายา%'`
+const DAILY_OPD_SQL = `op.icode IN (?, ?)`
+
+app.get('/api/thaimed-daily-summary', requireThaiMedValue, async (req, res) => {
+  try {
+    // วันเดียว: ?date=YYYY-MM-DD  ·  ช่วง/รายเดือน: ?startDate=...&endDate=...
+    let startDate
+    let endDate
+    if (isValidDate(req.query.date)) {
+      startDate = req.query.date
+      endDate = req.query.date
+    } else if (isValidDate(req.query.startDate) && isValidDate(req.query.endDate)) {
+      ;({ startDate, endDate } = readRange(req.query))
+    } else {
+      throw badRequest('กรุณาระบุวันที่ให้ถูกต้อง (YYYY-MM-DD)')
+    }
+    const single = startDate === endDate
+
+    const { inHours, outHours } = OPD_FEE_ICODES
+    const [rows] = await hosPool.query(
+      `SELECT ps.hipdata_code,
+              COUNT(DISTINCT o.hn) AS persons,
+              COUNT(DISTINCT CASE WHEN NOT (${DAILY_DRUG_SQL}) AND NOT (${DAILY_OPD_SQL}) THEN o.hn END) AS service_persons,
+              COUNT(DISTINCT CASE WHEN ${DAILY_DRUG_SQL} THEN o.hn END) AS drug_persons,
+              ROUND(SUM(CASE WHEN NOT (${DAILY_DRUG_SQL}) AND NOT (${DAILY_OPD_SQL}) THEN op.sum_price ELSE 0 END), 2) AS service_value,
+              ROUND(SUM(CASE WHEN ${DAILY_DRUG_SQL} THEN op.sum_price ELSE 0 END), 2) AS drug_value,
+              ROUND(SUM(CASE WHEN op.icode = ? THEN op.sum_price ELSE 0 END), 2) AS opd_in_value,
+              ROUND(SUM(CASE WHEN op.icode = ? THEN op.sum_price ELSE 0 END), 2) AS opd_out_value
+       FROM opitemrece op
+       JOIN ovst o ON o.vn = op.vn
+       JOIN spclty sp ON sp.spclty = o.spclty
+       LEFT JOIN pttype ps ON ps.pttype = o.pttype
+       LEFT JOIN income i ON i.income = op.income
+       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+       GROUP BY ps.hipdata_code`,
+      [inHours, outHours, inHours, outHours, inHours, outHours, startDate, endDate]
+    )
+
+    // ออกชุมชนนับรายวัน (คนเดียวกันต่างวันนับแยก) แล้วรวมเป็นช่วง
+    const [hosOutreach] = await hosPool.query(
+      `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.hn) AS persons
+       FROM ovst_community_service c
+       JOIN ovst o ON o.vn = c.vn
+       JOIN spclty sp ON sp.spclty = o.spclty
+       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+       GROUP BY o.vstdate`,
+      [startDate, endDate]
+    )
+
+    await ensureOutreachTables()
+    const [manualRows] = await dwPool.query(
+      `SELECT DATE_FORMAT(outreach_date, '%Y-%m-%d') AS date, person_count, reason, updated_by_name, updated_by,
+              DATE_FORMAT(updated_at, '%Y-%m-%dT%H:%i:%s') AS updated_at
+       FROM dw_hd_check_thaimed_outreach WHERE outreach_date BETWEEN ? AND ?`,
+      [startDate, endDate]
+    )
+    const merged = mergeOutreach(
+      hosOutreach.map((r) => ({ date: r.date, count: Number(r.persons) })),
+      manualRows.map((r) => ({ date: r.date, count: Number(r.person_count) }))
+    )
+    const manual = single ? manualRows[0] : undefined
+
+    const summary = buildDailySummary(rows, { count: merged.count, source: merged.source })
+    res.json({
+      success: true,
+      date: startDate,
+      startDate,
+      endDate,
+      ...summary,
+      outreach: {
+        ...summary.outreach,
+        hosxpCount: merged.hosxpCount,
+        manualDays: merged.manualDays,
+        manual: manual
+          ? { reason: manual.reason, updatedBy: manual.updated_by_name || manual.updated_by, updatedAt: manual.updated_at }
+          : null,
+      },
+    })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.put('/api/thaimed-daily-summary/outreach', requireThaiMedValue, async (req, res) => {
+  try {
+    const date = isValidDate(req.body?.date) ? req.body.date : null
+    if (!date) throw badRequest('กรุณาระบุวันที่ให้ถูกต้อง (YYYY-MM-DD)')
+    const clear = req.body?.count === null
+    const count = clear ? null : parseOutreachCount(req.body?.count)
+    if (!clear && count === null) throw badRequest('จำนวนผู้ออกชุมชนต้องเป็นจำนวนเต็ม 0–9999')
+    const reason = String(req.body?.reason ?? '').trim()
+    if (reason.length < 3 || reason.length > 255) throw badRequest('กรุณาระบุเหตุผล 3–255 ตัวอักษร')
+
+    await ensureOutreachTables()
+    const who = req.authUser
+    const conn = await dwPool.getConnection()
+    try {
+      await conn.beginTransaction()
+      const [[old]] = await conn.query('SELECT person_count FROM dw_hd_check_thaimed_outreach WHERE outreach_date = ? FOR UPDATE', [date])
+      if (clear) {
+        await conn.query('DELETE FROM dw_hd_check_thaimed_outreach WHERE outreach_date = ?', [date])
+      } else {
+        await conn.query(
+          `INSERT INTO dw_hd_check_thaimed_outreach (outreach_date, person_count, reason, updated_by, updated_by_name)
+           VALUES (?, ?, ?, ?, ?)
+           ON DUPLICATE KEY UPDATE person_count = VALUES(person_count), reason = VALUES(reason),
+             updated_by = VALUES(updated_by), updated_by_name = VALUES(updated_by_name)`,
+          [date, count, reason, who.loginname, who.name ?? null]
+        )
+      }
+      await conn.query(
+        `INSERT INTO dw_hd_check_thaimed_outreach_log (outreach_date, old_count, new_count, reason, changed_by, changed_by_name)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [date, old?.person_count ?? null, count, reason, who.loginname, who.name ?? null]
+      )
+      await conn.commit()
+    } catch (err) {
+      await conn.rollback()
+      throw err
+    } finally {
+      conn.release()
+    }
+    res.json({ success: true, date, count })
   } catch (err) {
     fail(res, err)
   }

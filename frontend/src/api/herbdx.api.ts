@@ -88,7 +88,57 @@ export interface ThaiMedValueResponse {
   readonly daily: readonly ThaiMedValueDaily[]
 }
 
+export interface ThaiMedDailyGroup {
+  readonly id: string
+  readonly label: string
+  readonly persons: number
+  readonly servicePersons: number
+  readonly drugPersons: number
+  readonly serviceValue: number
+  readonly drugValue: number
+  readonly total: number
+}
+
+export interface ThaiMedDailySummary {
+  readonly success: true
+  readonly date: string
+  readonly startDate: string
+  readonly endDate: string
+  readonly groups: readonly ThaiMedDailyGroup[]
+  readonly totals: {
+    readonly persons: number
+    readonly servicePersons: number
+    readonly drugPersons: number
+    readonly serviceValue: number
+    readonly drugValue: number
+    readonly opdFeeInHours: number
+    readonly opdFeeOutHours: number
+    readonly opdFee: number
+    readonly grandTotal: number
+  }
+  readonly outreach: {
+    readonly count: number
+    readonly source: 'hosxp' | 'manual' | 'mixed' | 'none'
+    readonly hosxpCount: number
+    readonly manualDays: number
+    readonly manual: { readonly reason: string; readonly updatedBy: string; readonly updatedAt: string } | null
+  }
+}
+
+export interface OutreachUpdate {
+  readonly date: string
+  /** null = ลบค่าที่กรอกเอง แล้วกลับไปใช้ยอดจาก HOSxP */
+  readonly count: number | null
+  readonly reason: string
+}
+
 export const herbDxApi = {
+  thaiMedDailySummary: (r: DateRange) =>
+    request<ThaiMedDailySummary>(`/api/thaimed-daily-summary?${qs({ startDate: r.startDate, endDate: r.endDate })}`),
+
+  saveThaiMedOutreach: (body: OutreachUpdate) =>
+    request<{ success: true }>('/api/thaimed-daily-summary/outreach', { method: 'PUT', body: JSON.stringify(body) }),
+
   thaiMedValue: (r: DateRange) =>
     request<ThaiMedValueResponse>(`/api/thaimed-value?${qs({ startDate: r.startDate, endDate: r.endDate })}`),
 

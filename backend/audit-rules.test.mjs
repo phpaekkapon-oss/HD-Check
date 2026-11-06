@@ -641,3 +641,48 @@ test('Claims - claim state from FDH status', () => {
   assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'rejected' }), 'rejected')
   assert.equal(claims.claimState({ hip: 'UCS', fdh_status: 'settled', fdh_errors: [{ code: '950' }] }), 'rejected')
 })
+
+const daily = await import('./thaimed-daily.mjs')
+
+test('Thai-med daily summary - maps hipdata_code to right groups and keeps money exact', () => {
+  assert.equal(daily.rightGroupOf('ucs').id, 'uc')
+  assert.equal(daily.rightGroupOf('OFC').id, 'ofc')
+  assert.equal(daily.rightGroupOf('XYZ').id, 'other')
+  const s = daily.buildDailySummary(
+    [
+      { hipdata_code: 'UCS', persons: 38, service_persons: 20, drug_persons: 30, service_value: 0.1, drug_value: 0.2, opd_in_value: 50, opd_out_value: 0 },
+      { hipdata_code: 'UCS', persons: 2, service_persons: 1, drug_persons: 1, service_value: 0.2, drug_value: 0, opd_in_value: 0, opd_out_value: 50 },
+      { hipdata_code: 'OFC', persons: 8, service_persons: 8, drug_persons: 8, service_value: 1000, drug_value: 2156, opd_in_value: 0, opd_out_value: 0 },
+    ],
+    { count: 3, source: 'manual' }
+  )
+  const uc = s.groups.find((g) => g.id === 'uc')
+  assert.equal(uc.persons, 40)
+  assert.equal(uc.serviceValue, 0.3, '0.1 + 0.2 must not become 0.30000000000000004')
+  assert.equal(s.groups.some((g) => g.id === 'other'), false, 'empty other group is hidden')
+  assert.equal(s.groups.find((g) => g.id === 'lgo').total, 0, 'groups without data still listed')
+  assert.equal(s.totals.opdFee, 100)
+  assert.equal(s.totals.grandTotal, 3256.5)
+  assert.deepEqual(s.outreach, { count: 3, source: 'manual' })
+})
+
+test('Thai-med daily summary - outreach count validation', () => {
+  assert.equal(daily.parseOutreachCount(21), 21)
+  assert.equal(daily.parseOutreachCount('15'), 15)
+  assert.equal(daily.parseOutreachCount(0), 0)
+  for (const bad of [-1, 1.5, '', 'abc', null, undefined, 10000]) assert.equal(daily.parseOutreachCount(bad), null)
+})
+
+test('Thai-med daily summary - outreach range merge prefers manual days over HOSxP', () => {
+  const none = daily.mergeOutreach([], [])
+  assert.deepEqual(none, { count: 0, source: 'none', manualDays: 0, hosxpCount: 0 })
+  const mixed = daily.mergeOutreach(
+    [{ date: '2026-11-03', count: 4 }, { date: '2026-11-04', count: 6 }],
+    [{ date: '2026-11-04', count: 10 }, { date: '2026-11-05', count: 2 }]
+  )
+  assert.equal(mixed.count, 4 + 10 + 2, 'day 4 uses manual 10 instead of HOSxP 6')
+  assert.equal(mixed.source, 'mixed')
+  assert.equal(mixed.hosxpCount, 10)
+  assert.equal(daily.mergeOutreach([{ date: '2026-11-03', count: 4 }], []).source, 'hosxp')
+  assert.equal(daily.mergeOutreach([], [{ date: '2026-11-03', count: 0 }]).source, 'manual', 'manual 0 is a deliberate override')
+})
