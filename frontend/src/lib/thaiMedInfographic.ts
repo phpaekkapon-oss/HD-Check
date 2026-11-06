@@ -1,6 +1,6 @@
 import type { ThaiMedDailySummary } from '@/api/herbdx.api'
 import { THAI_MONTHS_FULL, toThaiDate, toThaiDateLong } from '@/lib/format'
-import { layoutCards, layoutDashboard, layoutTable } from '@/lib/infographicLayouts'
+import { layoutCards, layoutDashboard, layoutPoster, layoutTable } from '@/lib/infographicLayouts'
 import { INFOGRAPHIC_STYLES } from '@/lib/infographicStyles'
 import { iconColors, loadFonts, loadIcons, type Period, type Scene } from '@/lib/infographicKit'
 
@@ -17,6 +17,7 @@ export function periodOf(s: ThaiMedDailySummary): Period {
       lead: `วัน${WEEKDAYS[d.getDay()] ?? ''}ที่`,
       big: toThaiDateLong(s.startDate).replace(' พ.ศ.', ''),
       title: 'สรุปผลการดำเนินงานประจำวัน',
+      time: s.timeRange ? `เวลา ${s.timeRange.from} – ${s.timeRange.to} น.` : undefined,
       panel: 'ภาพรวมผลการดำเนินงานประจำวัน',
     }
   }
@@ -55,6 +56,7 @@ export async function renderInfographic(s: ThaiMedDailySummary, hospitalName: st
   const sc: Scene = { ctx, icons, t, s, period: periodOf(s), hospital: hospitalName }
   if (t.layout === 'table') layoutTable(sc)
   else if (t.layout === 'dashboard') layoutDashboard(sc)
+  else if (t.layout === 'poster') layoutPoster(sc)
   else layoutCards(sc)
 
   return await new Promise<Blob>((resolve, reject) => {

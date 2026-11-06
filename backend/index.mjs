@@ -3,17 +3,24 @@ import mysql from 'mysql2/promise'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, DATE_RE, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
+import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, REALTIME_POLL_SECONDS, REALTIME_SYNC_MIN_SECONDS, RECONCILE_HOUR, DATE_RE, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
 import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
 import {
   HEALTH_MED_AUDIT_SQL,
+  THAI_MED_SERVICE_ND_COND,
   evaluateHealthMedAudit,
+  evaluateIpdHealthMed,
+  evaluateOrphanHealthMed,
+  evaluateNoProcedureHealthMed,
+  summarizeServiceItems,
   getDuplicateRules,
   saveDuplicateRules,
 } from './healthmed.mjs'
 import { evaluate } from './audit-rules.mjs'
 import { analyzeHerbRecord } from './herb-advice.mjs'
 import { checkVisitIcd, claimState, loadIcdReference, fetchClaimVisits, fdhLastChecked } from './claims.mjs'
+import { createChangeWatcher, createLiveCache } from './realtime.mjs'
+import { makeCounters, runReconcile, ymOf } from './reconcile.mjs'
 import { buildDailySummary, mergeOutreach, parseOutreachCount, OPD_FEE_ICODES } from './thaimed-daily.mjs'
 import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, canViewThaiMedValue as canViewThaiMedValueRule, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
 import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
@@ -439,6 +446,94 @@ async function runSync(startDate, endDate, trigger) {
 }
 
 /* ---------------- Routes ---------------- */
+/* ---------------- ข้อมูลเกือบเรียลไทม์ ---------------- */
+// เครื่องที่ทำหน้าที่ซิงก์ (SYNC_ENABLED + AUTO_SYNC_MINUTES) เฝ้าดูตลอด และซิงก์ยาเฉพาะ "เมื่อวาน–วันนี้" เมื่อมีการจ่ายยาใหม่
+const isSyncInstance = SYNC_ENABLED && AUTO_SYNC_MINUTES > 0
+const isoDay = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+let lastRealtimeSyncAt = 0
+let realtimeSyncTimer = null
+function scheduleRealtimeSync() {
+  if (realtimeSyncTimer) return
+  const wait = Math.max(0, REALTIME_SYNC_MIN_SECONDS * 1000 - (Date.now() - lastRealtimeSyncAt))
+  realtimeSyncTimer = setTimeout(async () => {
+    realtimeSyncTimer = null
+    lastRealtimeSyncAt = Date.now()
+    const today = new Date()
+    const yesterday = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1)
+    try {
+      const r = await runSync(isoDay(yesterday), isoDay(today), 'REALTIME')
+      if (!r.skipped) console.log(`[realtime-sync] ${r.startDate}..${r.endDate}: ${r.totalPrescriptions} rows (${r.durationMs} ms)`)
+    } catch (err) {
+      console.error('[realtime-sync] failed:', err.message)
+    }
+  }, wait)
+}
+const watcher = createChangeWatcher({
+  pool: hosPool,
+  getHerbCodes: async () => (await getActiveHerbalDrugs()).map((d) => d.icode),
+  intervalMs: REALTIME_POLL_SECONDS * 1000,
+  keepAlive: () => isSyncInstance,
+  onChange: (signal) => {
+    if (signal === 'herb' && isSyncInstance) scheduleRealtimeSync()
+  },
+})
+const liveCache = createLiveCache()
+const thaimedVersion = () => watcher.version('thaimed')
+
+// หน้าจอถามเลขเวอร์ชันจากหน่วยความจำ (ไม่แตะ HOSxP) แล้วโหลดใหม่เฉพาะเมื่อเลขเปลี่ยน
+/* ---------------- ตรวจความสอดคล้องรายเดือน + ซิงก์ย้อนหลังตอนกลางคืน ---------------- */
+let lastReconcile = null
+let reconcileRunning = null
+const reconcileCounters = makeCounters({
+  hosPool,
+  dwPool,
+  getFilter: async () => {
+    const [mapRows] = await dwPool.query('SELECT icode FROM dw_hd_check_drug_dx_map')
+    return buildHerbFilter(mapRows.map((r) => String(r.icode)))
+  },
+})
+function reconcileNow(trigger) {
+  if (reconcileRunning) return reconcileRunning
+  reconcileRunning = (async () => {
+    const [[first]] = await dwPool.query("SELECT DATE_FORMAT(MIN(visit_date), '%Y-%m') AS ym FROM dw_hd_check_prescriptions")
+    const today = new Date()
+    const report = await runReconcile({
+      ...reconcileCounters,
+      // การซิงก์อื่นในเครื่องนี้กำลังทำงาน: ถือว่า "รอแล้วลองใหม่" ไม่ใช่ข้อผิดพลาด
+      sync: async (s, e) => {
+        try {
+          return await runSync(s, e, 'NIGHTLY')
+        } catch (err) {
+          if (err.status === 409) return { skipped: true }
+          throw err
+        }
+      },
+      fromYm: first?.ym ?? ymOf(today),
+      toYm: ymOf(today),
+    })
+    lastReconcile = { trigger, ...report }
+    console.log(`[reconcile] ${report.monthsChecked} เดือน · ไม่ตรงก่อนซ่อม: ${report.mismatchedBefore.join(',') || '-'} · หลังซ่อม: ${report.mismatchedAfter.join(',') || '-'} · ซิงก์ ${report.resynced.length} เดือน`)
+    return lastReconcile
+  })().finally(() => {
+    reconcileRunning = null
+  })
+  return reconcileRunning
+}
+app.post('/api/admin/reconcile', requireAdmin, async (_req, res) => {
+  try {
+    if (!SYNC_ENABLED) throw Object.assign(new Error('ปิดการซิงก์ไว้ในสภาพแวดล้อมนี้'), { status: 403 })
+    res.json({ success: true, report: await reconcileNow('MANUAL') })
+  } catch (err) {
+    fail(res, err)
+  }
+})
+
+app.get('/api/realtime/version', requireSession, (_req, res) => {
+  watcher.touch()
+  res.setHeader('Cache-Control', 'no-store')
+  res.json({ success: true, ...watcher.snapshot(), syncInstance: isSyncInstance, syncMinSeconds: REALTIME_SYNC_MIN_SECONDS })
+})
+
 app.get('/api/status', requireSession, async (_req, res) => {
   try {
     const activeHerbs = await getActiveHerbalDrugs()
@@ -474,6 +569,9 @@ app.get('/api/status', requireSession, async (_req, res) => {
       isSyncing: Boolean(syncInFlight),
       syncEnabled: SYNC_ENABLED,
       autoSyncMinutes: AUTO_SYNC_MINUTES,
+      integrity: lastReconcile
+        ? { checkedAt: lastReconcile.finishedAt, monthsChecked: lastReconcile.monthsChecked, mismatched: lastReconcile.mismatchedAfter, resyncedMonths: lastReconcile.resynced.length }
+        : null,
     })
   } catch (err) {
     fail(res, err)
@@ -693,42 +791,88 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
  * มูลค่าบริการแผนกแพทย์แผนไทย (ประมาณการจาก opitemrece.sum_price) — เฉพาะ IT/ผู้ดูแลระบบ/ผู้ดูแลแผนไทย
  * ส่งเฉพาะยอดรวมระดับกลุ่มงาน ไม่มีข้อมูลรายแพทย์
  */
-app.get('/api/thaimed-value', requireThaiMedValue, async (req, res) => {
+app.get('/api/thaimed-value', requireThaiMedValue, liveCache(thaimedVersion), async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
-    const [byGroup] = await hosPool.query(
-      `SELECT COALESCE(i.name, 'ไม่ระบุหมวด') AS income_group,
-              COUNT(*) AS items,
-              ROUND(SUM(op.sum_price), 2) AS value,
-              ROUND(SUM(op.qty * COALESCE(op.cost, 0)), 2) AS cost
-       FROM opitemrece op
+    // ขอบเขต: visit แผนกแพทย์แผนไทย (ทุกรายการ) + ค่าบริการแผนไทย (58xxx) ของ visit แผนกอื่นที่มีบันทึกให้บริการ
+    // + ผู้ป่วยใน (แม่หลังคลอด) ตามเลข AN ในบันทึกให้บริการ — ให้ยอดตรงกับหน้าจอ "บันทึกให้บริการ" ของ HOSxP
+    const hasHms = 'EXISTS (SELECT 1 FROM health_med_service h WHERE h.vn = o.vn)'
+    const opdScope = `o.vstdate BETWEEN ? AND ? AND (${THAI_MED_FILTER} OR (nd.icode IS NOT NULL AND ${hasHms}))`
+    const opdFrom = `FROM opitemrece op
        JOIN ovst o ON o.vn = op.vn
        JOIN spclty sp ON sp.spclty = o.spclty
        LEFT JOIN income i ON i.income = op.income
-       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
-       GROUP BY i.name
-       ORDER BY value DESC`,
+       LEFT JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}`
+    const ipdFrom = `FROM (SELECT DISTINCT an FROM health_med_service WHERE service_date BETWEEN ? AND ? AND an IS NOT NULL AND an <> '') h
+       JOIN opitemrece op ON op.an = h.an AND op.rxdate BETWEEN ? AND ?
+       JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}
+       LEFT JOIN income i ON i.income = op.income`
+    const [opdByGroup] = await hosPool.query(
+      `SELECT COALESCE(i.name, 'ไม่ระบุหมวด') AS income_group, COUNT(*) AS items,
+              ROUND(SUM(op.sum_price), 2) AS value, ROUND(SUM(op.qty * COALESCE(op.cost, 0)), 2) AS cost
+       ${opdFrom}
+       WHERE ${opdScope}
+       GROUP BY i.name`,
       [startDate, endDate]
     )
-    const [daily] = await hosPool.query(
+    const [ipdByGroup] = await hosPool.query(
+      `SELECT COALESCE(i.name, 'ไม่ระบุหมวด') AS income_group, COUNT(*) AS items,
+              ROUND(SUM(op.sum_price), 2) AS value, ROUND(SUM(op.qty * COALESCE(op.cost, 0)), 2) AS cost
+       ${ipdFrom}
+       GROUP BY i.name`,
+      [startDate, endDate, startDate, endDate]
+    )
+    const groupMap = new Map()
+    for (const g of [...opdByGroup, ...ipdByGroup]) {
+      const cur = groupMap.get(g.income_group) ?? { income_group: g.income_group, items: 0, value: 0, cost: 0 }
+      cur.items += Number(g.items)
+      cur.value += Math.round(Number(g.value ?? 0) * 100)
+      cur.cost += Math.round(Number(g.cost ?? 0) * 100)
+      groupMap.set(g.income_group, cur)
+    }
+    const byGroup = [...groupMap.values()]
+      .map((g) => ({ ...g, value: g.value / 100, cost: g.cost / 100 }))
+      .sort((x, y) => y.value - x.value)
+
+    const [opdDaily] = await hosPool.query(
       `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.vn) AS visits, ROUND(SUM(op.sum_price), 2) AS value,
               ROUND(SUM(CASE WHEN i.name LIKE 'ค่ายา%' THEN op.sum_price ELSE 0 END), 2) AS drug_value
-       FROM opitemrece op
-       JOIN ovst o ON o.vn = op.vn
-       JOIN spclty sp ON sp.spclty = o.spclty
-       LEFT JOIN income i ON i.income = op.income
-       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
-       GROUP BY o.vstdate
-       ORDER BY o.vstdate`,
+       ${opdFrom}
+       WHERE ${opdScope}
+       GROUP BY o.vstdate`,
       [startDate, endDate]
     )
-    const [[visitRow]] = await hosPool.query(
+    const [ipdDaily] = await hosPool.query(
+      `SELECT DATE_FORMAT(op.rxdate, '%Y-%m-%d') AS date, COUNT(DISTINCT h.an) AS visits, ROUND(SUM(op.sum_price), 2) AS value,
+              ROUND(SUM(CASE WHEN i.name LIKE 'ค่ายา%' THEN op.sum_price ELSE 0 END), 2) AS drug_value
+       ${ipdFrom}
+       GROUP BY op.rxdate`,
+      [startDate, endDate, startDate, endDate]
+    )
+    const dailyMap = new Map()
+    for (const d of [...opdDaily, ...ipdDaily]) {
+      const cur = dailyMap.get(d.date) ?? { date: d.date, visits: 0, value: 0, drug_value: 0 }
+      cur.visits += Number(d.visits)
+      cur.value += Math.round(Number(d.value ?? 0) * 100)
+      cur.drug_value += Math.round(Number(d.drug_value ?? 0) * 100)
+      dailyMap.set(d.date, cur)
+    }
+    const daily = [...dailyMap.values()]
+      .sort((x, y) => x.date.localeCompare(y.date))
+      .map((d) => ({ ...d, value: d.value / 100, drug_value: d.drug_value / 100 }))
+
+    const [[opdVisitRow]] = await hosPool.query(
       `SELECT COUNT(DISTINCT o.vn) AS visits
        FROM ovst o JOIN spclty sp ON sp.spclty = o.spclty
-       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
-         AND EXISTS (SELECT 1 FROM opitemrece op WHERE op.vn = o.vn)`,
+       WHERE o.vstdate BETWEEN ? AND ?
+         AND ((${THAI_MED_FILTER} AND EXISTS (SELECT 1 FROM opitemrece op WHERE op.vn = o.vn)) OR ${hasHms})`,
       [startDate, endDate]
     )
+    const [[ipdVisitRow]] = await hosPool.query(
+      "SELECT COUNT(DISTINCT an) AS visits FROM health_med_service WHERE service_date BETWEEN ? AND ? AND an IS NOT NULL AND an <> ''",
+      [startDate, endDate]
+    )
+    const visitRow = { visits: Number(opdVisitRow?.visits ?? 0) + Number(ipdVisitRow?.visits ?? 0) }
 
     // มูลค่ายาสมุนไพร (OPD) ที่ตรวจแล้วไม่ผ่านเกณฑ์ DX/จำนวนขั้นต่ำ — ไม่รวมกฎรอบการจ่ายซ้ำ
     let atRiskValue = 0
@@ -824,10 +968,11 @@ function ensureOutreachTables() {
   return outreachTablesReady
 }
 
-const DAILY_DRUG_SQL = `i.name LIKE 'ค่ายา%'`
-const DAILY_OPD_SQL = `op.icode IN (?, ?)`
+// รายการในขอบเขตแผนไทย: ทุกรายการของ visit แผนก "แพทย์แผนไทย" หรือค่าบริการแผนไทย (58xxx) ของ visit แผนกอื่นที่มีบันทึกให้บริการ
+const DAILY_IN_SCOPE = `(${THAI_MED_FILTER} OR nd.icode IS NOT NULL)`
+const DAILY_IS_DRUG = `(i.name LIKE 'ค่ายา%' AND ${THAI_MED_FILTER})`
 
-app.get('/api/thaimed-daily-summary', requireThaiMedValue, async (req, res) => {
+app.get('/api/thaimed-daily-summary', requireThaiMedValue, liveCache(thaimedVersion), async (req, res) => {
   try {
     // วันเดียว: ?date=YYYY-MM-DD  ·  ช่วง/รายเดือน: ?startDate=...&endDate=...
     let startDate
@@ -843,24 +988,68 @@ app.get('/api/thaimed-daily-summary', requireThaiMedValue, async (req, res) => {
     const single = startDate === endDate
 
     const { inHours, outHours } = OPD_FEE_ICODES
-    const [rows] = await hosPool.query(
-      `SELECT ps.hipdata_code,
-              COUNT(DISTINCT o.hn) AS persons,
-              COUNT(DISTINCT CASE WHEN NOT (${DAILY_DRUG_SQL}) AND NOT (${DAILY_OPD_SQL}) THEN o.hn END) AS service_persons,
-              COUNT(DISTINCT CASE WHEN ${DAILY_DRUG_SQL} THEN o.hn END) AS drug_persons,
-              ROUND(SUM(CASE WHEN NOT (${DAILY_DRUG_SQL}) AND NOT (${DAILY_OPD_SQL}) THEN op.sum_price ELSE 0 END), 2) AS service_value,
-              ROUND(SUM(CASE WHEN ${DAILY_DRUG_SQL} THEN op.sum_price ELSE 0 END), 2) AS drug_value,
-              ROUND(SUM(CASE WHEN op.icode = ? THEN op.sum_price ELSE 0 END), 2) AS opd_in_value,
-              ROUND(SUM(CASE WHEN op.icode = ? THEN op.sum_price ELSE 0 END), 2) AS opd_out_value
-       FROM opitemrece op
-       JOIN ovst o ON o.vn = op.vn
+    // ผู้ป่วยนอก: นับจาก visit ที่มีบันทึกให้บริการแพทย์แผนไทย (health_med_service) หรือ visit แผนกแพทย์แผนไทยที่มีรายการ
+    // ไม่ใช้ชื่อแผนกอย่างเดียว เพราะมีบริการแผนไทยที่ลงใน visit แผนกอื่น (เช่น อายุรกรรม) จำนวนมาก
+    const [opdRows] = await hosPool.query(
+      `SELECT ps.hipdata_code, o.hn,
+              COUNT(DISTINCT o.vn) AS visits,
+              COUNT(DISTINCT CASE WHEN NOT EXISTS (SELECT 1 FROM health_med_service h2 WHERE h2.vn = o.vn) THEN o.vn END) AS visits_no_record,
+              MAX(CASE WHEN ${DAILY_IN_SCOPE} AND NOT ${DAILY_IS_DRUG} AND op.icode NOT IN (?, ?) THEN 1 ELSE 0 END) AS has_service,
+              MAX(CASE WHEN ${DAILY_IN_SCOPE} AND ${DAILY_IS_DRUG} THEN 1 ELSE 0 END) AS has_drug,
+              ROUND(SUM(CASE WHEN ${DAILY_IN_SCOPE} AND NOT ${DAILY_IS_DRUG} AND op.icode NOT IN (?, ?) THEN op.sum_price ELSE 0 END), 2) AS service_value,
+              ROUND(SUM(CASE WHEN ${DAILY_IN_SCOPE} AND ${DAILY_IS_DRUG} THEN op.sum_price ELSE 0 END), 2) AS drug_value,
+              ROUND(SUM(CASE WHEN op.icode = ? AND ${THAI_MED_FILTER} THEN op.sum_price ELSE 0 END), 2) AS opd_in_value,
+              ROUND(SUM(CASE WHEN op.icode = ? AND ${THAI_MED_FILTER} THEN op.sum_price ELSE 0 END), 2) AS opd_out_value
+       FROM ovst o
        JOIN spclty sp ON sp.spclty = o.spclty
        LEFT JOIN pttype ps ON ps.pttype = o.pttype
+       LEFT JOIN opitemrece op ON op.vn = o.vn
        LEFT JOIN income i ON i.income = op.income
-       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
-       GROUP BY ps.hipdata_code`,
+       LEFT JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}
+       WHERE o.vstdate BETWEEN ? AND ?
+         AND ((${THAI_MED_FILTER} AND EXISTS (SELECT 1 FROM opitemrece x WHERE x.vn = o.vn))
+              OR EXISTS (SELECT 1 FROM health_med_service h WHERE h.vn = o.vn))
+       GROUP BY ps.hipdata_code, o.hn`,
       [inHours, outHours, inHours, outHours, inHours, outHours, startDate, endDate]
     )
+
+    // ผู้ป่วยใน (แม่หลังคลอด): นับจากบันทึกให้บริการที่มีเลข AN ค่าบริการอ่านจาก opitemrece ตาม AN และวันที่สั่ง
+    const [ipdRows] = await hosPool.query(
+      `SELECT ps.hipdata_code, h.hn,
+              MAX(CASE WHEN nd.icode IS NOT NULL THEN 1 ELSE 0 END) AS has_service,
+              0 AS has_drug,
+              ROUND(SUM(CASE WHEN nd.icode IS NOT NULL THEN op.sum_price ELSE 0 END), 2) AS service_value,
+              0 AS drug_value, 0 AS opd_in_value, 0 AS opd_out_value
+       FROM (SELECT DISTINCT an, hn FROM health_med_service
+             WHERE service_date BETWEEN ? AND ? AND an IS NOT NULL AND an <> '') h
+       JOIN ipt ip ON ip.an = h.an
+       LEFT JOIN pttype ps ON ps.pttype = ip.pttype
+       LEFT JOIN opitemrece op ON op.an = h.an AND op.rxdate BETWEEN ? AND ?
+       LEFT JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}
+       GROUP BY ps.hipdata_code, h.hn`,
+      [startDate, endDate, startDate, endDate]
+    )
+
+    // จำนวนบันทึกให้บริการตามหน้าจอ HOSxP (ไว้กระทบยอด) และบันทึกที่ไม่มี visit รองรับ
+    const [[recordCounts]] = await hosPool.query(
+      `SELECT SUM(h.an IS NULL OR h.an = '') AS opd,
+              SUM(h.an IS NOT NULL AND h.an <> '') AS ipd,
+              SUM((h.an IS NULL OR h.an = '') AND NOT EXISTS (SELECT 1 FROM ovst x WHERE x.vn = h.vn)) AS orphan_opd
+       FROM health_med_service h
+       WHERE h.service_date BETWEEN ? AND ?`,
+      [startDate, endDate]
+    )
+
+    // ช่วงเวลาให้บริการจริงของวัน (จากเวลาลงบันทึกให้บริการ) ไว้แสดงบนภาพสรุป — เฉพาะการดูวันเดียว
+    let timeRange = null
+    if (single) {
+      const [[t]] = await hosPool.query(
+        `SELECT TIME_FORMAT(MIN(service_time), '%H.%i') AS first_time, TIME_FORMAT(MAX(service_time), '%H.%i') AS last_time
+         FROM health_med_service WHERE service_date = ? AND service_time IS NOT NULL`,
+        [startDate]
+      )
+      if (t?.first_time && t?.last_time) timeRange = { from: t.first_time, to: t.last_time }
+    }
 
     // ออกชุมชนนับรายวัน (คนเดียวกันต่างวันนับแยก) แล้วรวมเป็นช่วง
     const [hosOutreach] = await hosPool.query(
@@ -886,12 +1075,17 @@ app.get('/api/thaimed-daily-summary', requireThaiMedValue, async (req, res) => {
     )
     const manual = single ? manualRows[0] : undefined
 
-    const summary = buildDailySummary(rows, { count: merged.count, source: merged.source })
+    const summary = buildDailySummary(opdRows, ipdRows, { count: merged.count, source: merged.source }, {
+      opd: Number(recordCounts?.opd ?? 0),
+      ipd: Number(recordCounts?.ipd ?? 0),
+      orphanOpd: Number(recordCounts?.orphan_opd ?? 0),
+    })
     res.json({
       success: true,
       date: startDate,
       startDate,
       endDate,
+      timeRange,
       ...summary,
       outreach: {
         ...summary.outreach,
@@ -946,13 +1140,14 @@ app.put('/api/thaimed-daily-summary/outreach', requireThaiMedValue, async (req, 
     } finally {
       conn.release()
     }
+    watcher.invalidate('thaimed')
     res.json({ success: true, date, count })
   } catch (err) {
     fail(res, err)
   }
 })
 
-app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
+app.get('/api/healthmed/audit', requireMenu('healthmed'), liveCache(thaimedVersion), async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
     const resultFilter = String(req.query.result ?? 'ALL').toUpperCase()
@@ -1198,7 +1393,7 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
 
     // 5. โหลดเกณฑ์การคิดค่าบริการซ้ำ และประเมินผลเกณฑ์แพทย์แผนไทย
     const duplicateRules = await getDuplicateRules(dwPool)
-    const evaluated = validRows.map((r) => {
+    const evaluatedOpd = validRows.map((r) => {
       const dayKey = `${r.hn}__${r.visit_date}`
       const vnOps = opsByVn.get(r.vn) || []
       const dayOps = opsByHnDate.get(dayKey) || []
@@ -1254,9 +1449,139 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       }
     })
 
+    // 5.1 ผู้ป่วยใน (แม่หลังคลอด) และบันทึกให้บริการที่ไม่มี visit รองรับ — เพื่อให้จำนวนตรงกับหน้าจอ "บันทึกให้บริการ" ใน HOSxP
+    const [ipdHms] = await hosPool.query(
+      `SELECT hms.health_med_service_id AS hms_id, hms.an, hms.hn,
+              DATE_FORMAT(hms.service_date, '%Y-%m-%d') AS visit_date,
+              TIME_FORMAT(hms.service_time, '%H:%i:%s') AS visit_time,
+              CONCAT(pt.pname, pt.fname, ' ', pt.lname) AS patient_name,
+              TIMESTAMPDIFF(YEAR, pt.birthday, hms.service_date) AS age_y,
+              ps.name AS pttype_name, ps.pttype, ps.hipdata_code AS pttype_hipdata,
+              hd.doctor_code, hd.health_med_doctor_name AS doctor_name,
+              COALESCE(w.name, 'ผู้ป่วยใน') AS ward_name
+       FROM health_med_service hms
+       JOIN patient pt ON pt.hn = hms.hn
+       LEFT JOIN ipt ip ON ip.an = hms.an
+       LEFT JOIN pttype ps ON ps.pttype = ip.pttype
+       LEFT JOIN ward w ON w.ward = ip.ward
+       LEFT JOIN health_med_doctor hd ON hd.health_med_doctor_id = hms.health_med_doctor_id
+       WHERE hms.service_date BETWEEN ? AND ? AND hms.an IS NOT NULL AND hms.an <> ''
+       ORDER BY hms.service_date DESC, hms.service_time DESC`,
+      [startDate, endDate]
+    )
+    const ipdAns = [...new Set(ipdHms.map((r) => r.an))]
+    const ipdItemsByKey = new Map()
+    const ipdDxByAn = new Map()
+    if (ipdAns.length > 0) {
+      const [ipdItems] = await hosPool.query(
+        `SELECT op.an, DATE_FORMAT(op.rxdate, '%Y-%m-%d') AS rx_date, COALESCE(nd.nhso_adp_code, nd.icode) AS code,
+                nd.name, op.qty, op.unitprice
+         FROM opitemrece op
+         JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}
+         WHERE op.an IN (?) AND op.rxdate BETWEEN ? AND ?`,
+        [ipdAns, startDate, endDate]
+      )
+      for (const it of ipdItems) {
+        const key = `${it.an}__${it.rx_date}`
+        if (!ipdItemsByKey.has(key)) ipdItemsByKey.set(key, [])
+        ipdItemsByKey.get(key).push(it)
+      }
+      const [ipdDx] = await hosPool.query(
+        "SELECT an, icd10 FROM iptdiag WHERE an IN (?) AND icd10 IS NOT NULL AND icd10 <> '' ORDER BY an, diagtype, diag_no",
+        [ipdAns]
+      )
+      for (const d of ipdDx) {
+        if (!ipdDxByAn.has(d.an)) ipdDxByAn.set(d.an, [])
+        ipdDxByAn.get(d.an).push(String(d.icd10).trim())
+      }
+    }
+    const ipdEvaluated = ipdHms.map((r) => {
+      const dayKey = `${r.hn}__${r.visit_date}`
+      const items = ipdItemsByKey.get(`${r.an}__${r.visit_date}`) ?? []
+      const operations = opsByHnDate.get(dayKey) ?? []
+      const allDx = [...new Set([...(ipdDxByAn.get(r.an) ?? []), ...(dayDiagsMap.get(dayKey) ?? [])])]
+      const fullRow = {
+        ...r,
+        vn: `AN:${r.an}`,
+        patient_type: 'IPD',
+        department_name: `ผู้ป่วยใน · ${r.ward_name}`,
+        pdx: allDx[0] ?? '', dx0: allDx[1] ?? '', dx1: allDx[2] ?? '', dx2: allDx[3] ?? '', dx3: allDx[4] ?? '', dx4: allDx[5] ?? '', dx5: allDx[6] ?? '',
+        all_dx: allDx,
+        operations,
+        operation_codes: operations.map((o) => o.code).filter(Boolean),
+        labor_date: null,
+        ...summarizeServiceItems(items),
+        // เลข EP/ปิดสิทธิเป็นขั้นตอนของผู้ป่วยนอก — ผู้ป่วยในไม่ตรวจข้อนี้
+        ep_code: null, claim_code: '', claim_close_status: 'CLOSED', is_claim_closed: true,
+        visit_order: 1, total_day_visits: 1,
+      }
+      return { ...fullRow, ...evaluateIpdHealthMed(fullRow) }
+    })
+
+    const evaluatedVns = new Set(evaluatedOpd.map((r) => r.vn))
+    const [orphanHms] = await hosPool.query(
+      `SELECT hms.vn, hms.hn, DATE_FORMAT(hms.service_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(hms.service_time, '%H:%i:%s') AS visit_time,
+              CONCAT(pt.pname, pt.fname, ' ', pt.lname) AS patient_name,
+              TIMESTAMPDIFF(YEAR, pt.birthday, hms.service_date) AS age_y,
+              hd.doctor_code, hd.health_med_doctor_name AS doctor_name
+       FROM health_med_service hms
+       LEFT JOIN patient pt ON pt.hn = hms.hn
+       LEFT JOIN health_med_doctor hd ON hd.health_med_doctor_id = hms.health_med_doctor_id
+       WHERE hms.service_date BETWEEN ? AND ? AND (hms.an IS NULL OR hms.an = '')
+         AND NOT EXISTS (SELECT 1 FROM ovst x WHERE x.vn = hms.vn)`,
+      [startDate, endDate]
+    )
+    const orphanEvaluated = orphanHms
+      .filter((r) => !evaluatedVns.has(r.vn))
+      .map((r) => ({
+        ...r,
+        patient_type: 'OPD',
+        visit_missing: true,
+        pttype_name: '-', pttype: '', department_name: 'ไม่พบ visit',
+        pdx: '', all_dx: [], operations: [], operation_codes: [], labor_date: null,
+        count_58130: 0, count_58101: 0, count_58301: 0, count_58220: 0, count_58131: 0, count_compress: 0,
+        ep_code: null, claim_code: '', claim_close_status: 'CLOSED', is_claim_closed: true,
+        visit_order: 1, total_day_visits: 1,
+        ...evaluateOrphanHealthMed(),
+      }))
+
+    // 5.2 บันทึกให้บริการ OPD ที่ถูกตัดออกจากการตรวจ (ไม่มีค่านวด/หัตถการ หรือเป็น visit ที่ 2 ของวัน) — นำกลับมาแสดง
+    // เพื่อให้จำนวนรายการเท่ากับหน้าจอ "บันทึกให้บริการ" ของ HOSxP ทุกบันทึก
+    const [hmsOpd] = await hosPool.query(
+      `SELECT hms.vn FROM health_med_service hms
+       WHERE hms.service_date BETWEEN ? AND ? AND (hms.an IS NULL OR hms.an = '')`,
+      [startDate, endDate]
+    )
+    const auditRowByVn = new Map(rows.map((r) => [r.vn, r]))
+    const orphanVns = new Set(orphanEvaluated.map((r) => r.vn))
+    const noProcedureEvaluated = []
+    for (const h of hmsOpd) {
+      if (evaluatedVns.has(h.vn) || orphanVns.has(h.vn)) continue
+      const base = auditRowByVn.get(h.vn)
+      if (!base) continue
+      const dx = [base.pdx, base.dx0, base.dx1, base.dx2, base.dx3, base.dx4, base.dx5].filter(Boolean)
+      noProcedureEvaluated.push({
+        ...base,
+        patient_type: 'OPD',
+        no_procedure: true,
+        all_dx: [...new Set(dx)],
+        operations: [], operation_codes: [], labor_date: null,
+        service_items_raw: base.service_items_raw ?? '', service_codes: base.service_codes ?? '',
+        count_58130: Number(base.count_58130 ?? 0), count_58101: Number(base.count_58101 ?? 0), count_58301: Number(base.count_58301 ?? 0),
+        count_58220: Number(base.count_58220 ?? 0), count_58131: Number(base.count_58131 ?? 0), count_compress: Number(base.count_compress ?? 0),
+        ep_code: null, claim_code: '', claim_close_status: 'CLOSED', is_claim_closed: true,
+        visit_order: 1, total_day_visits: 1,
+        ...evaluateNoProcedureHealthMed(),
+      })
+    }
+
+    const evaluated = [...evaluatedOpd, ...noProcedureEvaluated, ...ipdEvaluated, ...orphanEvaluated].sort((a, b) =>
+      `${b.visit_date} ${b.visit_time ?? ''}`.localeCompare(`${a.visit_date} ${a.visit_time ?? ''}`)
+    )
+
     const filtered = evaluated.filter((r) => {
       if (resultFilter === 'PROBLEM' && r.audit_result === 'PASS') return false
-      if (['PASS', 'FAIL'].includes(resultFilter) && r.audit_result !== resultFilter) return false
+      if (['PASS', 'FAIL'].includes(resultFilter) && (r.audit_result !== resultFilter || r.no_procedure)) return false
       if (search) {
         const s = search.toLowerCase()
         const opCodesText = r.operation_codes?.join(' ') ?? ''
@@ -1267,8 +1592,9 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       return true
     })
 
-    const closedCount = evaluated.filter((r) => r.is_claim_closed).length
-    const unclosedCount = evaluated.filter((r) => !r.is_claim_closed).length
+    const epRows = evaluated.filter((r) => r.patient_type !== 'IPD' && !r.visit_missing && !r.no_procedure)
+    const closedCount = epRows.filter((r) => r.is_claim_closed).length
+    const unclosedCount = epRows.filter((r) => !r.is_claim_closed).length
     const unclosedOpenOnlyCount = evaluated.filter((r) => r.claim_close_status === 'OPEN_ONLY').length
     const unclosedVisit2DupCount = evaluated.filter((r) => r.claim_close_status === 'VISIT2_DUP').length
     const unclosedNoneCount = evaluated.filter((r) => r.claim_close_status === 'NONE').length
@@ -1276,10 +1602,14 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
 
     const kpi = {
       total: evaluated.length,
-      pass: evaluated.filter((r) => r.audit_result === 'PASS').length,
+      pass: evaluated.filter((r) => r.audit_result === 'PASS' && !r.no_procedure).length,
+      noProcedureCount: evaluated.filter((r) => r.no_procedure).length,
       fail: evaluated.filter((r) => r.audit_result === 'FAIL').length,
       closedCount,
-      closedRate: evaluated.length ? Math.round((closedCount / evaluated.length) * 1000) / 10 : 0,
+      closedRate: epRows.length ? Math.round((closedCount / epRows.length) * 1000) / 10 : 0,
+      opdCount: evaluated.filter((r) => r.patient_type !== 'IPD').length,
+      ipdCount: evaluated.filter((r) => r.patient_type === 'IPD').length,
+      orphanCount: evaluated.filter((r) => r.visit_missing).length,
       unclosedCount,
       unclosedOpenOnlyCount,
       unclosedVisit2DupCount,
@@ -1293,7 +1623,7 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
       epFail: unclosedCount,
       visit2ClaimFail: evaluated.filter((r) => r.is_visit2_claim_fail).length,
     }
-    kpi.passRate = kpi.total ? Math.round((kpi.pass / kpi.total) * 1000) / 10 : 0
+    kpi.passRate = kpi.pass + kpi.fail ? Math.round((kpi.pass / (kpi.pass + kpi.fail)) * 1000) / 10 : 0
 
     res.json({ success: true, data: filtered, kpi, meta: { total: filtered.length, startDate, endDate } })
   } catch (err) {
@@ -1302,7 +1632,7 @@ app.get('/api/healthmed/audit', requireMenu('healthmed'), async (req, res) => {
 })
 
 // ตรวจการเบิก สปสช. (เฟส 1): ตรวจรหัสก่อนเบิก + ผลเบิกจาก FDH ของ visit แผนกแพทย์แผนไทย
-app.get('/api/claims/check', requireMenu('claims'), async (req, res) => {
+app.get('/api/claims/check', requireMenu('claims'), liveCache(thaimedVersion), async (req, res) => {
   try {
     const { startDate, endDate } = readRange(req.query)
     const [ref, visits, lastChecked] = await Promise.all([
@@ -1371,6 +1701,7 @@ app.get('/api/healthmed/settings', requireSession, async (_req, res) => {
 app.post('/api/healthmed/settings', requireHerbDxManager, async (req, res) => {
   try {
     const result = await saveDuplicateRules(dwPool, req.body)
+    watcher.invalidate('thaimed')
     res.json(result)
   } catch (err) {
     fail(res, err)
@@ -3111,6 +3442,7 @@ app.listen(API_PORT, '0.0.0.0', () => {
 })
 
 if (SYNC_ENABLED && AUTO_SYNC_MINUTES > 0) {
+  watcher.start()
   let isAutoSyncing = false
   const autoSync = async () => {
     if (isAutoSyncing) return
@@ -3133,4 +3465,20 @@ if (SYNC_ENABLED && AUTO_SYNC_MINUTES > 0) {
   }
   setTimeout(autoSync, 2000)
   setInterval(autoSync, AUTO_SYNC_MINUTES * 60 * 1000)
+
+  // ทุกคืน: ตรวจจำนวนรายเดือนเทียบ HOSxP (เดือนไหนไม่ตรงซิงก์ใหม่) + ซิงก์เดือนนี้/เดือนก่อนเสมอ
+  const scheduleNightly = () => {
+    const now = new Date()
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate(), RECONCILE_HOUR, 0, 0)
+    if (next <= now) next.setDate(next.getDate() + 1)
+    setTimeout(async () => {
+      try {
+        await reconcileNow('NIGHTLY')
+      } catch (err) {
+        console.error('[reconcile] failed:', err.message)
+      }
+      scheduleNightly()
+    }, next.getTime() - now.getTime())
+  }
+  scheduleNightly()
 }

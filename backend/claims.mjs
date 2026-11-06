@@ -86,10 +86,11 @@ export async function fetchClaimVisits(hosPool, startDate, endDate) {
      FROM ovst o
      JOIN vn_stat ov ON ov.vn = o.vn
      JOIN patient pt ON pt.hn = o.hn
-     JOIN spclty sp ON sp.spclty = o.spclty AND ${THAI_MED_FILTER}
+     JOIN spclty sp ON sp.spclty = o.spclty
      LEFT JOIN pttype ps ON ps.pttype = o.pttype
      LEFT JOIN doctor doc ON doc.code = o.doctor
      WHERE o.vstdate BETWEEN ? AND ?
+       AND (${THAI_MED_FILTER} OR EXISTS (SELECT 1 FROM health_med_service h WHERE h.vn = o.vn))
      ORDER BY o.vstdate DESC, o.vsttime DESC`,
     [startDate, endDate]
   )

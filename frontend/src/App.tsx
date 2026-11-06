@@ -14,7 +14,7 @@ import { ClaimsCheckView } from '@/components/ClaimsCheckView'
 import { HospitalHeroBanner } from '@/components/HospitalHeroBanner'
 import { ExecutiveDashboardView } from '@/components/ExecutiveDashboardView'
 import { AuditKpiSkeleton, AuditTableSkeleton, AuditCardListSkeleton } from '@/components/AuditSkeleton'
-import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useMenuPermissions, useSyncHerbDx } from '@/hooks/useHerbDx'
+import { useAuditRecords, useDbStatus, useDrugSummaries, useDxMap, useMenuPermissions, useSyncHerbDx, useRealtimeSync } from '@/hooks/useHerbDx'
 import type { ActivePage, AuditFilterParams, AuditRecord, AuditResultFilter, DateRange, DrugSummaryRecord, DxMapRecord } from '@/types/herbdx.types'
 import { AUDIT_RESULT_META, currentMonthRange, downloadExcel, fmtNum, toThaiDate, type ExcelColumn, toReporter } from '@/lib/format'
 import { useAuth } from '@/context/AuthContext'
@@ -207,6 +207,7 @@ const DashboardView: FC = () => {
 
   // หน้าที่กลุ่มผู้ใช้ไม่มีสิทธิ์ (IT ตั้งค่าใน จัดการระบบ > สิทธิ์เมนู) แสดงข้อความแทน แม้พิมพ์ URL ตรง
   const { data: menuPerms } = useMenuPermissions()
+  useRealtimeSync()
   const isBlocked = activePage === 'thaimedvalue' || activePage === 'thaimeddaily'
     ? !canViewThaiMedValue(user)
     : activePage !== 'dashboard' && (menuPerms ? !menuPerms.myMenus.includes(activePage) : activePage === 'sql' && !isAdminUser(user))

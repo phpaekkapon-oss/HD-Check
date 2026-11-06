@@ -51,6 +51,20 @@ export function formatThaiDate(iso) {
   return `${d}/${m}/${Number(y) + 543}`
 }
 
+/** เงื่อนไขรายการ nondrugitems ที่นับเป็นค่าบริการแพทย์แผนไทย (ใช้ร่วมกันทั้งหน้าตรวจหัตถการและหน้าสรุปรายวัน) */
+export const THAI_MED_SERVICE_ND_COND = `(
+        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301')
+        OR (nd.nhso_adp_code LIKE '58%' AND nd.nhso_adp_code NOT IN ('58001', '58002'))
+        OR (nd.name LIKE '%ค่านวด%' AND nd.name NOT LIKE '%กายภาพ%')
+        OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')
+        OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
+        OR nd.name LIKE '%ค่าอบไอน้ำ%'
+        OR nd.name LIKE '%อบสมุนไพร%'
+        OR nd.name LIKE '%อบไอน้ำ%'
+      )
+      AND COALESCE(nd.nhso_adp_code, nd.icode) NOT IN ('58001', '58002')
+      AND nd.name NOT LIKE '%ฝังเข็ม%'`
+
 /**
  * SQL สำหรับดึงข้อมูลการรับบริการแพทย์แผนไทย (เฉพาะค่าบริการ/หัตถการ ไม่รวมรายการยาสมุนไพร)
  */
@@ -107,19 +121,7 @@ export const HEALTH_MED_AUDIT_SQL = `
   INNER JOIN patient pt ON o.hn = pt.hn
   LEFT JOIN health_med_service hms ON hms.vn = o.vn
   LEFT JOIN opitemrece op ON o.vn = op.vn
-  LEFT JOIN nondrugitems nd ON op.icode = nd.icode 
-      AND (
-        COALESCE(nd.nhso_adp_code, nd.icode) IN ('58101', '58102', '58130', '58131', '58201', '58220', '58301')
-        OR (nd.nhso_adp_code LIKE '58%' AND nd.nhso_adp_code NOT IN ('58001', '58002'))
-        OR (nd.name LIKE '%ค่านวด%' AND nd.name NOT LIKE '%กายภาพ%')
-        OR (nd.name LIKE '%ประคบ%' AND nd.name NOT LIKE '%ความร้อน%' AND nd.name NOT LIKE '%ประคบร้อน%' AND nd.name NOT LIKE '%ประคบเย็น%' AND nd.name NOT LIKE '%กายภาพ%')
-        OR nd.name LIKE '%ค่าทับหม้อเกลือ%'
-        OR nd.name LIKE '%ค่าอบไอน้ำ%'
-        OR nd.name LIKE '%อบสมุนไพร%'
-        OR nd.name LIKE '%อบไอน้ำ%'
-      )
-      AND COALESCE(nd.nhso_adp_code, nd.icode) NOT IN ('58001', '58002')
-      AND nd.name NOT LIKE '%ฝังเข็ม%'
+  LEFT JOIN nondrugitems nd ON op.icode = nd.icode AND ${THAI_MED_SERVICE_ND_COND}
   LEFT JOIN pttype ps ON o.pttype = ps.pttype
   LEFT JOIN spclty sp ON o.spclty = sp.spclty
   LEFT JOIN doctor doc ON o.doctor = doc.code
@@ -454,6 +456,45 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   }
 }
 
+/**
+ * ประเมินบันทึกให้บริการแพทย์แผนไทยของผู้ป่วยใน (IPD แม่หลังคลอด)
+ * IPD ใช้รหัสโรค/หัตถการต่างจาก OPD (มี O800, U504, U771; ไม่มี M6260/U506 และไม่มีรหัสหัตถการ) จึงยังไม่ใช้เกณฑ์ OPD
+ * ตรวจเฉพาะสิ่งที่ยืนยันได้จากข้อมูล: มีค่าบริการแพทย์แผนไทยของวันนั้น และไม่คิดค่านวดและประคบซ้ำในวันเดียว
+ */
+export function evaluateIpdHealthMed(row) {
+  const count58131 = Number(row.count_58131 ?? 0)
+  const count58130 = Number(row.count_58130 ?? 0)
+  const count58220 = Number(row.count_58220 ?? 0)
+  const count58301 = Number(row.count_58301 ?? 0)
+  const count58101 = Number(row.count_58101 ?? 0)
+  const countCompress = Number(row.count_compress ?? 0)
+  const failures = []
+  const bothCount = Math.max(count58130, count58131)
+  const billed = bothCount + count58220 + count58301 + count58101 + countCompress
+  if (billed === 0) failures.push('ผู้ป่วยใน: มีบันทึกให้บริการแพทย์แผนไทยแต่ไม่พบค่าบริการของวันนั้น (ไม่มีรายการให้เบิก)')
+  if (bothCount >= 2) failures.push('คิดค่าบริการซ้ำ: พบค่านวดและประคบ 2 ครั้งในวันเดียวกัน')
+  const passes = failures.length === 0 ? ['ผู้ป่วยใน (แม่หลังคลอด): มีค่าบริการแพทย์แผนไทยของวันนั้น (เกณฑ์รหัสโรค/หัตถการของ IPD ยังไม่ได้กำหนดในระบบ)'] : []
+  return {
+    audit_result: failures.length > 0 ? 'FAIL' : 'PASS',
+    failures,
+    passes,
+    audit_reason: failures.length > 0 ? failures.join(' • ') : passes.join(' • '),
+    is_duplicate_fail: failures.some((f) => f.includes('คิดค่าบริการซ้ำ')),
+  }
+}
+
+/** บันทึกให้บริการ OPD ที่ไม่มีค่านวด/หัตถการ/รหัสหัตถการเลย (เช่น จ่ายยาสมุนไพรหรือให้คำปรึกษา) — แสดงไว้ให้ยอดตรง HOSxP แต่ไม่เข้าเกณฑ์ตรวจหัตถการ */
+export function evaluateNoProcedureHealthMed() {
+  const note = 'บันทึกให้บริการนี้ไม่มีค่านวด/หัตถการและรหัสหัตถการ (เช่น จ่ายยาสมุนไพรหรือให้คำปรึกษา) จึงไม่เข้าเกณฑ์ตรวจหัตถการ'
+  return { audit_result: 'PASS', failures: [], passes: [note], audit_reason: note, is_duplicate_fail: false }
+}
+
+/** บันทึกให้บริการใน HOSxP ที่ไม่มี visit รองรับ (vn ไม่พบใน ovst) — ไม่มีค่าบริการ จึงเคลมไม่ได้ */
+export function evaluateOrphanHealthMed() {
+  const failure = 'บันทึกให้บริการแพทย์แผนไทยไม่มี visit รองรับ (ไม่พบ vn ในทะเบียนผู้ป่วยนอก) จึงไม่มีค่าบริการให้เบิก — ให้ตรวจ/ลบบันทึกใน HOSxP'
+  return { audit_result: 'FAIL', failures: [failure], passes: [], audit_reason: failure, is_duplicate_fail: false }
+}
+
 export const DEFAULT_DUPLICATE_RULES = {
   block_coexist: true,
   block_both_multiple: true,
@@ -487,3 +528,29 @@ export async function saveDuplicateRules(dwPool, rules) {
   return { success: true, data: merged }
 }
 
+
+/**
+ * สรุปรายการค่าบริการแพทย์แผนไทย (nondrugitems) ของผู้ป่วยใน ให้อยู่รูปเดียวกับคอลัมน์ที่ SQL ของผู้ป่วยนอกสร้าง
+ * @param items [{ code, name, qty, unitprice }]
+ */
+export function summarizeServiceItems(items) {
+  const sumQty = (pred) => items.filter(pred).reduce((n, it) => n + (Number(it.qty) || 1), 0)
+  const name = (it) => String(it.name ?? '')
+  const code = (it) => String(it.code ?? '')
+  const isBoth = (it) => ['58130', '58131'].includes(code(it)) || name(it).includes('นวดและประคบ') || name(it).includes('นวดประคบ')
+  const isMassage = (it) => (['58101', '58102'].includes(code(it)) || name(it).includes('ค่านวด')) && !name(it).includes('ประคบ')
+  const isCompress = (it) => (code(it) === '58201' || (name(it).includes('ประคบ') && !name(it).includes('ความร้อน') && !name(it).includes('ประคบร้อน') && !name(it).includes('ประคบเย็น') && !name(it).includes('กายภาพ'))) && !name(it).includes('นวด')
+  const isSteam = (it) => code(it) === '58301' || name(it).includes('อบไอน้ำ') || name(it).includes('อบสมุนไพร')
+  const is58220 = (it) => code(it) === '58220' || name(it).includes('ค่าทับหม้อเกลือ')
+  const is58131 = (it) => code(it) === '58131' || (name(it).includes('ค่านวดและประคบ') && name(it).includes('ฟื้นฟู'))
+  return {
+    service_items_raw: items.map((it) => `${code(it)}:${name(it)}:${it.qty}:${it.unitprice}`).join('||'),
+    service_codes: [...new Set(items.map(code))].join(','),
+    count_58130: sumQty(isBoth),
+    count_58101: sumQty(isMassage),
+    count_compress: sumQty(isCompress),
+    count_58301: sumQty(isSteam),
+    count_58220: sumQty(is58220),
+    count_58131: sumQty(is58131),
+  }
+}

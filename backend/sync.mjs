@@ -102,8 +102,11 @@ export function buildPrescriptionSql(customIcodes = []) {
     ) lv ON o.hn = lv.hn AND o.vstdate = lv.vstdate
     LEFT JOIN vn_stat ov_latest ON ov_latest.vn = lv.latest_vn
     -- 2) รหัสวินิจฉัยหลัก (PDX) จาก ovstdiag ของ visit นี้ หรือ visit ล่าสุดของแพทย์แผนไทย
+    --    บาง visit ใน HOSxP ลงรหัสโรคหลัก (diagtype 1) ไว้มากกว่า 1 รหัส: เลือกรหัสที่บันทึกก่อนเพียงตัวเดียว ไม่ให้แถวยาถูกคูณซ้ำ
     LEFT JOIN ovstdiag od_pdx ON od_pdx.vn = o.vn AND od_pdx.diagtype = '1'
+      AND NOT EXISTS (SELECT 1 FROM ovstdiag z WHERE z.vn = od_pdx.vn AND z.diagtype = '1' AND z.ovst_diag_id < od_pdx.ovst_diag_id)
     LEFT JOIN ovstdiag od1 ON od1.vn = lv.latest_vn AND od1.diagtype = '1'
+      AND NOT EXISTS (SELECT 1 FROM ovstdiag z1 WHERE z1.vn = od1.vn AND z1.diagtype = '1' AND z1.ovst_diag_id < od1.ovst_diag_id)
     -- 3) รหัสวินิจฉัยรองทั้งหมด: รวมรหัสแผนปัจจุบันจาก ovstdiag (priority 1) + รหัส U จาก F7 health_med_service_diagnosis (priority 2) + รหัส U จาก ovstdiag (priority 3)
     LEFT JOIN (
       SELECT t.hn, t.vstdate, GROUP_CONCAT(DISTINCT t.icd10 ORDER BY t.priority, t.icd10 SEPARATOR ',') AS all_sec_codes

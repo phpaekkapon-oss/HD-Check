@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { herbDxApi, type OutreachUpdate } from '@/api/herbdx.api'
 import type { AuditFilterParams, DateRange, DxMapUpdate, DxMapBatchItem, DispensingRule, MenuPermissionMatrix, ThaiMedDuplicateRules } from '@/types/herbdx.types'
@@ -15,6 +16,7 @@ export const herbDxKeys = {
   thaiMedValue: (r: DateRange) => [...herbDxKeys.all, 'thaimed-value', r] as const,
   thaiMedDaily: (r: DateRange) => [...herbDxKeys.all, 'thaimed-daily', r] as const,
   claims: (r: DateRange) => [...herbDxKeys.all, 'claims', r] as const,
+  realtime: () => [...herbDxKeys.all, 'realtime'] as const,
 }
 
 /** สิทธิ์เมนูของผู้ใช้ (และตารางสิทธิ์ทั้งหมดสำหรับ IT) */
@@ -264,4 +266,36 @@ export function useSaveThaiMedOutreach() {
     mutationFn: (u: OutreachUpdate) => herbDxApi.saveThaiMedOutreach(u),
     onSuccess: () => qc.invalidateQueries({ queryKey: [...herbDxKeys.all, 'thaimed-daily'] }),
   })
+}
+
+/** สถานะข้อมูลเกือบเรียลไทม์ — ถามเซิร์ฟเวอร์ของเราทุก 10 วินาที (หยุดเองเมื่อแท็บถูกซ่อน) */
+export function useRealtimeStatus(enabled = true) {
+  return useQuery({
+    enabled,
+    queryKey: herbDxKeys.realtime(),
+    queryFn: herbDxApi.realtimeVersion,
+    refetchInterval: 10_000,
+    staleTime: 0,
+    retry: false,
+  })
+}
+
+// หน้าที่อ่านสดจาก HOSxP / หน้าที่อ่านจากคลังข้อมูลยาสมุนไพร
+const THAIMED_KEYS = ['thaimed-daily', 'thaimed-value', 'healthmed', 'claims'] as const
+const HERB_KEYS = ['prescriptions', 'drugs', 'status'] as const
+
+/** ติดตั้งครั้งเดียวที่ระดับแอป: เมื่อเลขเวอร์ชันข้อมูลเปลี่ยน ให้โหลดหน้าที่เกี่ยวข้องใหม่ */
+export function useRealtimeSync(enabled = true) {
+  const qc = useQueryClient()
+  const { data } = useRealtimeStatus(enabled)
+  const prev = useRef<{ thaimed: number; herb: number } | null>(null)
+  useEffect(() => {
+    const v = data?.versions
+    if (!v) return
+    const p = prev.current
+    prev.current = { thaimed: v.thaimed, herb: v.herb }
+    if (!p) return
+    if (v.thaimed !== p.thaimed) for (const k of THAIMED_KEYS) void qc.invalidateQueries({ queryKey: [...herbDxKeys.all, k] })
+    if (v.herb !== p.herb) for (const k of HERB_KEYS) void qc.invalidateQueries({ queryKey: [...herbDxKeys.all, k] })
+  }, [data?.versions, qc])
 }

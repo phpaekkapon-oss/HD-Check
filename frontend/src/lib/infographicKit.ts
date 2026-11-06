@@ -7,6 +7,7 @@ import {
   Building2,
   CalendarDays,
   CircleHelp,
+  Clock,
   Coins,
   CreditCard,
   Flower2,
@@ -15,7 +16,9 @@ import {
   Hospital,
   House,
   Leaf,
+  Lightbulb,
   Pill,
+  Receipt,
   ShieldCheck,
   Sprout,
   UserRoundCheck,
@@ -40,6 +43,7 @@ const ICONS = {
   uc: CreditCard,
   pay: Banknote,
   sss: ShieldCheck,
+  reimb: Receipt,
   other: CircleHelp,
   calendar: CalendarDays,
   hospital: Hospital,
@@ -48,6 +52,8 @@ const ICONS = {
   baby: Baby,
   heart: Heart,
   flower: Flower2,
+  clock: Clock,
+  idea: Lightbulb,
 } satisfies Record<string, LucideIcon>
 export type IconName = keyof typeof ICONS
 export const groupIcon = (id: string): IconName => (id in ICONS ? (id as IconName) : 'other')
@@ -63,7 +69,7 @@ export interface Theme {
   readonly hint: string
   /** สีตัวอย่างบนปุ่มเลือกสไตล์ */
   readonly swatch: string
-  readonly layout: 'table' | 'dashboard' | 'cards'
+  readonly layout: 'table' | 'dashboard' | 'cards' | 'poster'
   readonly w: number
   readonly h: number
   readonly bg: Pair
@@ -105,6 +111,8 @@ export interface Period {
   /** วันที่/เดือนตัวใหญ่ */
   readonly big: string
   readonly title: string
+  /** ช่วงเวลาให้บริการจริงของวัน เช่น "เวลา 08.30 – 16.45 น." (เฉพาะดูวันเดียว) */
+  readonly time?: string
   /** หัวข้อแผงสรุปด้านขวา */
   readonly panel: string
 }
@@ -118,10 +126,11 @@ export interface Scene {
   readonly hospital: string
 }
 
-export const money = (n: number) => fmtNum(n, 2)
+/** เงินในภาพแสดงเป็นจำนวนเต็ม (ไม่แสดงทศนิยม) */
+export const money = (n: number) => fmtNum(n, 0)
 export const pct = (part: number, whole: number) => (whole > 0 ? (part / whole) * 100 : 0)
 
-export const iconColors = (t: Theme): readonly string[] => [...new Set([t.chipInk, WHITE, t.onAccent, t.accent, t.headInk, t.ink])]
+export const iconColors = (t: Theme): readonly string[] => [...new Set([t.chipInk, WHITE, t.onAccent, t.accent, t.headInk, t.ink, t.tableHeadInk])]
 
 async function loadIcon(Icon: LucideIcon, color: string): Promise<HTMLImageElement> {
   const svg = renderToStaticMarkup(createElement(Icon, { size: 96, color, strokeWidth: 2 }))

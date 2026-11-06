@@ -91,6 +91,19 @@ export interface ThaiMedValueResponse {
 export interface ThaiMedDailyGroup {
   readonly id: string
   readonly label: string
+  /** จำนวนครั้งที่รับบริการ (ราย) — ตรงกับจำนวนรายการในหน้าจอ HOSxP */
+  readonly visits: number
+  /** คนไม่ซ้ำ */
+  readonly persons: number
+  readonly servicePersons: number
+  readonly drugPersons: number
+  readonly serviceValue: number
+  readonly drugValue: number
+  readonly total: number
+}
+
+export interface ThaiMedDailyIpd {
+  readonly visits: number
   readonly persons: number
   readonly servicePersons: number
   readonly drugPersons: number
@@ -105,7 +118,16 @@ export interface ThaiMedDailySummary {
   readonly startDate: string
   readonly endDate: string
   readonly groups: readonly ThaiMedDailyGroup[]
+  /** ผู้ป่วยใน (แม่หลังคลอด) จากบันทึกให้บริการที่มีเลข AN */
+  readonly ipd: ThaiMedDailyIpd
+  /** ช่วงเวลาให้บริการจริงของวัน (เฉพาะดูวันเดียว) */
+  readonly timeRange: { readonly from: string; readonly to: string } | null
+  /** จำนวนบันทึกให้บริการตามหน้าจอ HOSxP ไว้กระทบยอด */
+  readonly records: { readonly opd: number; readonly ipd: number; readonly total: number; readonly orphanOpd: number }
   readonly totals: {
+    readonly visits: number
+    /** visit แผนกแพทย์แผนไทยที่ยังไม่ลงบันทึกให้บริการใน HOSxP */
+    readonly visitsNoRecord: number
     readonly persons: number
     readonly servicePersons: number
     readonly drugPersons: number
@@ -132,7 +154,23 @@ export interface OutreachUpdate {
   readonly reason: string
 }
 
+/** สถานะข้อมูลเกือบเรียลไทม์ (อ่านจากหน่วยความจำเซิร์ฟเวอร์ ไม่แตะ HOSxP) */
+export interface RealtimeStatus {
+  readonly success: true
+  readonly versions: { readonly thaimed: number; readonly herb: number }
+  readonly checkedAt: string | null
+  readonly changedAt: { readonly thaimed: string | null; readonly herb: string | null }
+  readonly durationMs: number | null
+  readonly intervalSeconds: number
+  readonly healthy: boolean
+  readonly error: string | null
+  readonly syncInstance: boolean
+  readonly syncMinSeconds: number
+}
+
 export const herbDxApi = {
+  realtimeVersion: () => request<RealtimeStatus>('/api/realtime/version'),
+
   thaiMedDailySummary: (r: DateRange) =>
     request<ThaiMedDailySummary>(`/api/thaimed-daily-summary?${qs({ startDate: r.startDate, endDate: r.endDate })}`),
 

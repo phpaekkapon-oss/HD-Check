@@ -313,10 +313,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       return data.kpi
     }
     const total = activeRecords.length
-    const pass = activeRecords.filter((r) => r.audit_result === 'PASS').length
+    const pass = activeRecords.filter((r) => r.audit_result === 'PASS' && !r.no_procedure).length
+    const noProcedureCount = activeRecords.filter((r) => r.no_procedure).length
     const fail = activeRecords.filter((r) => r.audit_result === 'FAIL').length
-    const closedCount = activeRecords.filter((r) => r.is_claim_closed).length
-    const unclosedCount = activeRecords.filter((r) => !r.is_claim_closed).length
+    // เลข EP ใช้กับผู้ป่วยนอกที่มี visit เท่านั้น (IPD และบันทึกที่ไม่มี visit ไม่นับ)
+    const epRows = activeRecords.filter((r) => r.patient_type !== 'IPD' && !r.visit_missing && !r.no_procedure)
+    const closedCount = epRows.filter((r) => r.is_claim_closed).length
+    const unclosedCount = epRows.filter((r) => !r.is_claim_closed).length
     const unclosedOpenOnlyCount = activeRecords.filter((r) => r.claim_close_status === 'OPEN_ONLY').length
     const unclosedVisit2DupCount = activeRecords.filter((r) => r.claim_close_status === 'VISIT2_DUP').length
     const unclosedNoneCount = activeRecords.filter((r) => r.claim_close_status === 'NONE').length
@@ -333,9 +336,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       total,
       pass,
       fail,
-      passRate: total ? Math.round((pass / total) * 1000) / 10 : 0,
+      passRate: pass + fail ? Math.round((pass / (pass + fail)) * 1000) / 10 : 0,
+      noProcedureCount,
       closedCount,
-      closedRate: total ? Math.round((closedCount / total) * 1000) / 10 : 0,
+      closedRate: epRows.length ? Math.round((closedCount / epRows.length) * 1000) / 10 : 0,
+      opdCount: activeRecords.filter((r) => r.patient_type !== 'IPD').length,
+      ipdCount: activeRecords.filter((r) => r.patient_type === 'IPD').length,
+      orphanCount: activeRecords.filter((r) => r.visit_missing).length,
       unclosedCount,
       unclosedOpenOnlyCount,
       unclosedVisit2DupCount,
@@ -442,7 +449,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
   const filteredRecords = useMemo(() => {
     return activeRecords.filter((r) => {
       // 1. KPI Category Filter
-      if (kpiFilter === 'PASS' && r.audit_result !== 'PASS') return false
+      if (kpiFilter === 'PASS' && (r.audit_result !== 'PASS' || r.no_procedure)) return false
       if (kpiFilter === 'FAIL' && r.audit_result !== 'FAIL') return false
       if (kpiFilter === 'CLOSED_EP' && !r.is_claim_closed) return false
       if ((kpiFilter === 'UNCLOSED_EP' || kpiFilter === 'EP') && r.is_claim_closed) return false
@@ -581,7 +588,13 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
 
     const buildRows = (list: readonly HealthMedRecord[]) =>
       list.map((r, i) => {
-        const closeLabel = r.is_claim_closed
+        const closeLabel = r.visit_missing
+          ? 'ไม่พบ visit'
+          : r.no_procedure
+          ? 'ไม่มีหัตถการ (ไม่ใช้ EP)'
+          : r.patient_type === 'IPD'
+          ? 'ผู้ป่วยใน (ไม่ใช้ EP)'
+          : r.is_claim_closed
           ? 'ปิดสิทธิแล้ว (EP)'
           : r.claim_close_status === 'OPEN_ONLY'
           ? 'รอปิดสิทธิ (เปิด PP แล้ว)'
@@ -817,7 +830,28 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                 />
               </span>
 
-              {row.original.is_claim_closed ? (
+              {row.original.no_procedure ? (
+                <span
+                  title="บันทึกให้บริการนี้ไม่มีค่านวด/หัตถการ (เช่น จ่ายยาสมุนไพรอย่างเดียว) จึงไม่เข้าเกณฑ์ตรวจและไม่ใช้เลขปิดสิทธิ EP"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-slate-500/15 text-slate-700 dark:text-slate-300 border border-slate-500/30 shrink-0"
+                >
+                  <span>ไม่มีหัตถการ</span>
+                </span>
+              ) : row.original.visit_missing ? (
+                <span
+                  title="บันทึกให้บริการใน HOSxP ไม่มี visit รองรับ จึงไม่มีค่าบริการให้เบิก"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-rose-500/15 text-rose-700 dark:text-rose-300 border border-rose-500/30 shrink-0"
+                >
+                  <span>✕ ไม่มี visit</span>
+                </span>
+              ) : row.original.patient_type === 'IPD' ? (
+                <span
+                  title="ผู้ป่วยใน (แม่หลังคลอด) ไม่ใช้เลขปิดสิทธิ EP"
+                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-semibold bg-sky-500/15 text-sky-700 dark:text-sky-300 border border-sky-500/30 shrink-0"
+                >
+                  <span>IPD · {row.original.vn.replace('AN:', 'AN ')}</span>
+                </span>
+              ) : row.original.is_claim_closed ? (
                 <span
                   title={`ปิดสิทธิแล้ว (Endpoint): ${row.original.ep_code || row.original.claim_code}`}
                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md font-mono font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border border-emerald-500/25 shrink-0"
@@ -1209,7 +1243,7 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
       id: 'ALL' as const,
       label: 'ทั้งหมด',
       value: kpi?.total ?? 0,
-      sub: 'ผู้รับบริการทั้งหมด',
+      sub: `ตรงกับ HOSxP: OPD ${fmtNum(kpi?.opdCount ?? 0)} + IPD ${fmtNum(kpi?.ipdCount ?? 0)} บันทึก${kpi?.noProcedureCount ? ` · ไม่มีหัตถการ ${fmtNum(kpi.noProcedureCount)}` : ''}`,
       icon: Users,
       iconBg: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-300 border border-indigo-500/20',
       valueColor: 'text-slate-900 dark:text-white',

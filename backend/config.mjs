@@ -47,6 +47,14 @@ export const SYNC_ENABLED = process.env.SYNC_ENABLED === 'true'
 // (default 15). 0 turns auto-sync off.
 const rawAutoSync = Number(process.env.AUTO_SYNC_MINUTES ?? 15)
 export const AUTO_SYNC_MINUTES = !Number.isFinite(rawAutoSync) || rawAutoSync <= 0 ? 0 : Math.max(5, rawAutoSync)
+// ข้อมูลเกือบเรียลไทม์: รอบตรวจการเปลี่ยนแปลงใน HOSxP (วินาที ต่ำสุด 5) และระยะห่างขั้นต่ำของการซิงก์ยาแบบเพิ่มทีละวัน (วินาที ต่ำสุด 30)
+const rawPoll = Number(process.env.REALTIME_POLL_SECONDS ?? 10)
+export const REALTIME_POLL_SECONDS = Number.isFinite(rawPoll) ? Math.max(5, rawPoll) : 10
+const rawGap = Number(process.env.REALTIME_SYNC_MIN_SECONDS ?? 60)
+export const REALTIME_SYNC_MIN_SECONDS = Number.isFinite(rawGap) ? Math.max(30, rawGap) : 60
+// ชั่วโมงที่ตรวจความสอดคล้องรายเดือน + ซิงก์ย้อนหลังทุกคืน (0–23, ค่าเริ่มต้น 02:00) เฉพาะเครื่องที่ทำหน้าที่ซิงก์
+const rawHour = Number(process.env.RECONCILE_HOUR ?? 2)
+export const RECONCILE_HOUR = Number.isInteger(rawHour) && rawHour >= 0 && rawHour <= 23 ? rawHour : 2
 
 /** Herbal drug filter (same criteria as SQL Query 2) */
 export const HERB_DRUG_FILTER = `

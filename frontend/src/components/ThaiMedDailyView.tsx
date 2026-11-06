@@ -2,7 +2,8 @@ import { useState, type FC, type FormEvent, type ReactNode } from 'react'
 import { Banknote, CalendarDays, ChevronLeft, ChevronRight, HandHeart, ImageDown, Pencil, Pill, Users, Wallet } from 'lucide-react'
 import type { ThaiMedDailySummary } from '@/api/herbdx.api'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
-import { useSaveThaiMedOutreach, useThaiMedDaily } from '@/hooks/useHerbDx'
+import { ThaiCalendarPicker } from '@/components/ThaiCalendarPicker'
+import { useRealtimeStatus, useSaveThaiMedOutreach, useThaiMedDaily } from '@/hooks/useHerbDx'
 import { THAI_MONTHS_FULL, fmtNum, toThaiDateLong } from '@/lib/format'
 import { INFOGRAPHIC_STYLES } from '@/lib/infographicStyles'
 import type { DateRange } from '@/types/herbdx.types'
@@ -36,7 +37,8 @@ const monthLabel = (ym: string) => {
 const WEEKDAYS = ['อาทิตย์', 'จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์'] as const
 const weekdayOf = (iso: string) => WEEKDAYS[new Date(`${iso}T00:00:00`).getDay()] ?? ''
 
-const baht = (n: number) => fmtNum(n, 2)
+// แสดงเงินเป็นจำนวนเต็ม (ไม่แสดงทศนิยม) ตามแบบรายงาน
+const baht = (n: number) => fmtNum(n, 0)
 const HEAD = 'px-3 py-2 text-[11px] font-bold text-white bg-accent text-center'
 const CELL = 'px-3 py-2 text-sm tabular-nums text-right'
 
@@ -167,7 +169,9 @@ export const ThaiMedDailyView: FC = () => {
   const [month, setMonth] = useState(() => todayIso().slice(0, 7))
   const [editing, setEditing] = useState(false)
   const range: DateRange = mode === 'day' ? { startDate: date, endDate: date } : monthRange(month)
-  const { data, isLoading, isError, error } = useThaiMedDaily(range, true)
+  const { data, isLoading, isError, error, dataUpdatedAt, isFetching } = useThaiMedDaily(range, true)
+  const { data: live } = useRealtimeStatus()
+  const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('th-TH', { hour12: false }) : '–'
 
   const [styleId, setStyleId] = useState(INFOGRAPHIC_STYLES[0]?.id ?? 'classic')
   const [exporting, setExporting] = useState(false)
@@ -204,8 +208,14 @@ export const ThaiMedDailyView: FC = () => {
 
   const totals = data?.totals
   const serviceDrugTotal = totals ? totals.serviceValue + totals.drugValue : 0
-  const maxGroupTotal = data ? Math.max(0, ...data.groups.map((g) => g.total)) : 0
-  const avgPerPerson = totals && totals.persons > 0 ? totals.grandTotal / totals.persons : 0
+  const bars = data
+    ? [
+        ...data.groups,
+        { id: 'ipd', label: 'ผู้ป่วยใน (แม่หลังคลอด)', visits: data.ipd.visits, persons: data.ipd.persons, serviceValue: data.ipd.serviceValue, drugValue: data.ipd.drugValue, total: data.ipd.total },
+      ]
+    : []
+  const maxGroupTotal = Math.max(0, ...bars.map((g) => g.total))
+  const avgPerPerson = totals && totals.visits > 0 ? totals.grandTotal / totals.visits : 0
 
   return (
     <div className="space-y-3">
@@ -220,6 +230,15 @@ export const ThaiMedDailyView: FC = () => {
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · {mode === 'day' ? `วัน${weekdayOf(date)}ที่ ${toThaiDateLong(date)}` : monthLabel(month)}
+            </p>
+            <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold" aria-live="polite">
+              <span className={`size-2 rounded-full ${live?.healthy === false ? 'bg-amber-500' : 'bg-emerald-500'} ${isFetching ? 'animate-pulse' : ''}`} aria-hidden />
+              <span className={live?.healthy === false ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'}>
+                {live?.healthy === false ? 'เชื่อม HOSxP ช้า/ขัดข้อง' : 'ข้อมูลสดจาก HOSxP'}
+              </span>
+              <span className="font-normal text-slate-500 dark:text-slate-400">
+                · ข้อมูล ณ {updatedAt}{isFetching ? ' · กำลังอัปเดต…' : ' · อัปเดตเองเมื่อมีการบันทึกใน HOSxP'}
+              </span>
             </p>
           </div>
         </div>
@@ -242,16 +261,7 @@ export const ThaiMedDailyView: FC = () => {
               <button type="button" onClick={() => changeDate(shiftDay(date, -1))} aria-label="วันก่อนหน้า" className="p-2 rounded-lg border border-themed">
                 <ChevronLeft className="size-4" />
               </button>
-              <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-themed text-sm">
-                <input
-                  type="date"
-                  value={date}
-                  max={todayIso()}
-                  onChange={(e) => e.target.value && changeDate(e.target.value)}
-                  aria-label="เลือกวันที่"
-                  className="bg-transparent outline-none"
-                />
-              </label>
+              <ThaiCalendarPicker mode="day" value={date} max={todayIso()} onChange={changeDate} />
               <button
                 type="button"
                 onClick={() => changeDate(shiftDay(date, 1))}
@@ -275,16 +285,7 @@ export const ThaiMedDailyView: FC = () => {
               <button type="button" onClick={() => changeMonth(shiftMonth(month, -1))} aria-label="เดือนก่อนหน้า" className="p-2 rounded-lg border border-themed">
                 <ChevronLeft className="size-4" />
               </button>
-              <label className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border border-themed text-sm">
-                <input
-                  type="month"
-                  value={month}
-                  max={thisMonth}
-                  onChange={(e) => e.target.value && changeMonth(e.target.value)}
-                  aria-label="เลือกเดือน"
-                  className="bg-transparent outline-none"
-                />
-              </label>
+              <ThaiCalendarPicker mode="month" value={month} max={thisMonth} onChange={changeMonth} />
               <button
                 type="button"
                 onClick={() => changeMonth(shiftMonth(month, 1))}
@@ -321,7 +322,7 @@ export const ThaiMedDailyView: FC = () => {
             <ImageDown className="size-4" aria-hidden /> {exporting ? 'กำลังสร้างภาพ…' : 'บันทึกเป็นภาพ (PNG)'}
           </button>
         </div>
-        <div role="radiogroup" aria-label="สไตล์ภาพ" className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-2">
+        <div role="radiogroup" aria-label="สไตล์ภาพ" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
           {INFOGRAPHIC_STYLES.map((st) => {
             const on = st.id === styleId
             return (
@@ -365,9 +366,9 @@ export const ThaiMedDailyView: FC = () => {
             <KpiCard
               icon={Users}
               label="ผู้รับบริการทั้งหมด"
-              value={totals.persons}
+              value={totals.visits}
               unit="ราย"
-              sub={`นวด/หัตถการ ${fmtNum(totals.servicePersons)} · รับยา ${fmtNum(totals.drugPersons)}`}
+              sub={`${fmtNum(totals.persons)} คน (ไม่ซ้ำ) · นวด/หัตถการ ${fmtNum(totals.servicePersons)} คน · รับยา ${fmtNum(totals.drugPersons)} คน`}
               tone="bg-indigo-500/15 text-indigo-600 dark:text-indigo-300 border-indigo-500/30"
             />
             <KpiCard
@@ -387,7 +388,7 @@ export const ThaiMedDailyView: FC = () => {
               icon={Banknote}
               label="รวมค่าบริการทั้งหมด"
               value={totals.grandTotal}
-              decimals={2}
+              decimals={0}
               unit="บาท"
               sub={`รวมค่าบริการผู้ป่วยนอก ${baht(totals.opdFee)}`}
               tone="bg-accent-soft text-accent border-accent/30"
@@ -397,7 +398,7 @@ export const ThaiMedDailyView: FC = () => {
               icon={Wallet}
               label="เฉลี่ยต่อผู้รับบริการ"
               value={avgPerPerson}
-              decimals={2}
+              decimals={0}
               unit="บาท/ราย"
               sub="ค่าบริการรวม ÷ ผู้รับบริการ"
               tone="bg-amber-500/15 text-amber-600 dark:text-amber-300 border-amber-500/30"
@@ -416,6 +417,21 @@ export const ThaiMedDailyView: FC = () => {
             </p>
           )}
 
+          <p className="text-[11px] text-slate-500 dark:text-slate-400">
+            HOSxP (บันทึกให้บริการ): ผู้ป่วยนอก {fmtNum(data.records.opd)} + ผู้ป่วยใน {fmtNum(data.records.ipd)} = {fmtNum(data.records.total)} รายการ
+            {' '}· หน้านี้นับ {fmtNum(totals.visits)} ราย{totals.visits === data.records.total ? ' ✓ ตรงกัน' : ''}
+            {' '}· เป็นคนไม่ซ้ำ {fmtNum(totals.persons)} คน{totals.visits > totals.persons ? ' (มีผู้มารับบริการมากกว่า 1 ครั้ง)' : ''}
+          </p>
+          {totals.visitsNoRecord > 0 && (
+            <p className="text-xs text-amber-700 dark:text-amber-300">
+              มี {fmtNum(totals.visitsNoRecord)} visit ที่แผนกแพทย์แผนไทยมีค่าบริการ แต่ยังไม่ลงบันทึกให้บริการใน HOSxP (นับรวมในหน้านี้แล้ว จึงอาจมากกว่ายอดของ HOSxP)
+            </p>
+          )}
+          {data.records.orphanOpd > 0 && (
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2" role="alert">
+              พบ {fmtNum(data.records.orphanOpd)} บันทึกให้บริการที่ไม่มี visit รองรับใน HOSxP (เคลมไม่ได้) — ดูรายละเอียดที่หน้า "ตรวจหัตถการแผนไทย"
+            </p>
+          )}
           {mode === 'month' && data.outreach.manualDays > 0 && (
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
               ยอดออกชุมชนรายเดือนรวมจากรายวัน · มี {fmtNum(data.outreach.manualDays)} วันที่เจ้าหน้าที่กรอกเอง (แก้ไขได้ในโหมดรายวัน)
@@ -428,7 +444,7 @@ export const ThaiMedDailyView: FC = () => {
                 <thead>
                   <tr>
                     <th className={`${HEAD} text-left`} scope="col">สิทธิการรักษา</th>
-                    <th className={HEAD} scope="col">จำนวนคน (ราย)</th>
+                    <th className={HEAD} scope="col">จำนวน (ราย)</th>
                     <th className={HEAD} scope="col">ค่านวด ประคบ อบ พอกเข่า หัตถการอื่นๆ (บาท)</th>
                     <th className={HEAD} scope="col">ค่ายาสมุนไพร (บาท)</th>
                     <th className={HEAD} scope="col">รวมค่าบริการ (บาท)</th>
@@ -437,7 +453,7 @@ export const ThaiMedDailyView: FC = () => {
                 <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
                   <tr className="bg-amber-500/10 font-semibold">
                     <th scope="row" className="px-3 py-2.5 text-left text-sm">ผู้รับบริการทั้งหมด</th>
-                    <td className={CELL}>{fmtNum(totals.persons)} คน</td>
+                    <td className={CELL}>{fmtNum(totals.visits)} ราย</td>
                     <td className={CELL}>{fmtNum(totals.servicePersons)} คน</td>
                     <td className={CELL}>{fmtNum(totals.drugPersons)} คน</td>
                     <td className={`${CELL} text-slate-400`}>–</td>
@@ -457,13 +473,20 @@ export const ThaiMedDailyView: FC = () => {
                     return (
                       <tr key={g.id} className={empty ? 'text-slate-400 dark:text-slate-600' : 'hover:bg-slate-50 dark:hover:bg-white/5'}>
                         <th scope="row" className="px-3 py-2.5 text-left text-sm font-medium">{g.label}</th>
-                        <td className={CELL}>{fmtNum(g.persons)}</td>
-                        <td className={CELL}>{fmtNum(g.serviceValue, 2)}</td>
-                        <td className={CELL}>{fmtNum(g.drugValue, 2)}</td>
-                        <td className={`${CELL} font-bold ${empty ? '' : 'text-accent'}`}>{fmtNum(g.total, 2)}</td>
+                        <td className={CELL}>{fmtNum(g.visits)}</td>
+                        <td className={CELL}>{baht(g.serviceValue)}</td>
+                        <td className={CELL}>{baht(g.drugValue)}</td>
+                        <td className={`${CELL} font-bold ${empty ? '' : 'text-accent'}`}>{baht(g.total)}</td>
                       </tr>
                     )
                   })}
+                  <tr className={data.ipd.persons === 0 ? 'text-slate-400 dark:text-slate-600' : 'hover:bg-slate-50 dark:hover:bg-white/5'}>
+                    <th scope="row" className="px-3 py-2.5 text-left text-sm font-medium">ผู้ป่วยใน (แม่หลังคลอด)</th>
+                    <td className={CELL}>{fmtNum(data.ipd.visits)}</td>
+                    <td className={CELL}>{baht(data.ipd.serviceValue)}</td>
+                    <td className={CELL}>{baht(data.ipd.drugValue)}</td>
+                    <td className={`${CELL} font-bold ${data.ipd.persons === 0 ? '' : 'text-accent'}`}>{baht(data.ipd.total)}</td>
+                  </tr>
                   <tr className="bg-amber-500/10">
                     <th scope="row" className="px-3 py-2.5 text-left text-sm font-medium">
                       ค่าบริการผู้ป่วยนอก (50 บาท)
@@ -480,7 +503,7 @@ export const ThaiMedDailyView: FC = () => {
                 <tfoot>
                   <tr className="bg-accent text-white font-extrabold">
                     <th scope="row" className="px-3 py-3 text-left text-sm">รวมทั้งสิ้น</th>
-                    <td className={CELL}>{fmtNum(totals.persons)}</td>
+                    <td className={CELL}>{fmtNum(totals.visits)}</td>
                     <td className={CELL}>{baht(totals.serviceValue)}</td>
                     <td className={CELL}>{baht(totals.drugValue)}</td>
                     <td className={CELL}>{baht(totals.grandTotal)}</td>
@@ -507,11 +530,11 @@ export const ThaiMedDailyView: FC = () => {
               ) : (
                 <>
                   <ul className="space-y-3">
-                    {data.groups.filter((g) => g.total > 0).map((g) => (
+                    {bars.filter((g) => g.total > 0).map((g) => (
                       <li key={g.id}>
                         <div className="flex items-baseline justify-between gap-2 text-xs">
                           <span className="font-semibold text-slate-700 dark:text-slate-200">{g.label}</span>
-                          <span className="tabular-nums text-slate-500">{baht(g.total)} บาท · {fmtNum(g.persons)} ราย</span>
+                          <span className="tabular-nums text-slate-500">{baht(g.total)} บาท · {fmtNum(g.visits)} ราย</span>
                         </div>
                         <div
                           className="mt-1 h-3 rounded-full bg-slate-200/70 dark:bg-white/10 overflow-hidden"

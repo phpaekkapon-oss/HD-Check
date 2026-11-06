@@ -644,26 +644,40 @@ test('Claims - claim state from FDH status', () => {
 
 const daily = await import('./thaimed-daily.mjs')
 
-test('Thai-med daily summary - maps hipdata_code to right groups and keeps money exact', () => {
+test('Thai-med daily summary - maps hipdata_code to right groups, merges OPD + IPD and keeps money exact', () => {
   assert.equal(daily.rightGroupOf('ucs').id, 'uc')
   assert.equal(daily.rightGroupOf('OFC').id, 'ofc')
+  assert.equal(daily.rightGroupOf('NRH').id, 'pay', 'foreigner self-pay counts as self-pay')
+  assert.equal(daily.rightGroupOf('CSH').id, 'reimb', 'pay-then-reclaim (receipt) group')
   assert.equal(daily.rightGroupOf('XYZ').id, 'other')
+  const row = (hipdata_code, hn, v) => ({ hipdata_code, hn, visits: 1, has_service: 1, has_drug: 1, service_value: 0, drug_value: 0, opd_in_value: 0, opd_out_value: 0, ...v })
   const s = daily.buildDailySummary(
     [
-      { hipdata_code: 'UCS', persons: 38, service_persons: 20, drug_persons: 30, service_value: 0.1, drug_value: 0.2, opd_in_value: 50, opd_out_value: 0 },
-      { hipdata_code: 'UCS', persons: 2, service_persons: 1, drug_persons: 1, service_value: 0.2, drug_value: 0, opd_in_value: 0, opd_out_value: 50 },
-      { hipdata_code: 'OFC', persons: 8, service_persons: 8, drug_persons: 8, service_value: 1000, drug_value: 2156, opd_in_value: 0, opd_out_value: 0 },
+      row('UCS', 'A', { service_value: 0.1, drug_value: 0.2, opd_in_value: 50 }),
+      row('UCS', 'B', { service_value: 0.2, has_drug: 0, opd_out_value: 50 }),
+      row('UCS', 'A', { service_value: 1, visits_no_record: 1 }),
+      row('OFC', 'C', { service_value: 1000, drug_value: 2156 }),
     ],
-    { count: 3, source: 'manual' }
+    [row('CSH', 'D', { service_value: 500, has_drug: 0 }), row('UCS', 'A', { service_value: 250, has_drug: 0 })],
+    { count: 3, source: 'manual' },
+    { opd: 5, ipd: 2, orphanOpd: 1 }
   )
   const uc = s.groups.find((g) => g.id === 'uc')
-  assert.equal(uc.persons, 40)
-  assert.equal(uc.serviceValue, 0.3, '0.1 + 0.2 must not become 0.30000000000000004')
+  assert.equal(uc.persons, 2, 'same HN twice in a group is one person')
+  assert.equal(uc.visits, 3, 'but two visits of the same HN count as two times (ราย) like the HOSxP list')
+  assert.equal(uc.serviceValue, 1.3, '0.1 + 0.2 + 1 must not become 1.3000000000000003')
   assert.equal(s.groups.some((g) => g.id === 'other'), false, 'empty other group is hidden')
   assert.equal(s.groups.find((g) => g.id === 'lgo').total, 0, 'groups without data still listed')
+  assert.deepEqual({ p: s.ipd.persons, v: s.ipd.serviceValue, t: s.ipd.total }, { p: 2, v: 750, t: 750 })
+  assert.equal(s.totals.persons, 4, 'A appears in OPD and IPD but is one person overall')
+  assert.equal(s.ipd.visits, 2, 'IPD times come from the HOSxP record count')
+  assert.equal(s.totals.visits, 4 + 2, '4 OPD visits + 2 IPD records')
+  assert.equal(s.totals.visitsNoRecord, 1)
   assert.equal(s.totals.opdFee, 100)
-  assert.equal(s.totals.grandTotal, 3256.5)
+  assert.equal(s.totals.serviceValue, 1.3 + 1000 + 750)
+  assert.equal(s.totals.grandTotal, 1.3 + 1000 + 750 + 0.2 + 2156 + 100)
   assert.deepEqual(s.outreach, { count: 3, source: 'manual' })
+  assert.deepEqual(s.records, { opd: 5, ipd: 2, total: 7, orphanOpd: 1 })
 })
 
 test('Thai-med daily summary - outreach count validation', () => {
@@ -685,4 +699,130 @@ test('Thai-med daily summary - outreach range merge prefers manual days over HOS
   assert.equal(mixed.hosxpCount, 10)
   assert.equal(daily.mergeOutreach([{ date: '2026-11-03', count: 4 }], []).source, 'hosxp')
   assert.equal(daily.mergeOutreach([], [{ date: '2026-11-03', count: 0 }]).source, 'manual', 'manual 0 is a deliberate override')
+})
+
+const hm = await import('./healthmed.mjs')
+
+test('IPD postpartum: service items summarised like the OPD SQL columns', () => {
+  const sum = hm.summarizeServiceItems([
+    { code: '58131', name: 'ค่านวดและประคบสมุนไพรเพื่อการฟื้นฟูสมรรถภาพ (58131)', qty: 1, unitprice: 250 },
+  ])
+  assert.equal(sum.count_58131, 1)
+  assert.equal(sum.count_58130, 1, '58131 also counts as นวดและประคบ')
+  assert.equal(sum.count_58101, 0)
+  assert.equal(sum.service_codes, '58131')
+  assert.match(sum.service_items_raw, /^58131:.+:1:250$/)
+})
+
+test('IPD postpartum: passes with a billed service, fails without one or when billed twice a day', () => {
+  const one = hm.evaluateIpdHealthMed({ count_58131: 1, count_58130: 1 })
+  assert.equal(one.audit_result, 'PASS')
+  assert.equal(hm.evaluateIpdHealthMed({}).audit_result, 'FAIL', 'service record with no billed item')
+  const twice = hm.evaluateIpdHealthMed({ count_58131: 2, count_58130: 2 })
+  assert.equal(twice.audit_result, 'FAIL')
+  assert.equal(twice.is_duplicate_fail, true)
+  assert.equal(hm.evaluateOrphanHealthMed().audit_result, 'FAIL')
+})
+
+test('Health-med audit - a recorded service with no procedure is listed but neither passes nor fails the criteria', () => {
+  const r = hm.evaluateNoProcedureHealthMed()
+  assert.equal(r.audit_result, 'PASS')
+  assert.deepEqual(r.failures, [])
+  assert.match(r.audit_reason, /ไม่เข้าเกณฑ์ตรวจหัตถการ/)
+})
+
+const rt = await import('./realtime.mjs')
+
+test('Realtime watcher - version moves only when HOSxP data really changes', async () => {
+  let items = '10:100.00'
+  let herb = '5:20:300.00'
+  const fakePool = {
+    query: async (sql) => {
+      if (sql.includes('health_med_service_operation')) {
+        return [[{ hms: '3:900', ops: 7, hdx: 8, opd_items: items, ipd_items: '0:0', today: '2026-11-06' }]]
+      }
+      return [[{ herb }]]
+    },
+  }
+  const changed = []
+  const w = rt.createChangeWatcher({ pool: fakePool, getHerbCodes: async () => ['H1'], onChange: (s) => changed.push(s) })
+  await w._check()
+  await w._check()
+  assert.deepEqual(w.snapshot().versions, { thaimed: 1, herb: 1 }, 'first read sets the baseline, same data = same version')
+  items = '11:350.00'
+  await w._check()
+  assert.equal(w.version('thaimed'), 2)
+  assert.equal(w.version('herb'), 1, 'Thai-med change does not wake the herbal side')
+  herb = '6:30:420.00'
+  await w._check()
+  assert.deepEqual(changed, ['thaimed', 'herb'])
+  w.invalidate('thaimed')
+  assert.equal(w.version('thaimed'), 3, 'edits made inside the program also refresh screens')
+})
+
+test('Realtime watcher - backs off when HOSxP errors instead of hammering it', async () => {
+  const w = rt.createChangeWatcher({ pool: { query: async () => { throw new Error('down') } }, getHerbCodes: async () => [], intervalMs: 10_000 })
+  await w._check()
+  assert.equal(w.snapshot().healthy, false)
+  assert.equal(w.snapshot().intervalSeconds, 20)
+  await w._check()
+  await w._check()
+  await w._check()
+  assert.equal(w.snapshot().intervalSeconds, 60, 'capped at 60 seconds')
+})
+
+test('Live cache - one HOSxP query per data version no matter how many screens ask', () => {
+  let version = 1
+  const mw = rt.createLiveCache()(() => version)
+  let computed = 0
+  const call = (url = '/api/x?d=1') => {
+    const res = { statusCode: 200, headers: {}, setHeader(k, v) { this.headers[k] = v }, json(b) { this.body = b; return this } }
+    const req = { originalUrl: url }
+    let ran = false
+    mw(req, res, () => { ran = true; computed += 1; res.json({ success: true, n: computed }) })
+    return { res, ran }
+  }
+  call(); call(); call()
+  assert.equal(computed, 1, 'three screens, one computation')
+  version = 2
+  const r = call()
+  assert.equal(r.ran, true, 'new data version recomputes')
+  assert.equal(computed, 2)
+  call('/api/x?d=2')
+  assert.equal(computed, 3, 'different range is a different entry')
+})
+
+const rc = await import('./reconcile.mjs')
+
+test('Reconcile - month helpers', () => {
+  assert.deepEqual(rc.monthsBetween('2025-11', '2026-02'), ['2025-11', '2025-12', '2026-01', '2026-02'])
+  assert.deepEqual(rc.monthRange('2024-02'), { startDate: '2024-02-01', endDate: '2024-02-29' }, 'leap year')
+  assert.equal(rc.compareMonthly(['2026-01'], new Map([['2026-01', { opd: 5, ipd: 1 }]]), new Map([['2026-01', { opd: 4, ipd: 1 }]]))[0].ok, false)
+})
+
+test('Reconcile - resyncs mismatched months plus the latest two, retries when another sync holds the lock', async () => {
+  const hos = new Map([['2026-01', { opd: 10, ipd: 2 }], ['2026-02', { opd: 8, ipd: 1 }], ['2026-03', { opd: 9, ipd: 0 }], ['2026-04', { opd: 3, ipd: 0 }]])
+  const dw = new Map([['2026-01', { opd: 6, ipd: 2 }], ['2026-02', { opd: 8, ipd: 1 }], ['2026-03', { opd: 9, ipd: 0 }], ['2026-04', { opd: 3, ipd: 0 }]])
+  const calls = []
+  let lockedOnce = true
+  const report = await rc.runReconcile({
+    countHos: async () => hos,
+    countDw: async () => dw,
+    sync: async (s) => {
+      if (s === '2026-04-01' && lockedOnce) {
+        lockedOnce = false
+        return { skipped: true }
+      }
+      calls.push(s)
+      if (s === '2026-01-01') dw.set('2026-01', { opd: 10, ipd: 2 }) // ซิงก์แล้วตรง
+      return { totalPrescriptions: 1, durationMs: 1 }
+    },
+    fromYm: '2026-01',
+    toYm: '2026-04',
+    sleep: async () => {},
+  })
+  assert.deepEqual(calls, ['2026-01-01', '2026-03-01', '2026-04-01'], 'Jan (mismatch) + Mar/Apr (latest two); Apr retried after the lock')
+  assert.deepEqual(report.mismatchedBefore, ['2026-01'])
+  assert.deepEqual(report.mismatchedAfter, [], 'verified fixed after resync')
+  assert.deepEqual(report.errors, [])
 })

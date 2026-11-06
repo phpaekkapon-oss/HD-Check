@@ -321,6 +321,12 @@ export interface HealthMedRecord {
   readonly is_visit2_claim_fail?: boolean
   readonly is_claim_closed?: boolean
   readonly claim_close_status?: 'CLOSED' | 'OPEN_ONLY' | 'VISIT2_DUP' | 'NONE'
+  /** ผู้ป่วยใน (แม่หลังคลอด) — ไม่ใช้เลขปิดสิทธิ EP */
+  readonly patient_type?: 'OPD' | 'IPD'
+  /** บันทึกให้บริการใน HOSxP ที่ไม่มี visit รองรับ */
+  readonly visit_missing?: boolean
+  /** บันทึกให้บริการที่ไม่มีค่านวด/หัตถการ (จ่ายยาอย่างเดียว) — ไม่เข้าเกณฑ์ตรวจ */
+  readonly no_procedure?: boolean
   readonly ep_code?: string | null
   readonly claim_code?: string | null
   readonly visit_order?: number
@@ -353,6 +359,10 @@ export interface HealthMedKpi {
   readonly muscleFail?: number
   readonly epFail: number
   readonly visit2ClaimFail?: number
+  readonly opdCount?: number
+  readonly ipdCount?: number
+  readonly orphanCount?: number
+  readonly noProcedureCount?: number
 }
 
 export interface DispensingRule {
