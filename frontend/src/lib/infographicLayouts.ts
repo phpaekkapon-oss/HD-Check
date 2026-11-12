@@ -138,6 +138,9 @@ function dateLabelOf(sc: Scene): string {
   if (sameMonth && d === 1 && new Date(y ?? 0, m ?? 1, 0).getDate() === Number(s.endDate.slice(8, 10))) {
     return `${THAI_MONTHS_SHORT[(m ?? 1) - 1] ?? ''} ${String((y ?? 0) + 543).slice(-2)}`
   }
+  if (sameMonth) {
+    return `${d}–${Number(s.endDate.slice(8, 10))} ${THAI_MONTHS_SHORT[(m ?? 1) - 1] ?? ''} ${String((y ?? 0) + 543).slice(-2)}`
+  }
   return `${short(s.startDate)} – ${short(s.endDate)}`
 }
 
@@ -233,7 +236,9 @@ function drawTable(sc: Scene, o: TableOpts): number {
   if (o.withTop) {
     row(y, rowH, 'users', 'ผู้รับบริการทั้งหมด', null, [`${fmtNum(s.totals.visits)} ราย`, `${fmtNum(s.totals.servicePersons)} คน`, `${fmtNum(s.totals.drugPersons)} คน`, '–'], { fill: t.hilite, bold: true })
     y += rowH
-    row(y, rowH, 'house', 'ออกชุมชน', null, [`${fmtNum(s.outreach.count)} ราย`, '–', '–', '–'], { fill: t.hilite, bold: true })
+    const oh = s.outreach.hosxp
+    const outreachMoney = oh.visits > 0 ? [fm(oh.serviceValue), fm(oh.drugValue), fm(oh.total)] : ['–', '–', '–']
+    row(y, rowH, 'house', s.outreach.source === 'hosxp' ? 'ในจำนวนนี้ ออกชุมชน' : 'ออกชุมชน', null, [`${fmtNum(s.outreach.count)} ราย`, ...outreachMoney], { fill: t.hilite, bold: true })
     y += rowH
   }
   s.groups.forEach((g, i) => {

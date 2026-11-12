@@ -153,3 +153,34 @@ export function mergeOutreach(hosxp, manual) {
     hosxpCount: [...hosByDate.values()].reduce((s, n) => s + n, 0),
   }
 }
+
+/**
+ * สรุป visit ที่ลงทะเบียนแผนกออกชุมชน (ขอบเขตค่าบริการเดียวกับตารางสิทธิ: นวด/หัตถการ + ยาสมุนไพร ไม่รวมค่าบริการ OPD 50 บาท)
+ * @param rows [{ vn, hn, vsttime, service_value, drug_value }] หนึ่งแถวต่อหนึ่ง visit
+ */
+export function summarizeOutreachVisits(rows) {
+  let service = 0
+  let drug = 0
+  const persons = new Set()
+  const list = rows.map((r) => {
+    service += toSatang(r.service_value)
+    drug += toSatang(r.drug_value)
+    persons.add(r.hn)
+    return {
+      date: r.vstdate ? String(r.vstdate) : null,
+      hn: String(r.hn ?? ''),
+      name: r.patient_name ? String(r.patient_name).trim() : null,
+      time: r.vsttime ? String(r.vsttime).slice(0, 5) : null,
+      serviceValue: toBaht(toSatang(r.service_value)),
+      drugValue: toBaht(toSatang(r.drug_value)),
+    }
+  })
+  return {
+    visits: rows.length,
+    persons: persons.size,
+    serviceValue: toBaht(service),
+    drugValue: toBaht(drug),
+    total: toBaht(service + drug),
+    list,
+  }
+}

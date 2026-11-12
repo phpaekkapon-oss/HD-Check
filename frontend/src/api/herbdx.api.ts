@@ -142,6 +142,18 @@ export interface ThaiMedDailySummary {
     readonly count: number
     readonly source: 'hosxp' | 'manual' | 'mixed' | 'none'
     readonly hosxpCount: number
+    /** false = ไม่พบชื่อแผนก "ออกชุมชน แพทย์แผนไทย" ใน HOSxP (ยอดจะเป็น 0 เสมอ) */
+    readonly departmentFound: boolean
+    /** visit แผนกออกชุมชนจาก HOSxP พร้อมค่าบริการ (ขอบเขตเดียวกับตารางสิทธิ) */
+    readonly hosxp: {
+      readonly visits: number
+      readonly persons: number
+      readonly serviceValue: number
+      readonly drugValue: number
+      readonly total: number
+    }
+    /** รายการ visit ไว้เทียบกับหน้าจอ HOSxP (ส่งมาเมื่อช่วงไม่เกิน 31 วัน) */
+    readonly visits: readonly { readonly date: string | null; readonly hn: string; readonly name: string | null; readonly time: string | null; readonly serviceValue: number; readonly drugValue: number }[]
     readonly manualDays: number
     readonly manual: { readonly reason: string; readonly updatedBy: string; readonly updatedAt: string } | null
   }

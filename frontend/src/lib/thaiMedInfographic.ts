@@ -1,5 +1,5 @@
 import type { ThaiMedDailySummary } from '@/api/herbdx.api'
-import { THAI_MONTHS_FULL, toThaiDate, toThaiDateLong } from '@/lib/format'
+import { THAI_MONTHS_FULL, toThaiDate, toThaiDateLong, toThaiDateShort } from '@/lib/format'
 import { layoutCards, layoutDashboard, layoutPoster, layoutTable } from '@/lib/infographicLayouts'
 import { INFOGRAPHIC_STYLES } from '@/lib/infographicStyles'
 import { iconColors, loadFonts, loadIcons, type Period, type Scene } from '@/lib/infographicKit'
@@ -29,6 +29,15 @@ export function periodOf(s: ThaiMedDailySummary): Period {
       big: `${THAI_MONTHS_FULL[(m ?? 1) - 1] ?? ''} ${(y ?? 0) + 543}`,
       title: 'สรุปผลการดำเนินงานประจำเดือน',
       panel: 'ภาพรวมผลการดำเนินงานประจำเดือน',
+    }
+  }
+  const days = (Date.parse(s.endDate) - Date.parse(s.startDate)) / 86_400_000
+  if (days <= 6 && new Date(`${s.startDate}T00:00:00`).getDay() === 1) {
+    return {
+      lead: 'ประจำสัปดาห์',
+      big: `${toThaiDateShort(s.startDate)} – ${toThaiDateShort(s.endDate)}`,
+      title: 'สรุปผลการดำเนินงานประจำสัปดาห์',
+      panel: 'ภาพรวมผลการดำเนินงานประจำสัปดาห์',
     }
   }
   return {

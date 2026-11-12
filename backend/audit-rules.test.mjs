@@ -826,3 +826,20 @@ test('Reconcile - resyncs mismatched months plus the latest two, retries when an
   assert.deepEqual(report.mismatchedAfter, [], 'verified fixed after resync')
   assert.deepEqual(report.errors, [])
 })
+
+test('Thai-med daily summary - outreach visits: persons are distinct, money is exact and scoped per visit', () => {
+  const empty = daily.summarizeOutreachVisits([])
+  assert.deepEqual({ v: empty.visits, p: empty.persons, t: empty.total, l: empty.list.length }, { v: 0, p: 0, t: 0, l: 0 })
+  const s = daily.summarizeOutreachVisits([
+    { vn: '1', hn: 'A', vsttime: '09:30:00', patient_name: ' นางทดสอบ ตัวอย่าง ', service_value: 0.1, drug_value: 100 },
+    { vn: '2', hn: 'B', vsttime: '09:05:00', service_value: 0.2, drug_value: 0 },
+    { vn: '3', hn: 'A', vsttime: null, service_value: 0, drug_value: null },
+  ])
+  assert.equal(s.visits, 3, 'every visit counts as a time (ราย)')
+  assert.equal(s.persons, 2, 'same HN twice is one person')
+  assert.equal(s.serviceValue, 0.3, '0.1 + 0.2 must not become 0.30000000000000004')
+  assert.equal(s.drugValue, 100)
+  assert.equal(s.total, 100.3)
+  assert.deepEqual(s.list.map((x) => x.time), ['09:30', '09:05', null])
+  assert.deepEqual(s.list.map((x) => x.name), ['นางทดสอบ ตัวอย่าง', null, null], 'name is trimmed and missing patient stays null')
+})

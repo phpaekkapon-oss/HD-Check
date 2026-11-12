@@ -31,7 +31,11 @@
 
 ## 6. Project Context
 - **Stack**: Node.js
-- **โครงสร้างโฟลเดอร์สำคัญ**: <!-- กรอก -->
-- **ฐานข้อมูล/ระบบภายนอกที่ห้ามเขียน**: <!-- กรอก เช่น ฐานข้อมูลต้นทางอ่านอย่างเดียว -->
-- **กฎธุรกิจที่เดาเองไม่ได้**: <!-- กรอก -->
-- **UI/ภาษา/ธีม**: <!-- กรอก เช่น UI ภาษาไทย รองรับโหมดมืด -->
+- **Stack จริง**: Monorepo — `backend/` (Node.js ESM + Express 5 + mysql2, เทสต์ `npm test --prefix backend`) · `frontend/` (React 19 + TypeScript + Tailwind v4 + Vite + TanStack Query/Table, ตรวจด้วย `npm run build` ที่ root)
+- **โครงสร้างโฟลเดอร์สำคัญ**: `backend/index.mjs` (API + cron sync) · `backend/config.mjs` · `backend/sync.mjs` / `init-db.mjs` · `frontend/src/{api,components,hooks,types,layouts,lib}`
+- **ฐานข้อมูล/ระบบภายนอกที่ห้ามเขียน**: HOSxP (`HOS_DB`) = อ่านอย่างเดียว · เขียนได้เฉพาะ `DW_DB` (dw_hd-check) และต้องเป็นคนละฐานกัน (`config.mjs` บังคับ)
+- **กฎธุรกิจที่เดาเองไม่ได้**: เกณฑ์ข้อบ่งใช้ยาสมุนไพรตาม ICD-10/ICD-10-TM และกฎการสั่งจ่าย (`backend/dispensing-rules.mjs`, `audit-rules.mjs`) — ห้ามเดาเกณฑ์ ให้ถามผู้ใช้
+- **UI/ภาษา/ธีม**: UI ภาษาไทย · วันที่เป็น พ.ศ. · ใช้ Tailwind v4 token ของโปรเจกต์
+- **Skill/Agent (Nexus AIO)**: ติดตั้งที่ `.claude/skills` (68 skill) และ `.claude/agents` (21 ผู้ช่วยอ่านอย่างเดียว) — โฟลเดอร์ `.claude/` ถูก gitignore จึงไม่เข้า commit · งานของโปรเจกต์นี้เริ่มที่ `hrms-dev-pro`/`core-dev-pro` → เลือก skill ตามสารบัญ `.claude/skills/INDEX.md`
+  - ใช้บ่อย: `hrms-mysql-testing` (SQL/migration) · `hrms-healthcare-data` + `pdpa-healthcare-security` (HN/ข้อมูลผู้ป่วย) · `hrms-frontend-ui` + `tailwind-design-system` (หน้าจอ) · `hrms-git-release` (commit/release) · `verification-before-completion` (ก่อนบอกว่าเสร็จ)
+  - skill ชื่อ `hrms-*` เขียนไว้สำหรับระบบ HRMS รพ.พังโคน: ใช้เฉพาะส่วนที่เป็นหลักการทั่วไป (DB read-only, PDPA, UI) · ส่วนที่เป็นเส้นทาง/ตาราง/เวิร์กโฟลว์ของ HRMS ไม่ใช้กับโปรเจกต์นี้ และกฎใน AGENTS.md นี้ชนะเสมอถ้าขัดกัน

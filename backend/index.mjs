@@ -21,7 +21,7 @@ import { analyzeHerbRecord } from './herb-advice.mjs'
 import { checkVisitIcd, claimState, loadIcdReference, fetchClaimVisits, fdhLastChecked } from './claims.mjs'
 import { createChangeWatcher, createLiveCache } from './realtime.mjs'
 import { makeCounters, runReconcile, ymOf } from './reconcile.mjs'
-import { buildDailySummary, mergeOutreach, parseOutreachCount, OPD_FEE_ICODES } from './thaimed-daily.mjs'
+import { buildDailySummary, mergeOutreach, parseOutreachCount, summarizeOutreachVisits, OPD_FEE_ICODES } from './thaimed-daily.mjs'
 import { ROLES, MENUS, ALWAYS_ALLOWED, resolveRole, canViewThaiMedValue as canViewThaiMedValueRule, validRoleOverride, allowedMenus, canAccessMenu, getMenuPermissions, saveMenuPermissions } from './permissions.mjs'
 import { COPILOT_OP_CODES, buildCopilotKb, buildCopilotContext, offlineAnswer } from './copilot-knowledge.mjs'
 import {
@@ -798,9 +798,11 @@ app.get('/api/thaimed-value', requireThaiMedValue, liveCache(thaimedVersion), as
     // + ผู้ป่วยใน (แม่หลังคลอด) ตามเลข AN ในบันทึกให้บริการ — ให้ยอดตรงกับหน้าจอ "บันทึกให้บริการ" ของ HOSxP
     const hasHms = 'EXISTS (SELECT 1 FROM health_med_service h WHERE h.vn = o.vn)'
     const opdScope = `o.vstdate BETWEEN ? AND ? AND (${THAI_MED_FILTER} OR (nd.icode IS NOT NULL AND ${hasHms}))`
-    const opdFrom = `FROM opitemrece op
-       JOIN ovst o ON o.vn = op.vn
-       JOIN spclty sp ON sp.spclty = o.spclty
+    // เริ่มจาก ovst ตามดัชนีวันที่แล้วค่อยต่อ opitemrece: ถ้าปล่อยให้ MySQL เลือกเอง ช่วงเกิน ~8 วันจะสแกนผิดทาง
+    // (ทั้งเดือน ~11 วินาที เทียบกับ ~0.1 วินาที) ผลลัพธ์เท่าเดิมทุกค่า
+    const opdFrom = `FROM ovst o FORCE INDEX (ix_vstdate)
+       STRAIGHT_JOIN spclty sp ON sp.spclty = o.spclty
+       STRAIGHT_JOIN opitemrece op ON op.vn = o.vn
        LEFT JOIN income i ON i.income = op.income
        LEFT JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}`
     const ipdFrom = `FROM (SELECT DISTINCT an FROM health_med_service WHERE service_date BETWEEN ? AND ? AND an IS NOT NULL AND an <> '') h
@@ -863,7 +865,7 @@ app.get('/api/thaimed-value', requireThaiMedValue, liveCache(thaimedVersion), as
 
     const [[opdVisitRow]] = await hosPool.query(
       `SELECT COUNT(DISTINCT o.vn) AS visits
-       FROM ovst o JOIN spclty sp ON sp.spclty = o.spclty
+       FROM ovst o FORCE INDEX (ix_vstdate) STRAIGHT_JOIN spclty sp ON sp.spclty = o.spclty
        WHERE o.vstdate BETWEEN ? AND ?
          AND ((${THAI_MED_FILTER} AND EXISTS (SELECT 1 FROM opitemrece op WHERE op.vn = o.vn)) OR ${hasHms})`,
       [startDate, endDate]
@@ -935,6 +937,9 @@ app.get('/api/thaimed-value', requireThaiMedValue, liveCache(thaimedVersion), as
 })
 
 /* ---------- สรุปผลการดำเนินงานรายวัน กลุ่มงานแพทย์แผนไทย ---------- */
+const OUTREACH_DEPARTMENT = 'ออกชุมชน แพทย์แผนไทย'
+// ส่งรายชื่อ visit ออกชุมชนเฉพาะช่วงไม่เกิน 31 วัน (กันข้อมูลบุคคลจำนวนมากไปกับช่วงยาว)
+const OUTREACH_LIST_MAX_DAYS = 31
 let outreachTablesReady = null
 function ensureOutreachTables() {
   outreachTablesReady ??= (async () => {
@@ -1000,8 +1005,8 @@ app.get('/api/thaimed-daily-summary', requireThaiMedValue, liveCache(thaimedVers
               ROUND(SUM(CASE WHEN ${DAILY_IN_SCOPE} AND ${DAILY_IS_DRUG} THEN op.sum_price ELSE 0 END), 2) AS drug_value,
               ROUND(SUM(CASE WHEN op.icode = ? AND ${THAI_MED_FILTER} THEN op.sum_price ELSE 0 END), 2) AS opd_in_value,
               ROUND(SUM(CASE WHEN op.icode = ? AND ${THAI_MED_FILTER} THEN op.sum_price ELSE 0 END), 2) AS opd_out_value
-       FROM ovst o
-       JOIN spclty sp ON sp.spclty = o.spclty
+       FROM ovst o FORCE INDEX (ix_vstdate)
+       STRAIGHT_JOIN spclty sp ON sp.spclty = o.spclty
        LEFT JOIN pttype ps ON ps.pttype = o.pttype
        LEFT JOIN opitemrece op ON op.vn = o.vn
        LEFT JOIN income i ON i.income = op.income
@@ -1052,15 +1057,67 @@ app.get('/api/thaimed-daily-summary', requireThaiMedValue, liveCache(thaimedVers
     }
 
     // ออกชุมชนนับรายวัน (คนเดียวกันต่างวันนับแยก) แล้วรวมเป็นช่วง
+    // นับตามหน้า "บันทึกผลการตรวจรักษา ผู้ป่วยนอก" ของ HOSxP: visit ที่ลงทะเบียนที่แผนก "ออกชุมชน แพทย์แผนไทย"
+    // (ovst_community_service ไม่ได้ถูกใช้งานที่ รพ. นี้ จึงได้ 0 เสมอ)
     const [hosOutreach] = await hosPool.query(
       `SELECT DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS date, COUNT(DISTINCT o.hn) AS persons
-       FROM ovst_community_service c
-       JOIN ovst o ON o.vn = c.vn
-       JOIN spclty sp ON sp.spclty = o.spclty
-       WHERE o.vstdate BETWEEN ? AND ? AND ${THAI_MED_FILTER}
+       FROM ovst o
+       JOIN kskdepartment k ON k.depcode = o.main_dep
+       WHERE o.vstdate BETWEEN ? AND ? AND k.department = ?
        GROUP BY o.vstdate`,
-      [startDate, endDate]
+      [startDate, endDate, OUTREACH_DEPARTMENT]
     )
+
+    // ค่าบริการของ visit ออกชุมชน (ขอบเขตเดียวกับตารางสิทธิ) + ตรวจว่าชื่อแผนกยังมีอยู่ใน HOSxP
+    // แยกเป็นสองขั้น: หา visit ออกชุมชนก่อน แล้วรวมเงินเฉพาะ vn เหล่านั้น
+    // (JOIN รวมก้อนเดียวทำให้ MySQL เลือกแพลนช้ามากเมื่อดูทั้งเดือน — ~11 วินาที เทียบกับ ~0.1 วินาที)
+    const [outreachVisitIds] = await hosPool.query(
+      `SELECT o.vn, o.hn, o.vsttime, DATE_FORMAT(o.vstdate, '%Y-%m-%d') AS vstdate
+       FROM ovst o
+       JOIN kskdepartment k ON k.depcode = o.main_dep
+       WHERE o.vstdate BETWEEN ? AND ? AND k.department = ?
+       ORDER BY o.vstdate, o.vsttime`,
+      [startDate, endDate, OUTREACH_DEPARTMENT]
+    )
+    const outreachVns = outreachVisitIds.map((r) => r.vn)
+    const listVisits = (Date.parse(endDate) - Date.parse(startDate)) / 86_400_000 < OUTREACH_LIST_MAX_DAYS
+    const moneyByVn = new Map()
+    const nameByHn = new Map()
+    if (outreachVns.length > 0) {
+      const [moneyRows] = await hosPool.query(
+        `SELECT o.vn,
+                ROUND(SUM(CASE WHEN ${DAILY_IN_SCOPE} AND NOT ${DAILY_IS_DRUG} AND op.icode NOT IN (?, ?) THEN op.sum_price ELSE 0 END), 2) AS service_value,
+                ROUND(SUM(CASE WHEN ${DAILY_IN_SCOPE} AND ${DAILY_IS_DRUG} THEN op.sum_price ELSE 0 END), 2) AS drug_value
+         FROM ovst o
+         JOIN spclty sp ON sp.spclty = o.spclty
+         JOIN opitemrece op ON op.vn = o.vn
+         LEFT JOIN income i ON i.income = op.income
+         LEFT JOIN nondrugitems nd ON nd.icode = op.icode AND ${THAI_MED_SERVICE_ND_COND}
+         WHERE o.vn IN (?)
+         GROUP BY o.vn`,
+        [inHours, outHours, outreachVns]
+      )
+      for (const m of moneyRows) moneyByVn.set(m.vn, m)
+      // ชื่อผู้รับบริการ: ดึงเฉพาะเมื่อจะส่งรายการ visit (ช่วงไม่เกิน OUTREACH_LIST_MAX_DAYS วัน)
+      if (listVisits) {
+        const [nameRows] = await hosPool.query(
+          "SELECT hn, CONCAT(pname, fname, ' ', lname) AS patient_name FROM patient WHERE hn IN (?)",
+          [[...new Set(outreachVisitIds.map((r) => r.hn))]]
+        )
+        for (const n of nameRows) nameByHn.set(n.hn, n.patient_name)
+      }
+    }
+    const outreachVisitRows = outreachVisitIds.map((r) => ({
+      ...r,
+      patient_name: nameByHn.get(r.hn) ?? null,
+      service_value: moneyByVn.get(r.vn)?.service_value ?? 0,
+      drug_value: moneyByVn.get(r.vn)?.drug_value ?? 0,
+    }))
+    const [[{ dept_found: deptFound }]] = await hosPool.query(
+      'SELECT COUNT(*) AS dept_found FROM kskdepartment WHERE department = ?',
+      [OUTREACH_DEPARTMENT]
+    )
+    const outreachVisits = summarizeOutreachVisits(outreachVisitRows)
 
     await ensureOutreachTables()
     const [manualRows] = await dwPool.query(
@@ -1090,6 +1147,15 @@ app.get('/api/thaimed-daily-summary', requireThaiMedValue, liveCache(thaimedVers
       outreach: {
         ...summary.outreach,
         hosxpCount: merged.hosxpCount,
+        departmentFound: Number(deptFound) > 0,
+        hosxp: {
+          visits: outreachVisits.visits,
+          persons: outreachVisits.persons,
+          serviceValue: outreachVisits.serviceValue,
+          drugValue: outreachVisits.drugValue,
+          total: outreachVisits.total,
+        },
+        visits: listVisits ? outreachVisits.list : [],
         manualDays: merged.manualDays,
         manual: manual
           ? { reason: manual.reason, updatedBy: manual.updated_by_name || manual.updated_by, updatedAt: manual.updated_at }

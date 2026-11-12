@@ -1,10 +1,11 @@
 import { useState, type FC, type FormEvent, type ReactNode } from 'react'
-import { Banknote, CalendarDays, ChevronLeft, ChevronRight, HandHeart, ImageDown, Pencil, Pill, Users, Wallet } from 'lucide-react'
+import { Banknote, CalendarDays, ChevronLeft, ChevronRight, HandHeart, ImageDown, List, Pencil, Pill, Users, Wallet } from 'lucide-react'
 import type { ThaiMedDailySummary } from '@/api/herbdx.api'
 import { AnimatedNumber } from '@/components/AnimatedNumber'
+import { PhiHn, PhiName } from '@/components/Phi'
 import { ThaiCalendarPicker } from '@/components/ThaiCalendarPicker'
 import { useRealtimeStatus, useSaveThaiMedOutreach, useThaiMedDaily } from '@/hooks/useHerbDx'
-import { THAI_MONTHS_FULL, fmtNum, toThaiDateLong } from '@/lib/format'
+import { THAI_MONTHS_FULL, fmtNum, toThaiDateLong, toThaiDateShort } from '@/lib/format'
 import { INFOGRAPHIC_STYLES } from '@/lib/infographicStyles'
 import type { DateRange } from '@/types/herbdx.types'
 
@@ -18,7 +19,16 @@ const shiftDay = (iso: string, delta: number) => {
   d.setDate(d.getDate() + delta)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
-type Mode = 'day' | 'month'
+type Mode = 'day' | 'week' | 'month'
+
+/** วันจันทร์ของสัปดาห์ที่มีวันที่นี้อยู่ (สัปดาห์นับ จันทร์–อาทิตย์) */
+const mondayOf = (iso: string) => shiftDay(iso, -((new Date(`${iso}T00:00:00`).getDay() + 6) % 7))
+/** ช่วงสัปดาห์ จันทร์–อาทิตย์ · สัปดาห์ปัจจุบันตัดที่วันนี้ ไม่นับวันในอนาคต */
+const weekRange = (monday: string, today: string): DateRange => {
+  const sunday = shiftDay(monday, 6)
+  return { startDate: monday, endDate: sunday > today ? today : sunday }
+}
+const MODE_LABEL: Record<Mode, string> = { day: 'รายวัน', week: 'รายสัปดาห์', month: 'รายเดือน' }
 
 const shiftMonth = (ym: string, delta: number) => {
   const [y, m] = ym.split('-').map(Number)
@@ -166,9 +176,11 @@ const DRUG_BAR = 'bg-amber-500'
 export const ThaiMedDailyView: FC = () => {
   const [mode, setMode] = useState<Mode>('day')
   const [date, setDate] = useState(todayIso)
+  const [week, setWeek] = useState(() => mondayOf(todayIso()))
   const [month, setMonth] = useState(() => todayIso().slice(0, 7))
   const [editing, setEditing] = useState(false)
-  const range: DateRange = mode === 'day' ? { startDate: date, endDate: date } : monthRange(month)
+  const [visitsOpen, setVisitsOpen] = useState(false)
+  const range: DateRange = mode === 'day' ? { startDate: date, endDate: date } : mode === 'week' ? weekRange(week, todayIso()) : monthRange(month)
   const { data, isLoading, isError, error, dataUpdatedAt, isFetching } = useThaiMedDaily(range, true)
   const { data: live } = useRealtimeStatus()
   const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('th-TH', { hour12: false }) : '–'
@@ -177,10 +189,15 @@ export const ThaiMedDailyView: FC = () => {
   const [exporting, setExporting] = useState(false)
   const [exportError, setExportError] = useState('')
   const thisMonth = todayIso().slice(0, 7)
+  const thisWeek = mondayOf(todayIso())
 
   const changeDate = (next: string) => {
     setEditing(false)
     setDate(next)
+  }
+  const changeWeek = (anyDay: string) => {
+    setEditing(false)
+    setWeek(mondayOf(anyDay))
   }
   const changeMonth = (next: string) => {
     setEditing(false)
@@ -215,6 +232,9 @@ export const ThaiMedDailyView: FC = () => {
       ]
     : []
   const maxGroupTotal = Math.max(0, ...bars.map((g) => g.total))
+  const exportDays = Math.round((Date.parse(range.endDate) - Date.parse(range.startDate)) / 86_400_000) + 1
+  const weekPartial = mode === 'week' && range.endDate < shiftDay(week, 6)
+  const hasExportData = !!data && (data.totals.visits > 0 || data.outreach.count > 0)
   const avgPerPerson = totals && totals.visits > 0 ? totals.grandTotal / totals.visits : 0
 
   return (
@@ -226,10 +246,10 @@ export const ThaiMedDailyView: FC = () => {
           </span>
           <div>
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-              {mode === 'day' ? 'สรุปผลการดำเนินงานประจำวัน' : 'สรุปผลการดำเนินงานประจำเดือน'}
+              {mode === 'day' ? 'สรุปผลการดำเนินงานประจำวัน' : mode === 'week' ? 'สรุปผลการดำเนินงานประจำสัปดาห์' : 'สรุปผลการดำเนินงานประจำเดือน'}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · {mode === 'day' ? `วัน${weekdayOf(date)}ที่ ${toThaiDateLong(date)}` : monthLabel(month)}
+              กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · {mode === 'day' ? `วัน${weekdayOf(date)}ที่ ${toThaiDateLong(date)}` : mode === 'week' ? `${toThaiDateShort(range.startDate)} – ${toThaiDateShort(range.endDate)}` : monthLabel(month)}
             </p>
             <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold" aria-live="polite">
               <span className={`size-2 rounded-full ${live?.healthy === false ? 'bg-amber-500' : 'bg-emerald-500'} ${isFetching ? 'animate-pulse' : ''}`} aria-hidden />
@@ -244,7 +264,7 @@ export const ThaiMedDailyView: FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <div role="group" aria-label="ช่วงเวลา" className="flex rounded-lg border border-themed overflow-hidden text-xs font-semibold">
-            {(['day', 'month'] as const).map((m) => (
+            {(['day', 'week', 'month'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -252,7 +272,7 @@ export const ThaiMedDailyView: FC = () => {
                 onClick={() => changeMode(m)}
                 className={`px-3 py-1.5 ${mode === m ? 'bg-accent text-white' : 'text-slate-500 dark:text-slate-400'}`}
               >
-                {m === 'day' ? 'รายวัน' : 'รายเดือน'}
+                {MODE_LABEL[m]}
               </button>
             ))}
           </div>
@@ -278,6 +298,30 @@ export const ThaiMedDailyView: FC = () => {
                 className="px-2.5 py-1.5 rounded-lg border border-themed text-xs font-semibold disabled:opacity-30"
               >
                 วันนี้
+              </button>
+            </>
+          ) : mode === 'week' ? (
+            <>
+              <button type="button" onClick={() => changeWeek(shiftDay(week, -7))} aria-label="สัปดาห์ก่อนหน้า" className="p-2 rounded-lg border border-themed">
+                <ChevronLeft className="size-4" />
+              </button>
+              <ThaiCalendarPicker mode="day" value={range.endDate} max={todayIso()} onChange={changeWeek} />
+              <button
+                type="button"
+                onClick={() => changeWeek(shiftDay(week, 7))}
+                disabled={week >= thisWeek}
+                aria-label="สัปดาห์ถัดไป"
+                className="p-2 rounded-lg border border-themed disabled:opacity-30"
+              >
+                <ChevronRight className="size-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => changeWeek(thisWeek)}
+                disabled={week === thisWeek}
+                className="px-2.5 py-1.5 rounded-lg border border-themed text-xs font-semibold disabled:opacity-30"
+              >
+                สัปดาห์นี้
               </button>
             </>
           ) : (
@@ -311,17 +355,26 @@ export const ThaiMedDailyView: FC = () => {
       <section className="p-3 rounded-2xl bg-themed-card border border-themed shadow-xs space-y-2.5" aria-label="ส่งออกเป็นภาพ">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <h3 className="inline-flex items-center gap-1.5 text-sm font-bold text-slate-800 dark:text-slate-100">
-            <ImageDown className="size-4 text-accent" aria-hidden /> ส่งออกเป็นภาพอินโฟกราฟิก ({mode === 'day' ? 'รายวัน' : 'รายเดือน'})
+            <ImageDown className="size-4 text-accent" aria-hidden /> ส่งออกเป็นภาพอินโฟกราฟิก ({MODE_LABEL[mode]})
           </h3>
           <button
             type="button"
             onClick={exportImage}
-            disabled={!data || exporting}
+            disabled={!hasExportData || exporting}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-accent disabled:opacity-40"
           >
             <ImageDown className="size-4" aria-hidden /> {exporting ? 'กำลังสร้างภาพ…' : 'บันทึกเป็นภาพ (PNG)'}
           </button>
         </div>
+        {data && (
+          <p className="text-[11px] text-slate-500 dark:text-slate-400" aria-live="polite">
+            ภาพนี้สรุปข้อมูล {toThaiDateShort(range.startDate)}
+            {exportDays > 1 && ` – ${toThaiDateShort(range.endDate)} (${fmtNum(exportDays)} วัน)`}
+            {' '}· ผู้รับบริการ {fmtNum(data.totals.visits)} ราย · ออกชุมชน {fmtNum(data.outreach.count)} ราย · รวม {baht(data.totals.grandTotal)} บาท
+            {weekPartial && ' · สัปดาห์นี้ยังไม่ครบ นับถึงวันนี้'}
+            {!hasExportData && ' · ไม่มีข้อมูลในช่วงนี้ จึงยังบันทึกภาพไม่ได้'}
+          </p>
+        )}
         <div role="radiogroup" aria-label="สไตล์ภาพ" className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
           {INFOGRAPHIC_STYLES.map((st) => {
             const on = st.id === styleId
@@ -378,11 +431,28 @@ export const ThaiMedDailyView: FC = () => {
               unit="ราย"
               sub={SOURCE_LABEL[data.outreach.source]}
               tone="bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 border-emerald-500/30"
-              action={mode === 'day' ? (
-                <button type="button" onClick={() => setEditing((v) => !v)} className="inline-flex items-center gap-1 font-semibold text-accent" aria-expanded={editing}>
-                  <Pencil className="size-3" aria-hidden /> แก้ไข
-                </button>
-              ) : undefined}
+              action={(
+                <span className="inline-flex items-center gap-3">
+                  {data.outreach.visits.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVisitsOpen(true)
+                        requestAnimationFrame(() => document.getElementById('outreach-visits')?.scrollIntoView({ behavior: 'smooth', block: 'center' }))
+                      }}
+                      className="inline-flex items-center gap-1 font-semibold text-accent cursor-pointer after:absolute after:inset-0 after:rounded-2xl after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-accent"
+                      aria-controls="outreach-visits"
+                    >
+                      <List className="size-3" aria-hidden /> ดูรายการ
+                    </button>
+                  )}
+                  {mode === 'day' && (
+                    <button type="button" onClick={() => setEditing((v) => !v)} className="relative z-10 inline-flex items-center gap-1 font-semibold text-accent" aria-expanded={editing}>
+                      <Pencil className="size-3" aria-hidden /> แก้ไข
+                    </button>
+                  )}
+                </span>
+              )}
             />
             <KpiCard
               icon={Banknote}
@@ -432,9 +502,52 @@ export const ThaiMedDailyView: FC = () => {
               พบ {fmtNum(data.records.orphanOpd)} บันทึกให้บริการที่ไม่มี visit รองรับใน HOSxP (เคลมไม่ได้) — ดูรายละเอียดที่หน้า "ตรวจหัตถการแผนไทย"
             </p>
           )}
-          {mode === 'month' && data.outreach.manualDays > 0 && (
+          {!data.outreach.departmentFound && (
+            <p className="text-xs font-semibold text-amber-700 dark:text-amber-300 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2" role="alert">
+              ไม่พบแผนก "ออกชุมชน แพทย์แผนไทย" ใน HOSxP — ยอดออกชุมชนจาก HOSxP จะเป็น 0 จนกว่าจะตรวจชื่อแผนก (กรอกยอดเองได้ที่ปุ่มแก้ไข)
+            </p>
+          )}
+          {data.outreach.hosxp.visits > 0 && (
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              ยอดออกชุมชนรายเดือนรวมจากรายวัน · มี {fmtNum(data.outreach.manualDays)} วันที่เจ้าหน้าที่กรอกเอง (แก้ไขได้ในโหมดรายวัน)
+              ออกชุมชนจาก HOSxP: {fmtNum(data.outreach.hosxp.visits)} ราย ({fmtNum(data.outreach.hosxp.persons)} คนไม่ซ้ำ) · นับ visit ที่ลงทะเบียนที่แผนก "ออกชุมชน แพทย์แผนไทย" · ค่าบริการนับเฉพาะรายการแพทย์แผนไทยและยาสมุนไพร (ไม่รวมค่าบริการ OPD) และรวมอยู่ในยอดทั้งหมดข้างต้นแล้ว
+            </p>
+          )}
+          {data.outreach.visits.length > 0 && (
+            <details id="outreach-visits" open={visitsOpen} onToggle={(e) => setVisitsOpen(e.currentTarget.open)} className="rounded-xl border border-themed bg-themed-card px-3 py-2 text-xs">
+              <summary className="cursor-pointer font-semibold text-accent">ดูรายชื่อ visit ออกชุมชน {fmtNum(data.outreach.visits.length)} ราย (เทียบกับหน้าจอ HOSxP)</summary>
+              <div className="mt-2 overflow-x-auto">
+                <table className="w-full min-w-[360px] border-collapse">
+                  <thead>
+                    <tr className="text-slate-500">
+                      <th scope="col" className="px-2 py-1 text-left font-semibold">#</th>
+                      {mode !== 'day' && <th scope="col" className="px-2 py-1 text-left font-semibold">วันที่</th>}
+                      <th scope="col" className="px-2 py-1 text-left font-semibold">HN</th>
+                      <th scope="col" className="px-2 py-1 text-left font-semibold">ชื่อ-สกุล</th>
+                      <th scope="col" className="px-2 py-1 text-left font-semibold">เวลา</th>
+                      <th scope="col" className="px-2 py-1 text-right font-semibold">นวด/หัตถการ (บาท)</th>
+                      <th scope="col" className="px-2 py-1 text-right font-semibold">ยาสมุนไพร (บาท)</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-200/60 dark:divide-white/5">
+                    {data.outreach.visits.map((v, i) => (
+                      <tr key={`${v.date ?? ''}-${v.hn}-${v.time ?? i}-${i}`}>
+                        <td className="px-2 py-1 tabular-nums">{i + 1}</td>
+                        {mode !== 'day' && <td className="px-2 py-1 tabular-nums">{v.date ? toThaiDateShort(v.date) : '–'}</td>}
+                        <td className="px-2 py-1 tabular-nums"><PhiHn value={v.hn} /></td>
+                        <td className="px-2 py-1"><PhiName value={v.name} /></td>
+                        <td className="px-2 py-1 tabular-nums">{v.time ?? '–'}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{baht(v.serviceValue)}</td>
+                        <td className="px-2 py-1 text-right tabular-nums">{baht(v.drugValue)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
+          )}
+          {mode !== 'day' && data.outreach.manualDays > 0 && (
+            <p className="text-[11px] text-slate-500 dark:text-slate-400">
+              ยอดออกชุมชน{mode === 'week' ? 'รายสัปดาห์' : 'รายเดือน'}รวมจากรายวัน · มี {fmtNum(data.outreach.manualDays)} วันที่เจ้าหน้าที่กรอกเอง (แก้ไขได้ในโหมดรายวัน)
             </p>
           )}
 
@@ -460,13 +573,23 @@ export const ThaiMedDailyView: FC = () => {
                   </tr>
                   <tr className="bg-amber-500/10 font-semibold">
                     <th scope="row" className="px-3 py-2.5 text-left text-sm">
-                      ออกชุมชน
+                      {data.outreach.source === 'hosxp' ? 'ในจำนวนนี้ ออกชุมชน' : 'ออกชุมชน'}
                       <span className="ml-2 text-[10px] font-medium text-slate-500">({SOURCE_LABEL[data.outreach.source]})</span>
                     </th>
                     <td className={CELL}>{fmtNum(data.outreach.count)} คน</td>
-                    <td className={`${CELL} text-slate-400`}>–</td>
-                    <td className={`${CELL} text-slate-400`}>–</td>
-                    <td className={`${CELL} text-slate-400`}>–</td>
+                    {data.outreach.hosxp.visits > 0 ? (
+                      <>
+                        <td className={CELL}>{baht(data.outreach.hosxp.serviceValue)}</td>
+                        <td className={CELL}>{baht(data.outreach.hosxp.drugValue)}</td>
+                        <td className={`${CELL} font-bold text-accent`}>{baht(data.outreach.hosxp.total)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className={`${CELL} text-slate-400`}>–</td>
+                        <td className={`${CELL} text-slate-400`}>–</td>
+                        <td className={`${CELL} text-slate-400`}>–</td>
+                      </>
+                    )}
                   </tr>
                   {data.groups.map((g) => {
                     const empty = g.persons === 0
@@ -512,7 +635,7 @@ export const ThaiMedDailyView: FC = () => {
               </table>
               <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
                 ยอดเงินประมาณการจากรายการค่าบริการใน HOSxP (opitemrece) แยกกลุ่มสิทธิตาม hipdata_code ของสิทธิในวันที่รับบริการ
-                {mode === 'month' && ' · รายเดือนนับผู้รับบริการไม่ซ้ำคนในแต่ละสิทธิ'}
+                {mode !== 'day' && ` · ${mode === 'week' ? 'รายสัปดาห์' : 'รายเดือน'}นับผู้รับบริการไม่ซ้ำคนในแต่ละสิทธิ`}
               </p>
             </div>
 
