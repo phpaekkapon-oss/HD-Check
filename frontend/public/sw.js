@@ -1,5 +1,7 @@
 // SMART-HOSCHECK PWA Service Worker
-const CACHE_NAME = 'smarthoscheck-v13';
+// ทุก cache ของระบบนี้ต้องขึ้นต้นด้วย prefix เพื่อไม่แตะ cache ของระบบอื่นบนโดเมนเดียวกัน
+const CACHE_PREFIX = 'hd-check-';
+const CACHE_NAME = CACHE_PREFIX + 'static-v13';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
@@ -8,7 +10,9 @@ self.addEventListener('install', () => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.map((k) => caches.delete(k)))
+      Promise.all(keys
+        .filter((k) => k.startsWith(CACHE_PREFIX) && k !== CACHE_NAME)
+        .map((k) => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
 });

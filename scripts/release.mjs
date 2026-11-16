@@ -3,6 +3,7 @@ import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execSync } from 'node:child_process'
 import readline from 'node:readline'
+import { step as uiStep } from './ui.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
@@ -439,7 +440,7 @@ async function main() {
   }
 
   // 1. Update package.json files
-  console.log('\n[1/6] กำลังอัปเดตเลขเวอร์ชันใน package.json...')
+  uiStep(1, 6, 'อัปเดตเลขเวอร์ชันใน package.json')
   rootPkgData.version = newVersion
   fs.writeFileSync(ROOT_PKG, JSON.stringify(rootPkgData, null, 2) + '\n', 'utf8')
 
@@ -457,7 +458,7 @@ async function main() {
   console.log(`[+] อัปเดตไฟล์ package.json ทุกโฟลเดอร์เป็น v${newVersion} สำเร็จ!`)
 
   // 2. Update changelog.json
-  console.log('\n[2/6] กำลังบันทึก Release Notes ลง changelog.json...')
+  uiStep(2, 6, 'บันทึก Release Notes ลง changelog.json')
   let changelogArr = []
   if (fs.existsSync(CHANGELOG_JSON)) {
     try {
@@ -486,7 +487,7 @@ async function main() {
   console.log('[+] อัปเดต changelog.json เรียบร้อยแล้ว!')
 
   // 3. Update CHANGELOG.md
-  console.log('\n[3/6] กำลังอัปเดตไฟล์ CHANGELOG.md...')
+  uiStep(3, 6, 'อัปเดตไฟล์ CHANGELOG.md')
   const mdHeader = `# บันทึกการเปลี่ยนแปลง\n\nเวอร์ชันของแอปยึดจาก \`package.json\` ที่โฟลเดอร์หลัก และแสดงเลขเดียวกันในหน้าระบบทุกตำแหน่ง\n\n`
   const mdEntry = `## v${newVersion} — ${getTodayThai()}\n\n${releaseTitle}\n\n### ไฮไลท์การเปลี่ยนแปลง (สร้างโดย ${aiResult.aiModel})\n\n${highlights.map((h) => `- ${h}`).join('\n')}\n\n`
 
@@ -499,7 +500,7 @@ async function main() {
   console.log('[+] อัปเดต CHANGELOG.md สำเร็จ!')
 
   // 4. Build application & packaging
-  console.log('\n[4/6] กำลังคอมไพล์ Frontend และสร้างไฟล์แพ็กเกจ HD-Check.zip...')
+  uiStep(4, 6, 'คอมไพล์ Frontend (Build) และสร้างแพ็กเกจ HD-Check.zip')
   const frontDir = path.join(rootDir, 'frontend')
   run('npm run build', frontDir)
 
@@ -528,7 +529,7 @@ async function main() {
   console.log('[+] สร้างแพ็กเกจ HD-Check.zip สำเร็จ!')
 
   // 5. Commit and push to GitHub
-  console.log('\n[5/6] กำลัง Commit และ Push ขึ้น GitHub (origin/main)...')
+  uiStep(5, 6, 'บันทึกเวอร์ชันลง GitHub (Commit • Tag • Push → origin/main)')
   run('git add .')
   run(`git commit -m "chore(release): v${newVersion} - ${releaseTitle}"`)
   try {
@@ -544,7 +545,7 @@ async function main() {
   }
 
   // 6. Deploy to remote server
-  console.log('\n[6/6] กำลังนำขึ้นเซิร์ฟเวอร์ปลายทาง (192.168.1.241)...')
+  uiStep(6, 6, 'อัปโหลดขึ้นเซิร์ฟเวอร์ปลายทาง (192.168.1.241)')
   const deploySuccess = run('node backend/deploy.mjs')
   if (deploySuccess) {
     console.log(`[+] Deploy ขึ้นเซิร์ฟเวอร์ 192.168.1.241 สำเร็จเรียบร้อย!`)
@@ -552,7 +553,7 @@ async function main() {
     console.log(`  [SUCCESS] Release v${newVersion} ดำเนินการเสร็จสมบูรณ์ 100%!`)
     console.log(`  - เวอร์ชันใหม่  : v${newVersion}`)
     console.log(`  - ผู้ช่วย AI    : ${aiResult.aiModel}`)
-    console.log(`  - เว็บไซต์     : http://pkhospital.moph.go.th/hd-check/`)
+    console.log(`  - เว็บไซต์     : https://pkhospital.moph.go.th/hd-check/`)
     console.log(`  - GitHub Tag  : https://github.com/phpaekkapon-oss/HD-Check/releases/tag/v${newVersion}`)
     console.log('====================================================================\n')
   } else {

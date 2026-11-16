@@ -2,6 +2,7 @@ import { Client } from 'ssh2'
 import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import '../scripts/ui.mjs'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const rootDir = path.resolve(__dirname, '..')
@@ -27,11 +28,11 @@ const zipStats = fs.statSync(zipPath)
 const zipSizeMb = (zipStats.size / (1024 * 1024)).toFixed(2)
 
 console.log('====================================================================')
-console.log('  SMART-HOSCHECK Automated Deployment to Linux Server')
+console.log('  SMART-HOSCHECK  •  อัปโหลดขึ้นเซิร์ฟเวอร์ Linux')
 console.log('====================================================================')
-console.log(`[*] Target Server : ${CONFIG.username}@${CONFIG.host}:${CONFIG.port}`)
-console.log(`[*] Remote Folder : ${CONFIG.remoteDir}`)
-console.log(`[*] Package File  : HD-Check.zip (${zipSizeMb} MB)`)
+console.log(`[*] เซิร์ฟเวอร์ปลายทาง : ${CONFIG.username}@${CONFIG.host}:${CONFIG.port}`)
+console.log(`[*] โฟลเดอร์ปลายทาง   : ${CONFIG.remoteDir}`)
+console.log(`[*] ไฟล์แพ็กเกจ       : HD-Check.zip (${zipSizeMb} MB)`)
 console.log('')
 
 const conn = new Client()
@@ -61,8 +62,8 @@ function runRemoteCommand(command) {
 }
 
 conn.on('ready', () => {
-  console.log('[+] SSH connection established successfully!')
-  console.log(`[*] Ensuring remote directory exists & fixing permissions: ${CONFIG.remoteDir}...`)
+  console.log('[+] เชื่อมต่อ SSH สำเร็จ')
+  console.log(`[*] ตรวจสอบโฟลเดอร์และสิทธิ์ปลายทาง: ${CONFIG.remoteDir}...`)
 
   // Ensure directory exists and give ownership to the deployment user
   const prepareDirScript = `
@@ -75,7 +76,7 @@ conn.on('ready', () => {
 
   runRemoteCommand(prepareDirScript)
     .then(() => {
-      console.log(`[*] Uploading HD-Check.zip via SFTP...`)
+      console.log(`[*] กำลังอัปโหลด HD-Check.zip ผ่าน SFTP...`)
       return new Promise((resolve, reject) => {
         conn.sftp((err, sftp) => {
           if (err) return reject(new Error(`SFTP initialization failed: ${err.message}`))
@@ -87,11 +88,11 @@ conn.on('ready', () => {
           readStream.on('data', (chunk) => {
             uploaded += chunk.length
             const percent = Math.round((uploaded / zipStats.size) * 100)
-            process.stdout.write(`\r[*] Uploading: ${percent}% (${(uploaded / (1024 * 1024)).toFixed(2)} / ${zipSizeMb} MB)`)
+            process.stdout.write(`\r[*] กำลังอัปโหลด: ${percent}% (${(uploaded / (1024 * 1024)).toFixed(2)} / ${zipSizeMb} MB)`)
           })
 
           writeStream.on('close', () => {
-            console.log('\n[+] File upload completed successfully!')
+            console.log('\n[+] อัปโหลดไฟล์เสร็จสมบูรณ์')
             resolve()
           })
 
@@ -105,7 +106,7 @@ conn.on('ready', () => {
       })
     })
     .then(() => {
-      console.log(`[*] Extracting files and restarting application on remote server...`)
+      console.log(`[*] กำลังแตกไฟล์และรีสตาร์ตแอปบนเซิร์ฟเวอร์...`)
       const remoteScript = `
         set -e
         # Load NVM or Node paths if present
@@ -117,7 +118,7 @@ conn.on('ready', () => {
         export PATH=$PATH:/usr/local/bin:/usr/bin:~/.nvm/versions/node/$(ls ~/.nvm/versions/node 2>/dev/null | tail -n 1)/bin
 
         cd "${CONFIG.remoteDir}"
-        echo "[1/4] Extracting HD-Check.zip..."
+        echo "[*] (1/4) แตกไฟล์ HD-Check.zip..."
         if command -v python3 >/dev/null 2>&1; then
           python3 -c "
 import zipfile, os
@@ -138,11 +139,11 @@ with zipfile.ZipFile('HD-Check.zip', 'r') as z:
           tar -xf HD-Check.zip
         fi
 
-        echo "[2/4] Installing backend production dependencies..."
+        echo "[*] (2/4) ติดตั้งแพ็กเกจ Backend..."
         cd "${CONFIG.remoteDir}/backend"
         npm install --omit=dev
 
-        echo "[3/4] Checking and restarting with PM2..."
+        echo "[*] (3/4) รีสตาร์ตด้วย PM2..."
         cd "${CONFIG.remoteDir}"
         if command -v pm2 >/dev/null 2>&1; then
           pm2 restart ${CONFIG.appName} 2>/dev/null || pm2 start backend/index.mjs --name ${CONFIG.appName}
@@ -153,29 +154,29 @@ with zipfile.ZipFile('HD-Check.zip', 'r') as z:
           nohup node backend/index.mjs > server.log 2>&1 &
         fi
 
-        echo "[4/4] Server is up and running!"
+        echo "[+] (4/4) เซิร์ฟเวอร์ทำงานปกติแล้ว"
       `
       return runRemoteCommand(remoteScript)
     })
     .then(() => {
       console.log('')
       console.log('====================================================================')
-      console.log('  [SUCCESS] Deployment Completed Successfully!')
-      console.log(`  * Server URL : http://${CONFIG.host}:3002`)
-      console.log(`  * Remote Path: ${CONFIG.remoteDir}`)
+      console.log('  [SUCCESS] อัปโหลดขึ้นเซิร์ฟเวอร์สำเร็จ!')
+      console.log('  * เว็บไซต์     : https://pkhospital.moph.go.th/hd-check/')
+      console.log(`  * โฟลเดอร์     : ${CONFIG.remoteDir}`)
       console.log('====================================================================')
       conn.end()
     })
     .catch((err) => {
       console.error('')
-      console.error('[ERROR] Deployment failed:', err.message)
+      console.error('[ERROR] อัปโหลดไม่สำเร็จ:', err.message)
       conn.end()
       process.exit(1)
     })
 })
 
 conn.on('error', (err) => {
-  console.error('[ERROR] SSH connection error:', err.message)
+  console.error('[ERROR] เชื่อมต่อ SSH ไม่ได้:', err.message)
   process.exit(1)
 })
 

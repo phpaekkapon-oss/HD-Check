@@ -10,8 +10,9 @@ const frontendPackageJsonPath = fileURLToPath(new URL('./package.json', import.m
 const { version: appVersion } = JSON.parse(readFileSync(packageJsonPath, 'utf8')) as { version: string }
 
 // https://vite.dev/config/
-export default defineConfig({
-  base: './',
+export default defineConfig(({ command }) => ({
+  // build ต้องตรงกับ scope/id ของ PWA (/hd-check/) เพื่อไม่ชนกับระบบอื่นบนโดเมนเดียวกัน
+  base: command === 'build' ? '/hd-check/' : '/',
   plugins: [
     react(),
     tailwindcss(),
@@ -69,4 +70,4 @@ export default defineConfig({
     outDir: '../HD-Check',
     emptyOutDir: true,
   },
-})
+}))

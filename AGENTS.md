@@ -39,3 +39,27 @@
 - **Skill/Agent (Nexus AIO)**: ติดตั้งที่ `.claude/skills` (68 skill) และ `.claude/agents` (21 ผู้ช่วยอ่านอย่างเดียว) — โฟลเดอร์ `.claude/` ถูก gitignore จึงไม่เข้า commit · งานของโปรเจกต์นี้เริ่มที่ `hrms-dev-pro`/`core-dev-pro` → เลือก skill ตามสารบัญ `.claude/skills/INDEX.md`
   - ใช้บ่อย: `hrms-mysql-testing` (SQL/migration) · `hrms-healthcare-data` + `pdpa-healthcare-security` (HN/ข้อมูลผู้ป่วย) · `hrms-frontend-ui` + `tailwind-design-system` (หน้าจอ) · `hrms-git-release` (commit/release) · `verification-before-completion` (ก่อนบอกว่าเสร็จ)
   - skill ชื่อ `hrms-*` เขียนไว้สำหรับระบบ HRMS รพ.พังโคน: ใช้เฉพาะส่วนที่เป็นหลักการทั่วไป (DB read-only, PDPA, UI) · ส่วนที่เป็นเส้นทาง/ตาราง/เวิร์กโฟลว์ของ HRMS ไม่ใช้กับโปรเจกต์นี้ และกฎใน AGENTS.md นี้ชนะเสมอถ้าขัดกัน
+
+## 7. PWA / การติดตั้งแอป (หลายระบบบนโดเมนเดียวกัน)
+โดเมน `pkhospital.moph.go.th` มีหลายระบบแยกกันด้วย path — Chrome ถือว่าแอปสองตัวที่ `id` ตรงกันเป็นแอปเดียวกัน แล้วจะไม่เสนอให้ติดตั้งซ้ำ
+
+**ระบบนี้**: path `/hd-check/` · `id` = `/hd-check/`
+
+**กติกา (ห้ามฝ่าฝืน)**
+1. `manifest`: `id`, `start_url`, `scope` ต้องเป็น path absolute ของระบบนี้ (`/hd-check/`) — ห้ามใช้ `"./"`, `"/"` หรือไม่ใส่ `id` (Chrome แปลง `"./"` ให้เป็นรากของโดเมน จึงชนกับทุกระบบที่ใช้ค่าเดียวกัน)
+2. `base` ของ Vite ตอน build ต้องตรงกับ path ที่ deploy และ service worker ต้องลงทะเบียนจากภายใน path นี้ ห้ามวางที่รากโดเมน
+3. ชื่อ cache ของ service worker ต้องมี prefix ของระบบ (`hd-check-static-vN`) และโค้ดลบ cache เก่าต้องลบเฉพาะ prefix นี้
+4. ไอคอน 192×192 และ 512×512 ต้องมีไฟล์จริงใน `public/` และตอบ 200 บน URL จริง
+5. ปุ่มติดตั้ง: เก็บ `beforeinstallprompt` แล้วเรียก `prompt()` · ถ้ามี event จริงให้ถือว่ายังไม่ได้ติดตั้ง · ถ้าไม่มี event ให้อธิบายเหตุผล (ไม่ใช่ HTTPS/localhost, ติดตั้งแล้ว, ขั้นตอนติดตั้งเอง)
+6. ก่อนเพิ่มหรือเปลี่ยน `id`/`scope` ให้ตรวจ manifest ของระบบอื่นบนโดเมนด้วย `curl` ว่าไม่ซ้ำและไม่ซ้อนกัน แล้วอัปเดตตารางด้านล่าง
+7. การเปลี่ยน `id` ทำให้ผู้ใช้ที่ติดตั้งไว้ต้องถอนแล้วติดตั้งใหม่ — แจ้งผู้ใช้ทุกครั้ง · ห้ามแก้ manifest ของระบบอื่นเอง ให้แจ้งเจ้าของระบบ
+
+**ทะเบียน `id` บนโดเมน (ตรวจล่าสุด 2026-11-16)**
+| ระบบ | path | `id` |
+|---|---|---|
+| ระบบงานพัสดุ (hp-registry) | `/hp-registry/` | `/hp-registry/` |
+| SMART-HOSCHECK (HD-Check) | `/hd-check/` | `/hd-check/` |
+| HRMS | `/hrms/` | `/hrms/` |
+| NarcoticDrug | `/narcotic/` | `/narcotic/` |
+
+**ตรวจหลัง deploy**: F12 → Application → Manifest (ดู Installability) · Clear site data · Ctrl+Shift+R แล้วกดติดตั้ง

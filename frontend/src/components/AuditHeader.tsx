@@ -659,7 +659,7 @@ export const AuditHeader: FC<AuditHeaderProps> = ({
           <div className="flex items-center gap-2">
             <Download className="size-4 text-emerald-300 shrink-0" />
             <span>
-              <strong>วิธีติดตั้งแอป:</strong> บน <strong>Google Chrome/Edge</strong> คลิกไอคอนติดตั้งที่แถบ URL หรือบน <strong>iPhone/iPad</strong> แตะปุ่มแชร์ แล้วเลือก <strong>'เพิ่มไปยังหน้าจอโฮม' (Add to Home Screen)</strong>
+              <strong>ยังเปิดหน้าต่างติดตั้งอัตโนมัติไม่ได้:</strong> อาจเปิดผ่าน HTTP (ต้องเป็น HTTPS/localhost) หรือเคยติดตั้งไว้แล้ว — ติดตั้งเองได้โดยบน <strong>Google Chrome/Edge</strong> คลิกไอคอนติดตั้งที่แถบ URL หรือบน <strong>iPhone/iPad</strong> แตะปุ่มแชร์ แล้วเลือก <strong>'เพิ่มไปยังหน้าจอโฮม' (Add to Home Screen)</strong>
             </span>
           </div>
           <button type="button" onClick={() => setShowPwaTip(false)} className="text-slate-200 hover:text-white">
