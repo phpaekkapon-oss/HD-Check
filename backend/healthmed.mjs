@@ -373,6 +373,18 @@ export function evaluateHealthMedAudit(row, duplicateRuleConfig = null) {
   }
 
   // -------------------------------------------------------------
+  // กฎ: มีรหัสหัตถการ ต้องมีค่ารักษา (ค่าบริการแพทย์แผนไทย) ด้วย ถ้าไม่มีค่ารักษา ไม่ผ่าน
+  // -------------------------------------------------------------
+  const hasFee =
+    effectiveCountBoth > 0 || effectiveCountMassage > 0 || effectiveCountCompress > 0 ||
+    effectiveCountSteam > 0 || count58220 > 0 || count58131 > 0 ||
+    serviceCodes.replace(/[,\s]/g, '').length > 0 ||
+    rawServices.trim().length > 0
+  if (normalizedOpSet.size > 0 && !hasFee) {
+    failures.push('มีรหัสหัตถการ แต่ไม่มีค่ารักษา (ค่าบริการแพทย์แผนไทย) ต้องคิดค่ารักษาร่วมด้วย')
+  }
+
+  // -------------------------------------------------------------
   // กฎข้อที่ 7 (ตามคำขอแผนกแพทย์แผนไทย):
   // ตรวจสอบสถานะการปิดสิทธิ (EP) และกรณีเปิด Visit 2 (visit_order >= 2)
   // -------------------------------------------------------------

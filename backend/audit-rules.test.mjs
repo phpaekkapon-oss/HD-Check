@@ -843,3 +843,33 @@ test('Thai-med daily summary - outreach visits: persons are distinct, money is e
   assert.deepEqual(s.list.map((x) => x.time), ['09:30', '09:05', null])
   assert.deepEqual(s.list.map((x) => x.name), ['นางทดสอบ ตัวอย่าง', null, null], 'name is trimmed and missing patient stays null')
 })
+
+test('HealthMed - procedure code without a treatment fee fails', () => {
+  const noFee = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11', '900-78-20'],
+  })
+  assert.equal(noFee.audit_result, 'FAIL')
+  assert.match(noFee.audit_reason, /ไม่มีค่ารักษา/)
+
+  const withFee = evaluateHealthMedAudit({
+    pdx: 'M7911',
+    dx0: 'U5720',
+    operation_codes: ['900-78-11', '900-78-20'],
+    service_codes: '58130',
+  })
+  assert.equal(withFee.audit_result, 'PASS')
+})
+
+test('Herb audit - diagnosis codes beyond the 6 secondary slots (dx_more) still count', () => {
+  const dxMap = new Map([['1650102', ['M179', 'M54']]])
+  const base = {
+    drug_icode: '1650102', drug_name: 'ไพลครีม', drug_qty: 1, pttype_name: 'UC',
+    pdx: 'E149', dx0: 'E785', dx1: 'I10', dx2: 'J209', dx3: 'K30', dx4: 'K590', dx5: 'K640',
+  }
+  assert.equal(evaluate(base, dxMap, new Map()).audit_result, 'FAIL')
+  const fixed = evaluate({ ...base, dx_more: 'M179,M6260,N183' }, dxMap, new Map())
+  assert.equal(fixed.audit_result, 'PASS')
+  assert.deepEqual(fixed.matched_dx, ['M179'])
+})

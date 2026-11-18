@@ -1917,7 +1917,22 @@ export const HealthMedAuditView: FC<HealthMedAuditViewProps> = ({ range, onRange
                   return (
                     <TableRow
                       key={row.id}
+                      tabIndex={0}
+                      aria-label="เปิดรายละเอียดการรับบริการ"
+                      onClick={(e) => {
+                        // ปุ่ม/ลิงก์/ช่องกรอกในแถวทำงานของมันเอง และไม่เปิดหน้าต่างเมื่อกำลังลากคลุมข้อความ
+                        if ((e.target as HTMLElement).closest('button, a, input, select, textarea, [role="button"]')) return
+                        if (window.getSelection()?.toString()) return
+                        setSelectedRecord(row.original)
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.target === e.currentTarget && (e.key === 'Enter' || e.key === ' ')) {
+                          e.preventDefault()
+                          setSelectedRecord(row.original)
+                        }
+                      }}
                       className={cn(
+                        'cursor-pointer focus-visible:outline-2 focus-visible:outline-teal-500/60 focus-visible:-outline-offset-2',
                         'hover:bg-slate-50/80 dark:hover:bg-white/[0.03] transition-colors border-slate-100 dark:border-white/5',
                         isFail && 'bg-rose-50/25 dark:bg-rose-950/[0.08]'
                       )}

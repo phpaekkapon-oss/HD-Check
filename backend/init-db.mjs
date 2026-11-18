@@ -70,6 +70,7 @@ export async function initDatabaseAndTables() {
       pdx VARCHAR(20) NULL,
       dx0 VARCHAR(20) NULL, dx1 VARCHAR(20) NULL, dx2 VARCHAR(20) NULL,
       dx3 VARCHAR(20) NULL, dx4 VARCHAR(20) NULL, dx5 VARCHAR(20) NULL,
+      dx_more TEXT NULL,
       doctor_code VARCHAR(50) NULL,
       doctor_name VARCHAR(200) NULL,
       audit_status ENUM('COMPLETE','INCOMPLETE') NOT NULL DEFAULT 'INCOMPLETE',
@@ -82,6 +83,7 @@ export async function initDatabaseAndTables() {
 
   // Migration for existing tables
   await conn.query("ALTER TABLE dw_hd_check_prescriptions ADD COLUMN IF NOT EXISTS drug_units VARCHAR(50) NULL DEFAULT '' AFTER drug_qty").catch(() => {})
+  await conn.query('ALTER TABLE dw_hd_check_prescriptions ADD COLUMN IF NOT EXISTS dx_more TEXT NULL AFTER dx5').catch(() => {})
 
   // 2) Drug dispensing summary snapshot (SQL Query 2)
   await conn.query(`

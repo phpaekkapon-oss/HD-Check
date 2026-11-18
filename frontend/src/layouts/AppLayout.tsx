@@ -202,7 +202,7 @@ export const AppLayout: FC<AppLayoutProps> = ({
           <span
             className={cn(
               'h-full shrink-0 inline-flex items-center gap-1.5 bg-[var(--sidebar-bg)] border-r border-slate-200 dark:border-[var(--sidebar-border)] transition-all duration-300 ease-in-out',
-              collapsed ? 'w-18 justify-center' : 'w-64 px-4'
+              collapsed ? 'w-18 justify-center' : 'w-72 px-4'
             )}
             title={collapsed ? 'ฐานข้อมูล HOSxP เชื่อมต่อแล้ว' : undefined}
           >

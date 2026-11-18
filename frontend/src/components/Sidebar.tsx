@@ -238,7 +238,7 @@ export const Sidebar: FC<SidebarProps> = ({
 
       {/* Navigation List */}
       <div className="relative flex min-h-0 flex-1 flex-col">
-      <nav ref={navRef} onScroll={updateNavHasMore} className="flex-1 min-h-0 p-2.5 space-y-1.5 overflow-y-auto overscroll-contain">
+      <nav ref={navRef} onScroll={updateNavHasMore} className={cn('flex-1 min-h-0 p-2.5 overflow-y-auto overscroll-contain', isMobileView ? 'space-y-1.5' : 'space-y-0.5')}>
         {!isCollapsedView && (
           <div className="px-2.5 pt-2 pb-1 text-xs font-bold uppercase tracking-wider font-mono text-slate-400 dark:text-slate-400 flex items-center gap-1.5">
             <span
@@ -266,7 +266,7 @@ export const Sidebar: FC<SidebarProps> = ({
                 'group w-full flex items-center rounded-xl transition-all duration-200 cursor-pointer relative',
                 isCollapsedView
                   ? 'justify-center p-2.5 my-1'
-                  : cn('gap-3 px-3.5 text-left', isMobileView ? 'min-h-12 py-2' : 'min-h-11 py-2'),
+                  : cn('gap-3 px-3.5 text-left', isMobileView ? 'min-h-12 py-2' : 'min-h-10 py-1.5 [@media(max-height:760px)]:min-h-9'),
                 isActive
                   ? 'border shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100/70 dark:hover:bg-white/[0.05]'
@@ -306,7 +306,7 @@ export const Sidebar: FC<SidebarProps> = ({
               />
 
               {!isCollapsedView && (
-                <span className="min-w-0 flex-1 animate-fade-in pl-0.5">
+                <span className="min-w-0 flex-1 animate-fade-in">
                   <span className={cn('block truncate text-sm', isActive ? 'text-slate-900 dark:text-white font-semibold' : 'font-medium')}>
                     {label}
                   </span>
@@ -469,7 +469,7 @@ export const Sidebar: FC<SidebarProps> = ({
       <aside
         className={cn(
           'hidden lg:flex sticky top-0 h-[calc(100dvh-2.25rem)] shrink-0 flex-col select-none transition-all duration-300 ease-in-out',
-          collapsed ? 'w-18' : 'w-64'
+          collapsed ? 'w-18' : 'w-72'
         )}
       >
         {content(false, collapsed)}

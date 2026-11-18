@@ -19,6 +19,12 @@ export function isThaiMedIcdCode(code) {
   return norm.startsWith('U') && !norm.startsWith('U07')
 }
 
+/** รหัสวินิจฉัยทั้งหมดของแถว: pdx + dx0..dx5 + dx_more (รหัสที่เกินช่องในสำเนา) */
+export function dxCodesOf(row) {
+  const more = String(row.dx_more ?? '').split(',')
+  return [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5, ...more]
+}
+
 export function evaluate(row, dxMap, minQtyMap) {
   const minQty = (minQtyMap ? minQtyMap.get(row.drug_icode) : 0) || 0
   const qty = Number(row.drug_qty ?? 0)
@@ -33,7 +39,7 @@ export function evaluate(row, dxMap, minQtyMap) {
   const isPlaiCream = String(row.drug_icode) === '1650102' || (row.drug_name && row.drug_name.includes('ไพลครีม'))
   const isMaxQtyFail = isPlaiCream && qty > 1
 
-  const dxList = [row.pdx, row.dx0, row.dx1, row.dx2, row.dx3, row.dx4, row.dx5]
+  const dxList = dxCodesOf(row)
     .map(normalizeIcdCode)
     .filter(Boolean)
   const unique = [...new Set(dxList)]

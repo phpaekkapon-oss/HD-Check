@@ -4,7 +4,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { HOS_DB_BASE, DW_DB_BASE, HOS_DB, DW_DB, API_PORT, AUTO_SYNC_MINUTES, REALTIME_POLL_SECONDS, REALTIME_SYNC_MIN_SECONDS, RECONCILE_HOUR, DATE_RE, HERB_DRUG_FILTER, THAI_MED_FILTER, SYNC_ENABLED, normalizeIcdCode } from './config.mjs'
-import { syncHerbalData, fetchDrugSummary, buildHerbFilter } from './sync.mjs'
+import { syncHerbalData, fetchDrugSummary, buildHerbFilter, ensureDxMoreColumn } from './sync.mjs'
 import {
   HEALTH_MED_AUDIT_SQL,
   THAI_MED_SERVICE_ND_COND,
@@ -429,6 +429,11 @@ async function loadDxMap() {
 }
 
 
+/* ---------------- dx_more: รหัสวินิจฉัยที่เกินช่อง dx0..dx5 ---------------- */
+// ถ้าเพิ่มคอลัมน์ในคลังข้อมูลไม่ได้ (สิทธิ์ DB) ให้ SELECT คืนค่าว่างแทน เพื่อไม่ให้หน้าตรวจพัง
+let DX_MORE_SQL = "'' AS dx_more"
+if (await ensureDxMoreColumn(dwPool)) DX_MORE_SQL = 'dx_more'
+
 /* ---------------- Sync state ---------------- */
 let syncInFlight = null
 async function runSync(startDate, endDate, trigger) {
@@ -605,7 +610,7 @@ app.get('/api/prescriptions', requireSession, async (req, res) => {
     let sql = `
       SELECT id, vn, DATE_FORMAT(visit_date, '%Y-%m-%d') AS visit_date, TIME_FORMAT(visit_time, '%H:%i:%s') AS visit_time,
              hn, patient_name, pttype_name, drug_icode, drug_name, drug_qty, COALESCE(drug_units, '') AS drug_units, department_name,
-             main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5, doctor_code, doctor_name
+             main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5, ${DX_MORE_SQL}, doctor_code, doctor_name
       FROM dw_hd_check_prescriptions
       WHERE visit_date BETWEEN ? AND ?
         AND drug_qty > 0`
@@ -882,7 +887,7 @@ app.get('/api/thaimed-value', requireThaiMedValue, liveCache(thaimedVersion), as
     const activeHerbs = await getActiveHerbalDrugs()
     if (activeHerbs.length > 0) {
       const [rxRows] = await dwPool.query(
-        `SELECT vn, drug_icode, drug_qty, pttype_name, department_name, doctor_name, pdx, dx0, dx1, dx2, dx3, dx4, dx5
+        `SELECT vn, drug_icode, drug_qty, pttype_name, department_name, doctor_name, pdx, dx0, dx1, dx2, dx3, dx4, dx5, ${DX_MORE_SQL}
          FROM dw_hd_check_prescriptions
          WHERE visit_date BETWEEN ? AND ? AND drug_qty > 0 AND vn NOT LIKE 'AN:%' AND drug_icode IN (?)`,
         [startDate, endDate, activeHerbs.map((d) => d.icode)]
@@ -2325,7 +2330,7 @@ app.post('/api/dx-map/:icode/preview', requireHerbDxManager, async (req, res) =>
     const dateFilter = periodDays > 0 ? ' AND visit_date >= DATE_SUB(CURDATE(), INTERVAL ? DAY)' : ''
     if (periodDays > 0) params.push(periodDays)
     const [rows] = await dwPool.query(
-      `SELECT pdx, dx0, dx1, dx2, dx3, dx4, dx5
+      `SELECT pdx, dx0, dx1, dx2, dx3, dx4, dx5, ${DX_MORE_SQL}
        FROM dw_hd_check_prescriptions
        WHERE drug_icode = ? AND drug_qty > 0${dateFilter}`,
       params

@@ -44,8 +44,16 @@ const getCodeAt = (field, n) =>
   `IF(IFNULL(${field}, '') <> '' AND LENGTH(${field}) - LENGTH(REPLACE(${field}, ',', '')) >= ${n - 1},
      SUBSTRING_INDEX(SUBSTRING_INDEX(${field}, ',', ${n}), ',', -1), '')`
 
+/** รหัสวินิจฉัยที่เหลือหลังช่อง dx0..dx5 (ลำดับที่ k+1 เป็นต้นไป) คั่นด้วยจุลภาค — กันรหัสที่แก้เพิ่มทีหลังหลุดจากสำเนา */
+const getCodesAfter = (field, k) =>
+  `IF(IFNULL(${field}, '') <> '' AND LENGTH(${field}) - LENGTH(REPLACE(${field}, ',', '')) >= ${k},
+     SUBSTRING_INDEX(${field}, ',', -(LENGTH(${field}) - LENGTH(REPLACE(${field}, ',', '')) + 1 - ${k})), '')`
+
 const ipdDx = (n) => getCodeAt("COALESCE(NULLIF(dgx.codes, ''), adx.codes, '')", n)
 const opdSecDx = (n) => getCodeAt('sec.all_sec_codes', n)
+const IPD_CODES = "COALESCE(NULLIF(dgx.codes, ''), adx.codes, '')"
+const opdSecMore = getCodesAfter('sec.all_sec_codes', 6)
+const ipdMore = getCodesAfter(IPD_CODES, 6)
 
 /** Placeholders: OPD lv (start, end), OPD sec o2 (start, end), OPD sec hms (start, end), OPD sec o3 (start, end), OPD plv (start, end), OPD (start, end), IPD dgx (start, end), IPD adx (start, end), IPD (start, end) */
 export function buildPrescriptionSql(customIcodes = []) {
@@ -74,6 +82,7 @@ export function buildPrescriptionSql(customIcodes = []) {
         ${opdSecDx(4)} AS dx3,
         ${opdSecDx(5)} AS dx4,
         ${opdSecDx(6)} AS dx5,
+        ${opdSecMore} AS dx_more,
         o.doctor AS doctor_code,
         doc.name AS doctor_name,
         CASE
@@ -170,6 +179,7 @@ export function buildPrescriptionSql(customIcodes = []) {
         ${ipdDx(4)} AS dx3,
         ${ipdDx(5)} AS dx4,
         ${ipdDx(6)} AS dx5,
+        ${ipdMore} AS dx_more,
         IFNULL(op.doctor, IFNULL(i.admdoctor, '')) AS doctor_code,
         IFNULL(doc.name, 'แพทย์ประจำหอผู้ป่วย') AS doctor_name,
         CASE
@@ -217,6 +227,28 @@ const DRUG_SUMMARY_SQL = buildDrugSummarySql()
 
 /** SQL Query 1 — combines OPD (Thai Med) and IPD herbal prescriptions */
 const PRESCRIPTION_SQL = buildPrescriptionSql()
+
+/**
+ * เพิ่มคอลัมน์ dx_more (รหัสวินิจฉัยที่เกินช่อง dx0..dx5) ให้ตารางเดิมโดยอัตโนมัติ
+ * คืน true เมื่อมีคอลัมน์พร้อมใช้ — ถ้าสิทธิ์ DB ไม่พอจะคืน false และระบบทำงานแบบเดิมต่อ
+ */
+let dxMoreReady = null
+export async function ensureDxMoreColumn(conn) {
+  if (dxMoreReady === true) return true
+  try {
+    const [found] = await conn.query("SHOW COLUMNS FROM dw_hd_check_prescriptions LIKE 'dx_more'")
+    if (found.length === 0) {
+      // เครื่องที่ไม่ได้เปิดซิงก์ (อ่านอย่างเดียว) ไม่แก้โครงสร้างตาราง
+      if (!SYNC_ENABLED) return false
+      await conn.query('ALTER TABLE dw_hd_check_prescriptions ADD COLUMN IF NOT EXISTS dx_more TEXT NULL AFTER dx5')
+    }
+    dxMoreReady = true
+  } catch (err) {
+    console.warn('[schema] เพิ่มคอลัมน์ dx_more ไม่สำเร็จ (ใช้ช่อง dx0..dx5 แบบเดิม):', err.message)
+    dxMoreReady = false
+  }
+  return dxMoreReady
+}
 
 const toNum = (v) => Number(v ?? 0)
 
@@ -326,6 +358,8 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
       }
     }
 
+    // DDL ทำให้ transaction ปิดโดยปริยาย จึงต้องตรวจ/เพิ่มคอลัมน์ก่อนเริ่ม transaction
+    const hasDxMore = await ensureDxMoreColumn(dw)
     await dw.beginTransaction()
 
     if (drugs.length) {
@@ -352,14 +386,14 @@ export async function syncHerbalData(startDate, endDate, trigger = 'MANUAL') {
     const values = presc.map((p) => [
       p.vn ?? '', p.visit_date, p.visit_time, p.hn, p.patient_name ?? '', p.pttype_name ?? '',
       p.drug_icode ?? '', p.drug_name ?? '', toNum(p.drug_qty), p.drug_units ?? '', p.department_name ?? '',
-      p.main_pdx ?? '', p.pdx ?? '', p.dx0 ?? '', p.dx1 ?? '', p.dx2 ?? '', p.dx3 ?? '', p.dx4 ?? '', p.dx5 ?? '',
+      p.main_pdx ?? '', p.pdx ?? '', p.dx0 ?? '', p.dx1 ?? '', p.dx2 ?? '', p.dx3 ?? '', p.dx4 ?? '', p.dx5 ?? '', ...(hasDxMore ? [p.dx_more ?? ''] : []),
       p.doctor_code ?? '', p.doctor_name ?? '', p.audit_status,
     ])
     for (let i = 0; i < values.length; i += 500) {
       await dw.query(
         `INSERT INTO dw_hd_check_prescriptions
          (vn, visit_date, visit_time, hn, patient_name, pttype_name, drug_icode, drug_name, drug_qty, drug_units, department_name,
-          main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5, doctor_code, doctor_name, audit_status)
+          main_pdx, pdx, dx0, dx1, dx2, dx3, dx4, dx5${hasDxMore ? ', dx_more' : ''}, doctor_code, doctor_name, audit_status)
          VALUES ?`,
         [values.slice(i, i + 500)]
       )

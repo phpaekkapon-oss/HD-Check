@@ -1,7 +1,7 @@
 // Rule-based explanation of a herbal-drug audit row (no DB access, unit-testable).
 // Tells staff what is missing, what was probably keyed wrong, and where to fix it in HOSxP.
 import { normalizeIcdCode } from './config.mjs'
-import { isThaiMedRow } from './audit-rules.mjs'
+import { isThaiMedRow, dxCodesOf } from './audit-rules.mjs'
 
 const VALID_ICD_RE = /^[A-Z]\d{2,6}$/
 
@@ -23,7 +23,7 @@ export function analyzeHerbRecord(record, allowedRaw = [], indication = '') {
   const modernAllowed = allowed.filter((p) => !p.startsWith('U'))
   const uAllowed = allowed.filter((p) => p.startsWith('U'))
   const effectiveModern = modernAllowed.length > 0 ? modernAllowed : allowed
-  const dx = [...new Set([record.pdx, record.dx0, record.dx1, record.dx2, record.dx3, record.dx4, record.dx5]
+  const dx = [...new Set(dxCodesOf(record)
     .map(normalizeIcdCode).filter(Boolean))]
   const uDx = dx.filter((c) => c.startsWith('U'))
   const modernDx = dx.filter((c) => !c.startsWith('U'))
