@@ -19,7 +19,9 @@ const shiftDay = (iso: string, delta: number) => {
   d.setDate(d.getDate() + delta)
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 }
-type Mode = 'day' | 'week' | 'month'
+type Mode = 'day' | 'week' | 'month' | 'range'
+/** เพดานช่วงวันที่ตรงกับฝั่งเซิร์ฟเวอร์ (MAX_RANGE_DAYS = 370) */
+const MAX_RANGE_DAYS = 370
 
 /** วันจันทร์ของสัปดาห์ที่มีวันที่นี้อยู่ (สัปดาห์นับ จันทร์–อาทิตย์) */
 const mondayOf = (iso: string) => shiftDay(iso, -((new Date(`${iso}T00:00:00`).getDay() + 6) % 7))
@@ -28,7 +30,8 @@ const weekRange = (monday: string, today: string): DateRange => {
   const sunday = shiftDay(monday, 6)
   return { startDate: monday, endDate: sunday > today ? today : sunday }
 }
-const MODE_LABEL: Record<Mode, string> = { day: 'รายวัน', week: 'รายสัปดาห์', month: 'รายเดือน' }
+const MODE_LABEL: Record<Mode, string> = { day: 'รายวัน', week: 'รายสัปดาห์', month: 'รายเดือน', range: 'ช่วงวันที่' }
+const PERIOD_LABEL: Record<Exclude<Mode, 'day'>, string> = { week: 'รายสัปดาห์', month: 'รายเดือน', range: 'ตามช่วงวันที่' }
 
 const shiftMonth = (ym: string, delta: number) => {
   const [y, m] = ym.split('-').map(Number)
@@ -178,9 +181,18 @@ export const ThaiMedDailyView: FC = () => {
   const [date, setDate] = useState(todayIso)
   const [week, setWeek] = useState(() => mondayOf(todayIso()))
   const [month, setMonth] = useState(() => todayIso().slice(0, 7))
+  const [rangeStart, setRangeStart] = useState(() => shiftDay(todayIso(), -6))
+  const [rangeEnd, setRangeEnd] = useState(todayIso)
   const [editing, setEditing] = useState(false)
   const [visitsOpen, setVisitsOpen] = useState(false)
-  const range: DateRange = mode === 'day' ? { startDate: date, endDate: date } : mode === 'week' ? weekRange(week, todayIso()) : monthRange(month)
+  const range: DateRange =
+    mode === 'day'
+      ? { startDate: date, endDate: date }
+      : mode === 'week'
+        ? weekRange(week, todayIso())
+        : mode === 'month'
+          ? monthRange(month)
+          : { startDate: rangeStart, endDate: rangeEnd }
   const { data, isLoading, isError, error, dataUpdatedAt, isFetching } = useThaiMedDaily(range, true)
   const { data: live } = useRealtimeStatus()
   const updatedAt = dataUpdatedAt ? new Date(dataUpdatedAt).toLocaleTimeString('th-TH', { hour12: false }) : '–'
@@ -202,6 +214,19 @@ export const ThaiMedDailyView: FC = () => {
   const changeMonth = (next: string) => {
     setEditing(false)
     setMonth(next)
+  }
+  // เลือกวันเริ่ม/สิ้นสุด: ถ้าสลับกันหรือเกิน 370 วัน ให้ดึงอีกฝั่งตามมาเพื่อให้ช่วงถูกต้องเสมอ
+  const changeRangeStart = (next: string) => {
+    setEditing(false)
+    setRangeStart(next)
+    if (next > rangeEnd) setRangeEnd(next)
+    else if (Date.parse(rangeEnd) - Date.parse(next) > MAX_RANGE_DAYS * 86_400_000) setRangeEnd(shiftDay(next, MAX_RANGE_DAYS))
+  }
+  const changeRangeEnd = (next: string) => {
+    setEditing(false)
+    setRangeEnd(next)
+    if (next < rangeStart) setRangeStart(next)
+    else if (Date.parse(next) - Date.parse(rangeStart) > MAX_RANGE_DAYS * 86_400_000) setRangeStart(shiftDay(next, -MAX_RANGE_DAYS))
   }
   const changeMode = (next: Mode) => {
     setEditing(false)
@@ -246,10 +271,10 @@ export const ThaiMedDailyView: FC = () => {
           </span>
           <div>
             <h2 className="text-base font-bold text-slate-800 dark:text-slate-100">
-              {mode === 'day' ? 'สรุปผลการดำเนินงานประจำวัน' : mode === 'week' ? 'สรุปผลการดำเนินงานประจำสัปดาห์' : 'สรุปผลการดำเนินงานประจำเดือน'}
+              {mode === 'day' ? 'สรุปผลการดำเนินงานประจำวัน' : mode === 'week' ? 'สรุปผลการดำเนินงานประจำสัปดาห์' : mode === 'month' ? 'สรุปผลการดำเนินงานประจำเดือน' : 'สรุปผลการดำเนินงานตามช่วงวันที่'}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · {mode === 'day' ? `วัน${weekdayOf(date)}ที่ ${toThaiDateLong(date)}` : mode === 'week' ? `${toThaiDateShort(range.startDate)} – ${toThaiDateShort(range.endDate)}` : monthLabel(month)}
+              กลุ่มงานแพทย์แผนไทยและการแพทย์ทางเลือก · {mode === 'day' ? `วัน${weekdayOf(date)}ที่ ${toThaiDateLong(date)}` : mode === 'week' || mode === 'range' ? `${toThaiDateShort(range.startDate)} – ${toThaiDateShort(range.endDate)}` : monthLabel(month)}
             </p>
             <p className="mt-0.5 inline-flex items-center gap-1.5 text-[11px] font-semibold" aria-live="polite">
               <span className={`size-2 rounded-full ${live?.healthy === false ? 'bg-amber-500' : 'bg-emerald-500'} ${isFetching ? 'animate-pulse' : ''}`} aria-hidden />
@@ -264,7 +289,7 @@ export const ThaiMedDailyView: FC = () => {
         </div>
         <div className="flex flex-wrap items-center gap-1.5">
           <div role="group" aria-label="ช่วงเวลา" className="flex rounded-lg border border-themed overflow-hidden text-xs font-semibold">
-            {(['day', 'week', 'month'] as const).map((m) => (
+            {(['day', 'week', 'month', 'range'] as const).map((m) => (
               <button
                 key={m}
                 type="button"
@@ -323,6 +348,13 @@ export const ThaiMedDailyView: FC = () => {
               >
                 สัปดาห์นี้
               </button>
+            </>
+          ) : mode === 'range' ? (
+            <>
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">จาก</span>
+              <ThaiCalendarPicker mode="day" value={rangeStart} max={todayIso()} onChange={changeRangeStart} />
+              <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">ถึง</span>
+              <ThaiCalendarPicker mode="day" value={rangeEnd} max={todayIso()} onChange={changeRangeEnd} />
             </>
           ) : (
             <>
@@ -547,7 +579,7 @@ export const ThaiMedDailyView: FC = () => {
           )}
           {mode !== 'day' && data.outreach.manualDays > 0 && (
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              ยอดออกชุมชน{mode === 'week' ? 'รายสัปดาห์' : 'รายเดือน'}รวมจากรายวัน · มี {fmtNum(data.outreach.manualDays)} วันที่เจ้าหน้าที่กรอกเอง (แก้ไขได้ในโหมดรายวัน)
+              ยอดออกชุมชน{PERIOD_LABEL[mode]}รวมจากรายวัน · มี {fmtNum(data.outreach.manualDays)} วันที่เจ้าหน้าที่กรอกเอง (แก้ไขได้ในโหมดรายวัน)
             </p>
           )}
 
@@ -635,7 +667,7 @@ export const ThaiMedDailyView: FC = () => {
               </table>
               <p className="px-3 py-2 text-[11px] text-slate-500 dark:text-slate-400">
                 ยอดเงินประมาณการจากรายการค่าบริการใน HOSxP (opitemrece) แยกกลุ่มสิทธิตาม hipdata_code ของสิทธิในวันที่รับบริการ
-                {mode !== 'day' && ` · ${mode === 'week' ? 'รายสัปดาห์' : 'รายเดือน'}นับผู้รับบริการไม่ซ้ำคนในแต่ละสิทธิ`}
+                {mode !== 'day' && ` · ${PERIOD_LABEL[mode]}นับผู้รับบริการไม่ซ้ำคนในแต่ละสิทธิ`}
               </p>
             </div>
 

@@ -31,6 +31,31 @@ function checkManifest(m, label) {
   return resolveId(m.id, mp)
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
+const READY_TIMEOUT_MS = 120_000
+const READY_INTERVAL_MS = 5_000
+
+/** ถามซ้ำทุก 5 วินาทีจนเซิร์ฟเวอร์ตอบ 2xx (สูงสุด 2 นาที) แล้วคืนผลล่าสุด */
+async function waitUntilReady(p) {
+  const started = Date.now()
+  let last = null
+  let announced = false
+  for (;;) {
+    try {
+      last = await fetch(ORIGIN + p, { signal: AbortSignal.timeout(15000) })
+      if (last.ok) {
+        if (announced) console.log(`  [OK] เซิร์ฟเวอร์พร้อมแล้ว (รอ ${Math.round((Date.now() - started) / 1000)} วินาที)`)
+        return last
+      }
+    } catch (e) {
+      last = { ok: false, status: e.message }
+    }
+    if (Date.now() - started >= READY_TIMEOUT_MS) return last
+    if (!announced) { console.log(`  [..] เซิร์ฟเวอร์ตอบ ${last.status} — กำลังรอให้ระบบเริ่มทำงานหลังอัปโหลด`); announced = true }
+    await sleep(READY_INTERVAL_MS)
+  }
+}
+
 async function main() {
   if (!live) {
     console.log('[*] ตรวจไฟล์ PWA ในโปรเจกต์')
@@ -63,7 +88,8 @@ async function main() {
       const res = await fetch(ORIGIN + p, { signal: AbortSignal.timeout(15000) })
       return res
     }
-    const mine = await get(APP + 'manifest.webmanifest')
+    // หลังอัปโหลด เซิร์ฟเวอร์ต้อง restart ระบบก่อน (ช่วงนั้นตอบ 502/503/504) จึงรอจนพร้อมแล้วค่อยตรวจ ไม่ถือว่าล้มเหลวทันที
+    const mine = await waitUntilReady(APP + 'manifest.webmanifest')
     if (!mine.ok) { fail(`${APP}manifest.webmanifest ตอบ ${mine.status}`) } else {
       const m = await mine.json()
       const myId = checkManifest(m, 'manifest (live)')

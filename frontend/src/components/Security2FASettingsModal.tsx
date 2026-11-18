@@ -1003,6 +1003,48 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
     })
   }
 
+  // กำหนด/ถอดสิทธิ์ "หน.แผนไทย" แบบกลุ่ม (ไม่ให้สิทธิ์ Admin เต็ม)
+  const handleBatchThaiMedAdmin = (enabled: boolean) => {
+    if (selectedLogins.size === 0) return
+    const action = enabled ? 'กำหนดสิทธิ์ หน.แผนไทย' : 'ถอดสิทธิ์ หน.แผนไทย'
+    promptConfirm({
+      title: `ยืนยัน${action}แบบกลุ่ม`,
+      description: `ยืนยัน${action}ให้ผู้ใช้ที่เลือกไว้จำนวน ${selectedLogins.size} คน หรือไม่?`,
+      detail: enabled
+        ? 'ผู้ใช้ที่เลือกจะเห็นการ์ดมูลค่าบริการแผนกแพทย์แผนไทยบนหน้าแรก โดยไม่ได้สิทธิ์ผู้ดูแลระบบอื่น (ข้ามคนที่เป็น Admin อยู่แล้ว)'
+        : 'ผู้ใช้ที่เลือกจะไม่เห็นการ์ดมูลค่าบริการบนหน้าแรกอีก',
+      confirmText: `${action} (${selectedLogins.size} คน)`,
+      variant: enabled ? 'primary' : 'danger',
+      icon: enabled ? 'shield-check' : 'shield-alert',
+      onConfirm: async () => {
+        setIsBatchProcessing(true)
+        let successCount = 0
+        let failCount = 0
+        for (const login of selectedLogins) {
+          const item = usersList.find((u) => u.loginname.toLowerCase() === login.toLowerCase())
+          if (item && isUserAdmin(item)) continue
+          try {
+            const res = await fetch(`/api/admin/users/${encodeURIComponent(login)}/thaimed-admin`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ enabled }),
+            })
+            const data = await res.json()
+            if (data.success) successCount++
+            else failCount++
+          } catch {
+            failCount++
+          }
+        }
+        setAdminNotice(`${action}สำเร็จ ${successCount} คน${failCount > 0 ? ` (ผิดพลาด ${failCount} คน)` : ''} ผู้ใช้ต้องออกจากระบบแล้วเข้าสู่ระบบใหม่`)
+        setSelectedLogins(new Set())
+        await fetchUsers()
+        setIsBatchProcessing(false)
+        setTimeout(() => setAdminNotice(null), 6000)
+      },
+    })
+  }
+
   // มือถือ: เลื่อนแถบแท็บให้แท็บที่เลือกอยู่กลางจอเสมอ (ไม่ให้แท็บหลุดขอบ)
   const tabsRef = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -1971,7 +2013,24 @@ export const Security2FASettingsModal: FC<Security2FASettingsModalProps> = ({
                       <span className="font-semibold text-white">เลือกไว้ {selectedLogins.size} คน</span>
                       <span className="text-violet-300/80 hidden sm:inline">จากรายการที่แสดง</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        disabled={isBatchProcessing}
+                        onClick={() => handleBatchThaiMedAdmin(true)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs transition cursor-pointer disabled:opacity-50"
+                      >
+                        {isBatchProcessing ? <Loader2 className="size-3 animate-spin" /> : <ShieldCheck className="size-3" />}
+                        <span>กำหนดเป็น หน.แผนไทย ({selectedLogins.size})</span>
+                      </button>
+                      <button
+                        type="button"
+                        disabled={isBatchProcessing}
+                        onClick={() => handleBatchThaiMedAdmin(false)}
+                        className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-semibold bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/30 transition cursor-pointer disabled:opacity-50"
+                      >
+                        <span>ถอด หน.แผนไทย</span>
+                      </button>
                       <button
                         type="button"
                         disabled={isBatchProcessing}
